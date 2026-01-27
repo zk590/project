@@ -1,0 +1,21 @@
+[package]
+name = "rsa"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "rsa"
+path = "src/main.rs"
+
+[[bin]]
+name = "rsa_batch"
+path = "src/main_batch.rs"
+
+[dependencies]
+rsa = { git = "https://github.com/sp1-patches/RustCrypto-RSA", tag = "patch-0.9.6-sp1-5.0.0" }
+sha2 = {version =  "0.10.8",package = "sha2", features = ["oid"]}  
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+common = {path="../common"}
+clap = { version = "4.4.8", features = ["derive"] }
+hex = "0.4.3"

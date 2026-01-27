@@ -1,0 +1,16 @@
+[package]
+name = "zkvm-verifier-script"
+version = "1.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+sp1-sdk = "5.0.8"
+rkyv = { version = "0.7.45", features = ["std", "validation"] }
+clap = { version = "4.4.0", features = ["derive"] }
+
+[build-dependencies]
+sp1-build = "5.0.8"
+
+[features]
+cuda = ["sp1-sdk/cuda"]

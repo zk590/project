@@ -1,0 +1,21 @@
+[package]
+name = "schnorr-host"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+default-run = "schnorr-host"
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+clap = { workspace = true }
+dotenv = { workspace = true }
+hex = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+rkyv = { version = "0.7.45", features = ["std", "validation"] }
+schnorr-lib = { path = "../lib" }
+zkm-sdk = { workspace = true }
+
+[build-dependencies]
+zkm-build = { workspace = true }

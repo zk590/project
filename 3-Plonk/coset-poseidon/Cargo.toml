@@ -1,0 +1,41 @@
+[package]
+name = "coset-poseidon"
+version = "0.41.0"
+edition = "2021"
+
+[dependencies]
+coset-bls12_381 = { path = "../coset-bls12_381", package = "coset-bls12_381", default-features = false, features = ["zeroize"] }
+coset-jubjub = { path = "../coset-jubjub", package = "coset-jubjub", default-features = false }
+plonk = {path="../plonk", package="plonk", default-features = false, features = ["alloc", "zeroize"], optional = true }
+dusk-safe = "0.3"
+
+[dev-dependencies]
+criterion = "0.5"
+rand = { version = "0.8", default-features = false, features = ["getrandom", "std_rng"] }
+ff = { version = "0.13", default-features = false }
+once_cell = "1"
+coset-bytes = { path = "../coset-bytes/bytes", package = "coset-bytes"}
+
+[features]
+zk = [
+    "plonk",
+]
+encryption = ["dusk-safe/encryption"]
+
+[profile.dev]
+opt-level = 3
+debug = false
+rpath = false
+lto = false
+debug-assertions = false
+codegen-units = 16
+panic = 'unwind'
+incremental = false
+overflow-checks = false
+
+[profile.release]
+debug = false
+panic = 'abort'
+lto = true
+incremental = false
+codegen-units = 1

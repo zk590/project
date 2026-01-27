@@ -1,0 +1,9 @@
+[package]
+name = "fibonacci_add"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rkyv = { version = "0.7.45", features = ["std", "alloc", "validation"] }
+clap = { version = "4.4.8", features = ["derive"] }
+common = {path="../common"}

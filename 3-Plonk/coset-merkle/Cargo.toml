@@ -1,0 +1,29 @@
+[package]
+name = "coset-merkle"
+version = "0.5.3"
+categories = ["data-structures", "no-std"]
+edition = "2021"
+
+
+[dependencies]
+coset-bytes = { path = "../coset-bytes/bytes", package = "coset-bytes"}
+rkyv = { version = "0.7", optional = true, default-features = false }
+bytecheck = { version = "0.6", optional = true, default-features = false }
+
+[dev-dependencies]
+blake3 = "1"
+rand = "0.8"
+coset-bls12_381 = { path = "../coset-bls12_381", package = "coset-bls12_381"}
+ff = { version = "0.13", default-features = false }
+criterion = "0.3"
+
+[features]
+size_16 = ["rkyv/size_16"]
+size_32 = ["rkyv/size_32"]
+size_64 = ["rkyv/size_64"]
+rkyv-impl = [
+    "rkyv/validation",
+    "rkyv/alloc",
+    "rkyv",
+    "bytecheck",
+]

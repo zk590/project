@@ -1,0 +1,6 @@
+Hello, world!
+This is a test message for Schnorr signature.
+Batch processing of multiple messages.
+Schnorr signatures are efficient.
+Another example message.
+Let's test six messages in total.

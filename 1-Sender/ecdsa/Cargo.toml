@@ -1,0 +1,22 @@
+[package]
+name = "ecdsa"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "ecdsa"
+path = "src/main.rs"
+
+[[bin]]
+name = "ecdsa_batch"
+path = "src/main_batch.rs"
+
+[dependencies]
+k256 = { git = "https://github.com/sp1-patches/elliptic-curves", tag = "patch-k256-13.4-sp1-5.0.0",default-features = false, features = ["ecdsa", "serde", "alloc"] }
+ecdsa = { git = "https://github.com/sp1-patches/signatures", tag = "patch-16.9-sp1-4.1.0", features = ["verifying"] }
+clap = { version = "4.4.8", features = ["derive"] }
+hex = "0.4.3"
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+common = {path="../common"}
+rand = "0.8.5"

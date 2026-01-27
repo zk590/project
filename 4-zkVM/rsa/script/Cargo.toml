@@ -1,0 +1,23 @@
+[package]
+name = "rsa-script"
+version = { workspace = true }
+edition = { workspace = true }
+default-run = "rsa-script"
+publish = false
+
+[dependencies]
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+hex = { workspace = true }
+rsa = { git = "https://github.com/sp1-patches/RustCrypto-RSA", tag = "patch-0.9.6-sp1-5.0.0" }
+sha2 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", features = ["oid"], tag = "patch-sha2-0.10.9-sp1-4.0.0" }
+sp1-sdk = { workspace = true }
+common = { workspace = true }
+
+[build-dependencies]
+sp1-build = "5.0.8"
+
+
+[[bin]]
+name = "rsa-script"
+path = "src/main.rs"

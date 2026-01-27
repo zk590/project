@@ -1,0 +1,22 @@
+[package]
+name = "keccak"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "keccak"
+path = "src/main.rs"
+
+[[bin]]
+name = "keccak_batch"
+path = "src/main_batch.rs"
+
+[dependencies]
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+common = {path="../common"}
+tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "patch-v2.0.2", features = [
+  "keccak",
+] }
+clap = { version = "4.4.8", features = ["derive"] }
+hex = "0.4.3"

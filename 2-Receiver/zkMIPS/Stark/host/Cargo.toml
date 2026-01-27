@@ -1,0 +1,14 @@
+
+[package]
+name = "plonk-verifier-host"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+zkm-zkvm = { git = "https://github.com/zkMIPS/zkMIPS.git" }
+zkm-sdk = { git = "https://github.com/zkMIPS/zkMIPS.git" }
+rkyv = { version = "0.7.45", features = ["std", "validation"] }
+
+[build-dependencies]
+zkm-build = { git = "https://github.com/zkMIPS/zkMIPS.git" }

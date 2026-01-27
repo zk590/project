@@ -1,0 +1,7 @@
+Hello, world!
+This is a test message.
+SHA-256 hashing is cool.
+Batch processing is efficient.
+Let's try some special characters: !@#$%^&*()
+1234567890
+The quick brown fox jumps over the lazy dog

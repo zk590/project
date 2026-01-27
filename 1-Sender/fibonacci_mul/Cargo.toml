@@ -1,0 +1,9 @@
+[package]
+name = "fibonacci_mul"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rkyv = { version = "0.7.44", features = ["std", "alloc", "validation"] }
+clap = { version = "4.4.0", features = ["derive"] }
+common = { path = "/opt/sp10924/application/common" }

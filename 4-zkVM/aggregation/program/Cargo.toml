@@ -1,0 +1,9 @@
+[package]
+name = "aggregation-program"
+version = "1.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+sha2 = { git = "https://github.com/succinctbot/RustCrypto-hashes.git" }
+sp1-zkvm = {version = "5.0.8", features = ["verify"]}

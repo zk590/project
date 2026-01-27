@@ -1,0 +1,51 @@
+# 编译输出
+target/
+**/target/
+
+# Cargo相关文件
+Cargo.lock
+**/Cargo.lock
+
+# 编辑器配置
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 操作系统文件
+.DS_Store
+Thumbs.db
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 生成的二进制文件
+*.bin
+*.exe
+
+# 测试数据文件
+test_1m_text.txt
+
+# 密钥文件
+*.der
+*.pem
+
+# Docker相关
+*.json
+
+# 证明文件
+**/circuit_prove.bin
+
+# 验证密钥文件
+**/vk_map.bin
+
+# 核心转储文件
+core.*
+
+# 其他临时文件
+*.log
+*.tmp
+*.bak

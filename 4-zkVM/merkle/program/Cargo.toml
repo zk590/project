@@ -1,0 +1,14 @@
+[package]
+name = "merkle-program"
+version = "1.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+sp1-zkvm = { workspace = true }
+coset-bls12_381 = { workspace = true }
+plonk = { workspace = true, features = ["std"] }
+poseidon-merkle = { path = "../../../3-Plonk/poseidon-merkle", package = "poseidon-merkle", features = ["zk", "rkyv-impl"] }
+common = { workspace = true }
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }

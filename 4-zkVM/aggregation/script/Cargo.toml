@@ -1,0 +1,19 @@
+[package]
+name = "aggregation_script"
+version = "1.1.0"
+edition = "2024"
+
+[dependencies]
+sp1-sdk = { workspace = true }
+tracing = { workspace = true }
+hex = "0.4"
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+common = { workspace = true }
+clap = { version = "4.4", features = ["derive"] }
+thiserror = "1.0.40"
+plonk = {workspace = true, features = ["std"] }
+coset-bytes = {workspace = true }
+
+[build-dependencies]
+sp1-build = "5.0.8"

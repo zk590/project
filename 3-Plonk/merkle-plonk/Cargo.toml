@@ -1,0 +1,34 @@
+[package]
+name = "merkle-plonk"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+serde_json = { version = "1.0", default-features = false, features = ["alloc"] }
+serde = { version = "1.0.200", default-features = false, features = ["derive"] }
+clap = { version = "4.0", features = ["derive", "env"] }
+tracing = "0.1.40"
+hex = "0.4.3"
+dotenv = "0.15.0"
+rand = "0.8.5"  # 添加随机数生成库依赖
+coset-bls12_381 = { path = "../coset-bls12_381", package = "coset-bls12_381"}
+coset-poseidon = { path = "../coset-poseidon" }
+plonk = {path = "../plonk", package="plonk", features = ["std"] }
+poseidon-merkle = { path = "../poseidon-merkle", features = ["zk"] }
+alloy-sol-types = "1.0"
+blake3 = "1.5.1"
+chrono = "0.4.38"
+coset-bytes = { path = "../coset-bytes/bytes", package = "coset-bytes"}
+bincode = "1.3"
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
+rkyv_derive = { version = "0.7.45" }
+common = {path = "../../1-Sender/common"}
+
+[[bin]]
+name = "batch_merkle_proof"
+path = "src/batch_main.rs"
+
+
+[[bin]]
+name = "merkle_proof"
+path = "src/main.rs"

@@ -1,0 +1,17 @@
+[package]
+version = "0.1.0"
+name = "coset-program"
+edition = "2021"
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+alloy-primitives = "0.6.4"
+sp1-zkvm = "5.0.8"
+coset-lib = { path = "../lib" } 
+coset-bls12_381 = { workspace = true }
+coset-poseidon = { workspace = true }
+plonk = { workspace = true , features = ["std"] }
+poseidon-merkle = {  workspace = true , features = ["zk"] }
+rand = "0.8.5"
+coset-bytes = { workspace = true }
+merkle = { workspace = true }
