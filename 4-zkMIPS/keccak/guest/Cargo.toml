@@ -1,0 +1,11 @@
+[package]
+name = "keccak"
+version = "1.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+keccak-lib = { path = "../lib" }
+tiny-keccak = { version = "2.0", features = ["keccak"] }
+zkm-zkvm.workspace = true

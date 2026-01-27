@@ -1,0 +1,11 @@
+[package]
+name = "aggregation"
+version = "1.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+alloy-sol-types.workspace = true
+aggregation-lib = { path = "../lib" }
+sha2 = { git = "https://github.com/ziren-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-0.10.8" }
+zkm-zkvm.workspace = true

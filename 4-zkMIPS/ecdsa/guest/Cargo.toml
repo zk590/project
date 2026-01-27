@@ -1,0 +1,12 @@
+[package]
+name = "ecdsa"
+version = "1.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+ecdsa-lib = { path = "../lib" }
+k256 = { git = "https://github.com/ziren-patches/elliptic-curves", branch = "patch-k256-0.13.4", default-features = false, features = ["ecdsa", "serde", "alloc"] }
+ecdsa = { git = "https://github.com/ziren-patches/signatures", package = "ecdsa", branch = "patch-ecdsa-0.16.9", features = ["verifying"] }
+zkm-zkvm = { workspace = true }

@@ -1,0 +1,24 @@
+[package]
+name = "fibonacci-add-host"
+version = "1.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+alloy-sol-types = { workspace = true }
+clap = { workspace = true }
+common = { path = "/opt/project/1-Sender/common" }
+dotenv = { workspace = true }
+hex = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true }
+fibonacci-add-lib = { path = "../lib", features = ["host"] }
+rkyv = { version = "0.7.45", features = ["std", "validation"] }
+zkm-sdk = { workspace = true }
+
+[build-dependencies]
+zkm-build = { workspace = true }
+
+[[bin]]
+name = "fibonacci-add"
+path = "src/main.rs"
