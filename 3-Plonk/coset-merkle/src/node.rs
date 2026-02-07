@@ -34,17 +34,22 @@ where
             let empty_subtree = &T::EMPTY_SUBTREE;
             let mut item_refs = [empty_subtree; A];
 
-            let child_items: [Option<Ref<T>>; A] = init_array(|i| {
-                self.children[i].as_ref().map(|item| item.item())
+            let child_items: [Option<Ref<T>>; A] = init_array(|child_index| {
+                self.children[child_index]
+                    .as_ref()
+                    .map(|child_node| child_node.item())
             });
 
             let mut has_children = false;
-            item_refs.iter_mut().zip(&child_items).for_each(|(r, c)| {
-                if let Some(c) = c {
-                    *r = c;
-                    has_children = true;
-                }
-            });
+            item_refs
+                .iter_mut()
+                .zip(&child_items)
+                .for_each(|(item_ref_slot, child_item)| {
+                    if let Some(child_item) = child_item {
+                        *item_ref_slot = child_item;
+                        has_children = true;
+                    }
+                });
 
             if has_children {
                 self.item.replace(Some(T::aggregate(item_refs)));
@@ -83,14 +88,14 @@ where
 
         let (child_index, child_pos) = Self::child_location(height, position);
 
-        let child = &mut self.children[child_index];
-        if child.is_none() {
-            *child = Some(Box::new(Node::new()));
+        let selected_child = &mut self.children[child_index];
+        if selected_child.is_none() {
+            *selected_child = Some(Box::new(Node::new()));
         }
 
         // We just inserted a child at the given index.
-        let child = self.children[child_index].as_mut().unwrap();
-        Self::insert(child, height + 1, child_pos, item);
+        let selected_child = self.children[child_index].as_mut().unwrap();
+        Self::insert(selected_child, height + 1, child_pos, item);
     }
 
     /// Returns the removed element, together with if there are any siblings
@@ -108,19 +113,19 @@ where
 
         let (child_index, child_pos) = Self::child_location(height, position);
 
-        let child = self.children[child_index]
+        let selected_child = self.children[child_index]
             .as_mut()
             .expect("There should be a child at this position");
         let (removed_item, child_has_children) =
-            Self::remove(child, height + 1, child_pos);
+            Self::remove(selected_child, height + 1, child_pos);
 
         if !child_has_children {
             self.children[child_index] = None;
         }
 
         let mut has_children = false;
-        for child in &self.children {
-            if child.is_some() {
+        for child_node in &self.children {
+            if child_node.is_some() {
                 has_children = true;
                 break;
             }

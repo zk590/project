@@ -52,20 +52,30 @@ mod alloc {
             let kappa_cu = kappa_sq * kappa;
             let kappa_qu = kappa_cu * kappa;
 
-            let a = evaluations.a_w_eval - four * evaluations.a_eval;
-            let c_0 = delta(a);
+            let a_shift_delta_input =
+                evaluations.a_w_eval - four * evaluations.a_eval;
+            let c_0 = delta(a_shift_delta_input);
 
-            let b = evaluations.b_w_eval - four * evaluations.b_eval;
-            let c_1 = delta(b) * kappa;
+            let b_shift_delta_input =
+                evaluations.b_w_eval - four * evaluations.b_eval;
+            let c_1 = delta(b_shift_delta_input) * kappa;
 
-            let d = evaluations.d_w_eval - four * evaluations.d_eval;
-            let c_2 = delta(d) * kappa_sq;
+            let d_shift_delta_input =
+                evaluations.d_w_eval - four * evaluations.d_eval;
+            let c_2 = delta(d_shift_delta_input) * kappa_sq;
 
-            let w = evaluations.c_eval;
-            let c_3 = (w - a * b) * kappa_cu;
+            let wire_w_eval = evaluations.c_eval;
+            let c_3 =
+                (wire_w_eval - a_shift_delta_input * b_shift_delta_input)
+                    * kappa_cu;
 
-            let c_4 =
-                delta_xor_and(&a, &b, &w, &d, &evaluations.q_c_eval) * kappa_qu;
+            let c_4 = delta_xor_and(
+                &a_shift_delta_input,
+                &b_shift_delta_input,
+                &wire_w_eval,
+                &d_shift_delta_input,
+                &evaluations.q_c_eval,
+            ) * kappa_qu;
             scalars.push(
                 (c_0 + c_1 + c_2 + c_3 + c_4) * logic_separation_challenge,
             );

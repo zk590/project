@@ -159,17 +159,17 @@ impl Composer {
     /// Initialize the constraint system with the constants for 0 and 1 and
     /// append two dummy gates
     pub fn initialized() -> Self {
-        let mut slf = Self::uninitialized();
+        let mut composer = Self::uninitialized();
 
-        let zero = slf.append_witness(0);
-        let one = slf.append_witness(1);
+        let zero = composer.append_witness(0);
+        let one = composer.append_witness(1);
 
-        slf.assert_equal_constant(zero, 0, None);
-        slf.assert_equal_constant(one, 1, None);
+        composer.assert_equal_constant(zero, 0, None);
+        composer.assert_equal_constant(one, 1, None);
 
-        slf.append_dummy_gates();
+        composer.append_dummy_gates();
 
-        slf
+        composer
     }
 
     /// Create an empty constraint system.

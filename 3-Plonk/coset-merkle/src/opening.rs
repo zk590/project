@@ -29,13 +29,14 @@ where
     /// # Panics
     /// If the given `position` is not in the `tree`.
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
-        let positions = [0; H];
-        let branch = init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
+        let opening_positions = [0; H];
+        let opening_branch =
+            init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
 
         let mut opening = Self {
             root: tree.root.item().clone(),
-            branch,
-            positions,
+            branch: opening_branch,
+            positions: opening_positions,
         };
         fill_opening(&mut opening, &tree.root, 0, position);
 
@@ -65,20 +66,20 @@ where
     {
         let mut item = item.into();
 
-        for h in (0..H).rev() {
-            let level = &self.branch[h];
-            let position = self.positions[h];
+        for level_index in (0..H).rev() {
+            let level_branch = &self.branch[level_index];
+            let level_position = self.positions[level_index];
 
             // if the computed item doesn't match the stored item at the given
             // position, the opening is incorrect
-            if item != level[position] {
+            if item != level_branch[level_position] {
                 return false;
             }
 
             let empty_subtree = &T::EMPTY_SUBTREE;
 
             let mut item_refs = [empty_subtree; A];
-            item_refs.iter_mut().zip(&self.branch[h]).for_each(
+            item_refs.iter_mut().zip(level_branch).for_each(
                 |(r, item_ref)| {
                     *r = item_ref;
                 },
@@ -113,11 +114,11 @@ where
         }
 
         // serialize positions
-        for pos in self.positions {
+        for position_index in self.positions {
             // the positions will be in the range [0..A[, so casting to u32
             // is never going to be a problem
             #[allow(clippy::cast_possible_truncation)]
-            bytes.extend(&(pos as u32).to_bytes());
+            bytes.extend(&(position_index as u32).to_bytes());
         }
 
         bytes
@@ -163,8 +164,8 @@ where
 
         // deserialize positions
         let mut positions = [0usize; H];
-        for pos in &mut positions {
-            *pos = u32::from_reader(&mut bytes)? as usize;
+        for position_slot in &mut positions {
+            *position_slot = u32::from_reader(&mut bytes)? as usize;
         }
 
         Ok(Self {
@@ -187,13 +188,13 @@ fn fill_opening<T, const H: usize, const A: usize>(
         return;
     }
 
-    let (child_index, child_pos) =
+    let (child_index, child_position) =
         Node::<T, H, A>::child_location(height, position);
     let child = node.children[child_index]
         .as_ref()
         .expect("There should be a child at this position");
 
-    fill_opening(opening, child, height + 1, child_pos);
+    fill_opening(opening, child, height + 1, child_position);
 
     for i in 0..A {
         if let Some(child) = &node.children[i] {

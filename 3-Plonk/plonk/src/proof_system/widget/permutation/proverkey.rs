@@ -57,14 +57,14 @@ impl ProverKey {
         beta: &BlsScalar,
         gamma: &BlsScalar,
     ) -> BlsScalar {
-        let a = self.compute_quotient_identity_range_check_i(
+        let identity_term = self.compute_quotient_identity_range_check_i(
             index, a_i, b_i, c_i, d_i, z_i, alpha, beta, gamma,
         );
-        let b = self.compute_quotient_copy_range_check_i(
+        let copy_term = self.compute_quotient_copy_range_check_i(
             index, a_i, b_i, c_i, d_i, z_i_w, alpha, beta, gamma,
         );
-        let c = self.compute_quotient_term_check_one_i(z_i, l1_alpha_sq);
-        a + b + c
+        let one_check_term = self.compute_quotient_term_check_one_i(z_i, l1_alpha_sq);
+        identity_term + copy_term + one_check_term
     }
     // (a(x) + beta * X + gamma) (b(X) + beta * k1 * X + gamma) (o(X) + beta *
     // k2 * X + gamma)(d(X) + beta * k3 * X + gamma)z(X) * alpha
@@ -80,12 +80,12 @@ impl ProverKey {
         beta: &BlsScalar,
         gamma: &BlsScalar,
     ) -> BlsScalar {
-        let x = self.linear_evaluations[index];
+        let domain_point = self.linear_evaluations[index];
 
-        (a_i + (beta * x) + gamma)
-            * (b_i + (beta * K1 * x) + gamma)
-            * (c_i + (beta * K2 * x) + gamma)
-            * (d_i + (beta * K3 * x) + gamma)
+        (a_i + (beta * domain_point) + gamma)
+            * (b_i + (beta * K1 * domain_point) + gamma)
+            * (c_i + (beta * K2 * domain_point) + gamma)
+            * (d_i + (beta * K3 * domain_point) + gamma)
             * z_i
             * alpha
     }
@@ -145,13 +145,13 @@ impl ProverKey {
         z_eval: &BlsScalar,
         z_poly: &Polynomial,
     ) -> Polynomial {
-        let a = self.compute_linearizer_identity_range_check(
+        let identity_linearization = self.compute_linearizer_identity_range_check(
             (a_eval, b_eval, c_eval, d_eval),
             z_challenge,
             (alpha, beta, gamma),
             z_poly,
         );
-        let b = self.compute_linearizer_copy_range_check(
+        let copy_linearization = self.compute_linearizer_copy_range_check(
             (a_eval, b_eval, c_eval),
             z_eval,
             sigma_1_eval,
@@ -163,13 +163,13 @@ impl ProverKey {
 
         // the poly is increased by 2 after blinding it
         let domain = EvaluationDomain::new(z_poly.degree() - 2).unwrap();
-        let c = self.compute_linearizer_check_is_one(
+        let one_check_linearization = self.compute_linearizer_check_is_one(
             &domain,
             z_challenge,
             &alpha.square(),
             z_poly,
         );
-        &(&a + &b) + &c
+        &(&identity_linearization + &copy_linearization) + &one_check_linearization
     }
     // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1 * z_challenge +
     // gamma)(c_eval + beta * K2 * z_challenge + gamma) * alpha z(X)
@@ -188,31 +188,31 @@ impl ProverKey {
         let beta_z = beta * z_challenge;
 
         // a_eval + beta * z_challenge + gamma
-        let mut a_0 = a_eval + beta_z;
-        a_0 += gamma;
+        let mut a_term = a_eval + beta_z;
+        a_term += gamma;
 
         // b_eval + beta * K1 * z_challenge + gamma
         let beta_z_k1 = K1 * beta_z;
-        let mut a_1 = b_eval + beta_z_k1;
-        a_1 += gamma;
+        let mut b_term = b_eval + beta_z_k1;
+        b_term += gamma;
 
         // c_eval + beta * K2 * z_challenge + gamma
         let beta_z_k2 = K2 * beta_z;
-        let mut a_2 = c_eval + beta_z_k2;
-        a_2 += gamma;
+        let mut c_term = c_eval + beta_z_k2;
+        c_term += gamma;
 
         // d_eval + beta * K3 * z_challenge + gamma
         let beta_z_k3 = K3 * beta_z;
-        let mut a_3 = d_eval + beta_z_k3;
-        a_3 += gamma;
+        let mut d_term = d_eval + beta_z_k3;
+        d_term += gamma;
 
-        let mut a = a_0 * a_1;
-        a *= a_2;
-        a *= a_3;
-        a *= alpha; // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1 *
+        let mut accumulator = a_term * b_term;
+        accumulator *= c_term;
+        accumulator *= d_term;
+        accumulator *= alpha; // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1 *
                     // z_challenge + gamma)(c_eval + beta * K2 * z_challenge + gamma)(d_eval
                     // + beta * K3 * z_challenge + gamma) * alpha
-        z_poly * &a // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1
+        z_poly * &accumulator // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1
                     // * z_challenge + gamma)(c_eval + beta * K2 * z_challenge +
                     // gamma) * alpha z(X)
     }
@@ -230,27 +230,27 @@ impl ProverKey {
     ) -> Polynomial {
         // a_eval + beta * sigma_1 + gamma
         let beta_sigma_1 = beta * sigma_1_eval;
-        let mut a_0 = a_eval + beta_sigma_1;
-        a_0 += gamma;
+        let mut a_term = a_eval + beta_sigma_1;
+        a_term += gamma;
 
         // b_eval + beta * sigma_2 + gamma
         let beta_sigma_2 = beta * sigma_2_eval;
-        let mut a_1 = b_eval + beta_sigma_2;
-        a_1 += gamma;
+        let mut b_term = b_eval + beta_sigma_2;
+        b_term += gamma;
 
         // c_eval + beta * sigma_3 + gamma
         let beta_sigma_3 = beta * sigma_3_eval;
-        let mut a_2 = c_eval + beta_sigma_3;
-        a_2 += gamma;
+        let mut c_term = c_eval + beta_sigma_3;
+        c_term += gamma;
 
         let beta_z_eval = beta * z_eval;
 
-        let mut a = a_0 * a_1 * a_2;
-        a *= beta_z_eval;
-        a *= alpha; // (a_eval + beta * sigma_1 + gamma)(b_eval + beta * sigma_2 +
+        let mut accumulator = a_term * b_term * c_term;
+        accumulator *= beta_z_eval;
+        accumulator *= alpha; // (a_eval + beta * sigma_1 + gamma)(b_eval + beta * sigma_2 +
                     // gamma)(c_eval + beta * sigma_3 + gamma) * beta * z_eval * alpha
 
-        s_sigma_4_poly * &-a // -(a_eval + beta * sigma_1 + gamma)(b_eval +
+        s_sigma_4_poly * &-accumulator // -(a_eval + beta * sigma_1 + gamma)(b_eval +
                              // beta * sigma_2 + gamma) (c_eval + beta *
                              // sigma_3 + gamma) * beta * z_eval * alpha^2 *
                              // Sigma_4(X)

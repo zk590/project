@@ -100,11 +100,12 @@ where
 
     /// Returns the root of the smallest sub-tree that holds all the leaves.
     pub fn smallest_subtree(&self) -> (Ref<T>, usize) {
-        let mut smallest_node = &self.root;
-        let mut height = H;
+        let mut current_node = &self.root;
+        let mut current_height = H;
         loop {
-            let mut children = smallest_node.children.iter().flatten();
-            match children.next() {
+            let mut non_empty_children =
+                current_node.children.iter().flatten();
+            match non_empty_children.next() {
                 // when the root has no children, the tree is empty and we
                 // return its root. This is only possible because the empty
                 // subtrees are the same for each level.
@@ -112,18 +113,20 @@ where
                 Some(child) => {
                     // if there is no more than one child and we are not at the
                     // end of the tree, we need to continue to traverse
-                    if children.next().is_none() && height > 1 {
-                        smallest_node = child;
+                    if non_empty_children.next().is_none()
+                        && current_height > 1
+                    {
+                        current_node = child;
                     }
                     // otherwise we return the item of the current node and the
                     // current height as the root and height of the smallest
                     // subtree
                     else {
-                        return (smallest_node.item(), height);
+                        return (current_node.item(), current_height);
                     }
                 }
             }
-            height -= 1;
+            current_height -= 1;
         }
     }
 
@@ -241,24 +244,24 @@ mod tests {
         const EMPTY_SUBTREE: Self = None;
 
         fn aggregate(items: [&Self; A]) -> Self {
-            let mut bh_range = None;
+            let mut block_height_range = None;
 
             for item in items {
-                bh_range = match (bh_range, item.as_ref()) {
+                block_height_range = match (block_height_range, item.as_ref()) {
                     (None, None) => None,
                     (None, Some(r)) => Some(*r),
                     (Some(r), None) => Some(r),
-                    (Some(bh_range), Some(item_bh_range)) => {
+                    (Some(existing_range), Some(item_range)) => {
                         let min =
-                            core::cmp::min(item_bh_range.min, bh_range.min);
+                            core::cmp::min(item_range.min, existing_range.min);
                         let max =
-                            core::cmp::max(item_bh_range.max, bh_range.max);
+                            core::cmp::max(item_range.max, existing_range.max);
                         Some(Range { min, max })
                     }
                 };
             }
 
-            bh_range
+            block_height_range
         }
     }
 

@@ -49,11 +49,16 @@ impl ProverKey {
         // Delta([o(X) - 4 * d(X)]) + Delta([b(X) - 4 * o(X)]) + Delta([a(X) - 4
         // * b(X)]) + Delta([d(Xg) - 4 * a(X)]) * Q_Range(X)
         //
-        let b_1 = delta(c_i - four * d_i);
-        let b_2 = delta(b_i - four * c_i) * kappa;
-        let b_3 = delta(a_i - four * b_i) * kappa_sq;
-        let b_4 = delta(d_i_w - four * a_i) * kappa_cu;
-        (b_1 + b_2 + b_3 + b_4) * q_range_i * range_separation_challenge
+        let c_minus_4d_delta = delta(c_i - four * d_i);
+        let b_minus_4c_delta = delta(b_i - four * c_i) * kappa;
+        let a_minus_4b_delta = delta(a_i - four * b_i) * kappa_sq;
+        let d_shift_minus_4a_delta = delta(d_i_w - four * a_i) * kappa_cu;
+        (c_minus_4d_delta
+            + b_minus_4c_delta
+            + a_minus_4b_delta
+            + d_shift_minus_4a_delta)
+            * q_range_i
+            * range_separation_challenge
     }
 
     pub(crate) fn compute_linearization(
@@ -71,16 +76,22 @@ impl ProverKey {
         // Delta([c_eval - 4 * d_eval]) + Delta([b_eval - 4 * c_eval]) +
         // Delta([a_eval - 4 * b_eval]) + Delta([d_w_eval - 4 * a_eval]) *
         // Q_Range(X)
-        let b_1 = delta(evaluations.c_eval - four * evaluations.d_eval);
-        let b_2 = delta(evaluations.b_eval - four * evaluations.c_eval) * kappa;
-        let b_3 =
+        let c_minus_4d_delta =
+            delta(evaluations.c_eval - four * evaluations.d_eval);
+        let b_minus_4c_delta =
+            delta(evaluations.b_eval - four * evaluations.c_eval) * kappa;
+        let a_minus_4b_delta =
             delta(evaluations.a_eval - four * evaluations.b_eval) * kappa_sq;
-        let b_4 =
+        let d_shift_minus_4a_delta =
             delta(evaluations.d_w_eval - four * evaluations.a_eval) * kappa_cu;
 
-        let t = (b_1 + b_2 + b_3 + b_4) * range_separation_challenge;
+        let combined_range_term = (c_minus_4d_delta
+            + b_minus_4c_delta
+            + a_minus_4b_delta
+            + d_shift_minus_4a_delta)
+            * range_separation_challenge;
 
-        q_range_poly * &t
+        q_range_poly * &combined_range_term
     }
 }
 

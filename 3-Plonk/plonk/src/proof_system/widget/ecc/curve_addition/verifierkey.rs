@@ -45,31 +45,31 @@ mod alloc {
         ) {
             let kappa = curve_add_separation_challenge.square();
 
-            let x_1 = evaluations.a_eval;
-            let x_3 = evaluations.a_w_eval;
-            let y_1 = evaluations.b_eval;
-            let y_3 = evaluations.b_w_eval;
-            let x_2 = evaluations.c_eval;
-            let y_2 = evaluations.d_eval;
-            let x1_y2 = evaluations.d_w_eval;
+            let point_x_left = evaluations.a_eval;
+            let point_x_output = evaluations.a_w_eval;
+            let point_y_left = evaluations.b_eval;
+            let point_y_output = evaluations.b_w_eval;
+            let point_x_right = evaluations.c_eval;
+            let point_y_right = evaluations.d_eval;
+            let x_left_mul_y_right = evaluations.d_w_eval;
 
             // Checks
             //
             // Check x1 * y2 is correct
-            let xy_consistency = x_1 * y_2 - x1_y2;
+            let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
 
-            let y1_x2 = y_1 * x_2;
-            let y1_y2 = y_1 * y_2;
-            let x1_x2 = x_1 * x_2;
+            let y_left_mul_x_right = point_y_left * point_x_right;
+            let y_left_mul_y_right = point_y_left * point_y_right;
+            let x_left_mul_x_right = point_x_left * point_x_right;
 
             // Check x_3 is correct
-            let x3_lhs = x1_y2 + y1_x2;
-            let x3_rhs = x_3 + (x_3 * (EDWARDS_D * x1_y2 * y1_x2));
+            let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
+            let x3_rhs = point_x_output + (point_x_output * (EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right));
             let x3_consistency = (x3_lhs - x3_rhs) * kappa;
 
             // Check y_3 is correct
-            let y3_lhs = y1_y2 + x1_x2;
-            let y3_rhs = y_3 - (y_3 * EDWARDS_D * x1_y2 * y1_x2);
+            let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
+            let y3_rhs = point_y_output - (point_y_output * EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right);
             let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
 
             let identity = xy_consistency + x3_consistency + y3_consistency;

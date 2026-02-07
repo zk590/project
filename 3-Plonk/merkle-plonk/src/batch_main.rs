@@ -8,7 +8,7 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::io::{Error as IoError, ErrorKind};
 use std::path::Path;
-use coset_bytes::{Serializable, DeserializableSlice};
+use coset_bytes::Serializable;
 use bincode;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -99,7 +99,7 @@ impl Circuit for OpeningCircuit {
 }
 
 // 从文件读取并使用rkyv反序列化数据
-fn read_and_deserialize<T: Archive>(file_path: &str) -> Result<Vec<u8>, IoError> {
+fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
         return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
@@ -116,23 +116,23 @@ fn read_and_deserialize<T: Archive>(file_path: &str) -> Result<Vec<u8>, IoError>
 // 加载或编译 prover/verifier
 fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
-    if let (Ok(mut prove_file), Ok(mut verifier_file)) = (
+    if let (Ok(mut prover_file), Ok(mut verifier_file)) = (
         File::open("circuit_prove.bin"), 
         File::open(VERIFIER_FILE)
     ) {
         // 读取证明器数据和容量信息
-        let mut prove_buf = Vec::new();
-        prove_file.read_to_end(&mut prove_buf)?;
+        let mut prover_buffer = Vec::new();
+        prover_file.read_to_end(&mut prover_buffer)?;
         
-        if let Ok(prover_with_capacity) = bincode::deserialize::<ProverWithCapacity>(&prove_buf) {
+        if let Ok(prover_with_capacity) = bincode::deserialize::<ProverWithCapacity>(&prover_buffer) {
             // 比较容量值
             if prover_with_capacity.capacity == CAPACITY {
                 // 读取验证器数据
-                let mut verifier_buf = Vec::new();
-                verifier_file.read_to_end(&mut verifier_buf)?;
+                let mut verifier_buffer = Vec::new();
+                verifier_file.read_to_end(&mut verifier_buffer)?;
                 
                 let prover: Prover = Prover::try_from_bytes(&prover_with_capacity.prover)?;
-                let verifier: Verifier = Verifier::try_from_bytes(&verifier_buf)?;
+                let verifier: Verifier = Verifier::try_from_bytes(&verifier_buffer)?;
                 
                 println!("加载缓存的 prover/verifier 成功 (容量: {})", CAPACITY);
                 return Ok((prover, verifier));
@@ -144,10 +144,11 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
     }
     
     // 文件不存在或容量不匹配，编译电路
-    let label = b"opening-circuit";
+    let circuit_label = b"opening-circuit";
     let mut rng = rand::thread_rng();
-    let pp = PublicParameters::setup(1 << CAPACITY, &mut rng)?;
-    let (prover, verifier) = Compiler::compile::<OpeningCircuit>(&pp, label)?;
+    let public_parameters = PublicParameters::setup(1 << CAPACITY, &mut rng)?;
+    let (prover, verifier) =
+        Compiler::compile::<OpeningCircuit>(&public_parameters, circuit_label)?;
 
     // 保存证明器和容量信息到circuit_prove.bin
     let prover_with_capacity = ProverWithCapacity {
@@ -170,43 +171,39 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 批量验证叶子节点并生成零知识证明 ======");
     
     // 从文件中加载MultipleLeavesData
-    let bytes = read_and_deserialize::<MultipleLeavesData>(MERKLE_SOME_FILE)?;
-    let multiple_leaves_data = unsafe {
+    let bytes = read_and_deserialize(MERKLE_SOME_FILE)?;
+    let all_leaves_data = unsafe {
         rkyv::archived_root::<MultipleLeavesData>(&bytes)
     };
     println!("MultipleLeavesData 加载成功");
     // 解析根哈希
-    let root_hash = match BlsScalar::from_bytes(&multiple_leaves_data.root_hash).into_option() {
+    let root_hash = match BlsScalar::from_bytes(&all_leaves_data.root_hash).into_option() {
         Some(hash) => hash,
         None => return Err(Box::new(IoError::new(ErrorKind::Other, "解析根哈希失败")))
     };
     println!("根哈希加载成功");
-    let start_time = Instant::now();
+    let circuit_load_start = Instant::now();
     // 加载或编译电路
     let (prover, verifier) = load_or_build_circuit()?;
-    let end_time = Instant::now();
-    let duration = end_time.duration_since(start_time);
-    println!("加载电路耗时: {:?}",duration);
+    let circuit_load_end = Instant::now();
+    let circuit_load_duration = circuit_load_end.duration_since(circuit_load_start);
+    println!("加载电路耗时: {:?}", circuit_load_duration);
     println!("Plonk Proof verifier = {}",hex::encode(verifier.to_bytes()));
 
-    let mut valid_count = 0;
-    let mut invalid_count = 0;
-    
-    println!("1. 收到{} 个叶子节点数据", multiple_leaves_data.leaves_info.len());
-    println!("Plonk Public_input.root = {}",hex::encode(multiple_leaves_data.root_hash));
+    println!("1. 收到{} 个叶子节点数据", all_leaves_data.leaves_info.len());
+    println!("Plonk Public_input.root = {}", hex::encode(all_leaves_data.root_hash));
     // 处理所有叶子节点
-    for (i, leaf_info) in multiple_leaves_data.leaves_info.iter().enumerate() {
+    for (leaf_index, leaf_info) in all_leaves_data.leaves_info.iter().enumerate() {
         println!("\n处理叶子节点 ");
-        // println!("\n处理叶子节点 {} （位置: {}）", i + 1, leaf_info.position);
-        if i==0{
-            println!("Plonk Public_input.leaf = {}",hex::encode(leaf_info.leaf_hash));
+        // println!("\n处理叶子节点 {} （位置: {}）", leaf_index + 1, leaf_info.position);
+        if leaf_index == 0 {
+            println!("Plonk Public_input.leaf = {}", hex::encode(leaf_info.leaf_hash));
         }
         // 解析叶子节点哈希
         let leaf_hash = match BlsScalar::from_bytes(&leaf_info.leaf_hash).into_option() {
             Some(hash) => hash,
             None => {
                 println!("  解析叶子哈希失败，跳过此节点");
-                invalid_count += 1;
                 continue;
             }
         };
@@ -214,9 +211,8 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
         // 使用Opening::from_slice方法反序列化叶子路径
         let opening: Opening<(), { TREE_HEIGHT }> = match Opening::from_slice(&leaf_info.proof_bytes) {
             Ok(opening) => opening,
-            Err(e) => {
-                println!("  反序列化证明失败: {:?}，跳过此节点", e);
-                invalid_count += 1;
+            Err(error) => {
+                println!("  反序列化证明失败: {:?}，跳过此节点", error);
                 continue;
             }
         };
@@ -224,7 +220,6 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
         // 验证证明中的根哈希是否与提供的根哈希一致
         if opening.root().hash != root_hash {
             println!("  证明中的根哈希与提供的根哈希不一致，跳过此节点");
-            invalid_count += 1;
             continue;
         }
         
@@ -235,47 +230,38 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
         // 检查叶子节点是否有效（先进行常规验证）
         if !opening.verify(leaf.clone()) {
             println!("  叶子节点不在Merkle树中，跳过此节点");
-            invalid_count += 1;
             continue;
         }
         
         // println!(" 开始生成零知识证明");
-        valid_count += 1;
-        
-        if i==0{
-            let start_time = Instant::now();
-        }
         // 创建电路实例
         let circuit = OpeningCircuit::new(opening, leaf);
-        if i==0{
-            let end_time = Instant::now();
-            let duration = end_time.duration_since(start_time);
-            println!("创建叶子节点电路实例耗时: {:?}",duration);
-        }
-        if i==0{
-            let start_time = Instant::now();
-        }
+        let first_circuit_start = if leaf_index == 0 {
+            Some(Instant::now())
+        } else {
+            None
+        };
         // 生成零知识证明
-        let mut rng = StdRng::seed_from_u64(0xdea1 + i as u64);
+        let mut rng = StdRng::seed_from_u64(0xdea1 + leaf_index as u64);
         let (proof, public_inputs) = prover.prove(&mut rng, &circuit)?;
         // println!("  生成零知识证明成功");
-         if i==0{
-            println!("Plonk proof = {}",hex::encode(proof.to_bytes()));
-            let end_time = Instant::now();
-            let duration = end_time.duration_since(start_time);
-            println!("生成Plonk证明耗时: {:?}",duration);
+        if let Some(first_start) = first_circuit_start {
+            println!("Plonk proof = {}", hex::encode(proof.to_bytes()));
+            let first_end = Instant::now();
+            let first_proof_duration = first_end.duration_since(first_start);
+            println!("生成Plonk证明耗时: {:?}", first_proof_duration);
         }
 
         // 验证零知识证明
-        verifier.verify(&proof, &public_inputs).map_err(|e| {
-            IoError::new(ErrorKind::Other, format!("验证证明失败: {:?}", e))
+        verifier.verify(&proof, &public_inputs).map_err(|error| {
+            IoError::new(ErrorKind::Other, format!("验证证明失败: {:?}", error))
         })?;
          println!("  验证零知识证明成功");
         // 将Proof转换为字节数组
         let proof_bytes = proof.to_bytes();
         
         // 将BlsScalar向量转换为字节数组的向量
-        let public_input_bytes: Vec<u8> = public_inputs
+        let public_inputs_flattened: Vec<u8> = public_inputs
             .iter()
             .flat_map(|scalar| scalar.to_bytes().to_vec())
             .collect();
@@ -286,8 +272,9 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
         };
         
         // 为每个证明创建唯一的文件名（按照1、2、3的顺序）
-        let proof_file_name = format!("plonk_proof_{}.bin", i + 1);
-        let public_inputs_file_name = format!("plonk_publicinputs_{}.bin", i + 1);
+        let proof_file_name = format!("plonk_proof_{}.bin", leaf_index + 1);
+        let public_inputs_file_name =
+            format!("plonk_publicinputs_{}.bin", leaf_index + 1);
         
         // 序列化并保存到文件
         let mut proof_file = File::create(&proof_file_name)?;
@@ -296,7 +283,7 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
         
         // 使用rkyv保存公开输入数据
         let public_inputs_data = ZKProofData {
-            data: public_input_bytes
+            data: public_inputs_flattened
         };
         
         let mut public_inputs_file = File::create(&public_inputs_file_name)?;
@@ -320,9 +307,9 @@ fn main() {
     
     match verify_and_generate_proofs() {
         Ok(()) => println!("\n Plonk 零知识证明生成完成"),
-        Err(e) => {
+        Err(error) => {
             println!("\n错误：批量验证和零知识证明生成失败");
-            println!("  ├── 详细信息: {}", e);
+            println!("  ├── 详细信息: {}", error);
         }
     }
 }

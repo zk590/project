@@ -81,23 +81,23 @@ mod alloc {
                 ((bit * evaluations.q_c_eval) - xy_alpha) * kappa;
 
             // x accumulator consistency check
-            let x_3 = acc_x_w;
-            let lhs = x_3 + (x_3 * xy_alpha * acc_x * acc_y * EDWARDS_D);
-            let rhs = (x_alpha * acc_y) + (y_alpha * acc_x);
-            let x_acc_consistency = (lhs - rhs) * kappa_sq;
+            let shifted_acc_x = acc_x_w;
+            let x_consistency_lhs = shifted_acc_x + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
+            let x_consistency_rhs = (x_alpha * acc_y) + (y_alpha * acc_x);
+            let x_acc_consistency = (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
 
             // y accumulator consistency check
-            let y_3 = acc_y_w;
-            let lhs = y_3 - (y_3 * xy_alpha * acc_x * acc_y * EDWARDS_D);
-            let rhs = (x_alpha * acc_x) + (y_alpha * acc_y);
-            let y_acc_consistency = (lhs - rhs) * kappa_cu;
+            let shifted_acc_y = acc_y_w;
+            let y_consistency_lhs = shifted_acc_y - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
+            let y_consistency_rhs = (x_alpha * acc_x) + (y_alpha * acc_y);
+            let y_acc_consistency = (y_consistency_lhs - y_consistency_rhs) * kappa_cu;
 
-            let a = bit_consistency
+            let combined_identity = bit_consistency
                 + x_acc_consistency
                 + y_acc_consistency
                 + xy_consistency;
 
-            scalars.push(a * ecc_separation_challenge);
+            scalars.push(combined_identity * ecc_separation_challenge);
             points.push(self.q_fixed_group_add.0);
         }
     }

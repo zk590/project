@@ -59,47 +59,53 @@ mod alloc {
             // * (b_eval + beta * z * k1 + gamma)
             // * (c_eval + beta * k2 * z + gamma)
             // * (d_eval + beta * k3 * z + gamma) * alpha
-            let x = {
+            let identity_permutation_term = {
                 let beta_z = beta * z_challenge;
-                let q_0 = evaluations.a_eval + beta_z + gamma;
+                let a_contribution = evaluations.a_eval + beta_z + gamma;
 
                 let beta_k1_z = beta * K1 * z_challenge;
-                let q_1 = evaluations.b_eval + beta_k1_z + gamma;
+                let b_contribution = evaluations.b_eval + beta_k1_z + gamma;
 
                 let beta_k2_z = beta * K2 * z_challenge;
-                let q_2 = evaluations.c_eval + beta_k2_z + gamma;
+                let c_contribution = evaluations.c_eval + beta_k2_z + gamma;
 
                 let beta_k3_z = beta * K3 * z_challenge;
-                let q_3 = (evaluations.d_eval + beta_k3_z + gamma) * alpha;
+                let d_contribution =
+                    (evaluations.d_eval + beta_k3_z + gamma) * alpha;
 
-                q_0 * q_1 * q_2 * q_3
+                a_contribution * b_contribution * c_contribution * d_contribution
             };
 
             // l1(z) * alpha^2
-            let r = l1_eval * alpha_sq;
+            let lagrange_first_term = l1_eval * alpha_sq;
 
-            scalars.push(x + r + u_challenge);
+            scalars.push(
+                identity_permutation_term + lagrange_first_term + u_challenge,
+            );
             points.push(z_comm);
 
             // -1 * (a_eval + beta * sigma_1_eval + gamma)
             // * (b_eval + beta * sigma_2_eval + gamma)
             // * (c_eval + beta * sigma_3_eval + gamma)
             // * alpha^2
-            let y = {
+            let copy_permutation_term = {
                 let beta_sigma_1 = beta * evaluations.s_sigma_1_eval;
-                let q_0 = evaluations.a_eval + beta_sigma_1 + gamma;
+                let a_contribution = evaluations.a_eval + beta_sigma_1 + gamma;
 
                 let beta_sigma_2 = beta * evaluations.s_sigma_2_eval;
-                let q_1 = evaluations.b_eval + beta_sigma_2 + gamma;
+                let b_contribution = evaluations.b_eval + beta_sigma_2 + gamma;
 
                 let beta_sigma_3 = beta * evaluations.s_sigma_3_eval;
-                let q_2 = evaluations.c_eval + beta_sigma_3 + gamma;
+                let c_contribution = evaluations.c_eval + beta_sigma_3 + gamma;
 
-                let q_3 = beta * evaluations.z_eval * alpha;
+                let z_alpha_factor = beta * evaluations.z_eval * alpha;
 
-                -(q_0 * q_1 * q_2 * q_3)
+                -(a_contribution
+                    * b_contribution
+                    * c_contribution
+                    * z_alpha_factor)
             };
-            scalars.push(y);
+            scalars.push(copy_permutation_term);
             points.push(self.s_sigma_4.0);
         }
     }

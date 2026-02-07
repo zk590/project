@@ -125,8 +125,8 @@ impl Serializable<{ 11 * Commitment::SIZE + ProofEvaluations::SIZE }>
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
 
-        let mut buf = [0u8; Self::SIZE];
-        let mut writer = &mut buf[..];
+        let mut serialized_bytes = [0u8; Self::SIZE];
+        let mut writer = &mut serialized_bytes[..];
         writer.write(&self.a_comm.to_bytes());
         writer.write(&self.b_comm.to_bytes());
         writer.write(&self.c_comm.to_bytes());
@@ -140,11 +140,11 @@ impl Serializable<{ 11 * Commitment::SIZE + ProofEvaluations::SIZE }>
         writer.write(&self.w_z_chall_w_comm.to_bytes());
         writer.write(&self.evaluations.to_bytes());
 
-        buf
+        serialized_bytes
     }
 
-    fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
-        let mut buffer = &buf[..];
+    fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
+        let mut buffer = &bytes[..];
 
         let a_comm = Commitment::from_reader(&mut buffer)?;
         let b_comm = Commitment::from_reader(&mut buffer)?;
@@ -306,7 +306,7 @@ pub(crate) mod alloc {
             );
 
             // Compute '[D]_1'
-            let D = self
+            let linearization_commitment = self
                 .compute_linearization_commitment(
                     &alpha,
                     &beta,
@@ -346,20 +346,23 @@ pub(crate) mod alloc {
                     * self.evaluations.z_eval;
 
             // Coefficients to compute [E]_1
-            let mut v_coeffs_E = vec![v_challenge];
+            let mut v_coefficients_for_e = vec![v_challenge];
 
             // Compute the powers of the v_challenge
             for i in 1..V_MAX_DEGREE {
-                v_coeffs_E.push(v_coeffs_E[i - 1] * v_challenge);
+                v_coefficients_for_e
+                    .push(v_coefficients_for_e[i - 1] * v_challenge);
             }
 
             // Compute the powers of the v_challenge multiplied by u_challenge
-            v_coeffs_E.push(v_w_challenge * u_challenge);
-            v_coeffs_E.push(v_coeffs_E[V_MAX_DEGREE] * v_w_challenge);
-            v_coeffs_E.push(v_coeffs_E[V_MAX_DEGREE + 1] * v_w_challenge);
+            v_coefficients_for_e.push(v_w_challenge * u_challenge);
+            v_coefficients_for_e
+                .push(v_coefficients_for_e[V_MAX_DEGREE] * v_w_challenge);
+            v_coefficients_for_e
+                .push(v_coefficients_for_e[V_MAX_DEGREE + 1] * v_w_challenge);
 
             // Evaluations to compute [E]_1
-            let E_evals = vec![
+            let e_evaluations = vec![
                 self.evaluations.a_eval,
                 self.evaluations.b_eval,
                 self.evaluations.c_eval,
@@ -375,17 +378,17 @@ pub(crate) mod alloc {
             // Compute E = (-r_0 + (v)a + (v^2)b + (v^3)c + (v^4)d +
             // + (v^5)s_sigma_1 + (v^6)s_sigma_2 + (v^7)s_sigma_3 +
             // + (u)z_w + (u * v_w)a_w + (u * v_w^2)b_w + (u * v_w^3)d_w)
-            let mut E_scalar: BlsScalar = E_evals
+            let mut e_scalar: BlsScalar = e_evaluations
                 .iter()
-                .zip(v_coeffs_E.iter())
+                .zip(v_coefficients_for_e.iter())
                 .map(|(eval, coeff)| eval * coeff)
                 .sum();
-            E_scalar += -r_0_eval + (u_challenge * self.evaluations.z_eval);
+            e_scalar += -r_0_eval + (u_challenge * self.evaluations.z_eval);
 
             // We group all the remaining scalar multiplications in the
             // verification process, with the purpose of
             // parallelizing them
-            let scalarmuls_points = vec![
+            let msm_points = vec![
                 self.a_comm.0,
                 self.b_comm.0,
                 self.c_comm.0,
@@ -399,66 +402,69 @@ pub(crate) mod alloc {
                 self.w_z_chall_w_comm.0,
             ];
 
-            let mut scalarmuls_scalars = v_coeffs_E[..V_MAX_DEGREE].to_vec();
+            let mut msm_scalars = v_coefficients_for_e[..V_MAX_DEGREE].to_vec();
 
             // As we include the shifted coefficients when computing [F]_1,
             // we group them to save scalar multiplications when multiplying
             // by [a]_1, [b]_1, and [d]_1
-            scalarmuls_scalars[0] += v_coeffs_E[V_MAX_DEGREE];
-            scalarmuls_scalars[1] += v_coeffs_E[V_MAX_DEGREE + 1];
-            scalarmuls_scalars[3] += v_coeffs_E[V_MAX_DEGREE + 2];
+            msm_scalars[0] += v_coefficients_for_e[V_MAX_DEGREE];
+            msm_scalars[1] += v_coefficients_for_e[V_MAX_DEGREE + 1];
+            msm_scalars[3] += v_coefficients_for_e[V_MAX_DEGREE + 2];
 
-            scalarmuls_scalars.push(E_scalar);
-            scalarmuls_scalars.push(u_challenge);
-            scalarmuls_scalars.push(z_challenge);
-            scalarmuls_scalars
+            msm_scalars.push(e_scalar);
+            msm_scalars.push(u_challenge);
+            msm_scalars.push(z_challenge);
+            msm_scalars
                 .push(u_challenge * z_challenge * domain.group_gen);
 
             // Compute the scalar multiplications in single-core
             #[cfg(not(feature = "std"))]
-            let scalarmuls: Vec<G1Projective> = scalarmuls_points
+            let msm_results: Vec<G1Projective> = msm_points
                 .iter()
-                .zip(scalarmuls_scalars.iter())
+                .zip(msm_scalars.iter())
                 .map(|(point, scalar)| point * scalar)
                 .collect();
 
             // Compute the scalar multiplications in multi-core
             #[cfg(feature = "std")]
-            let scalarmuls: Vec<G1Projective> = scalarmuls_points
+            let msm_results: Vec<G1Projective> = msm_points
                 .par_iter()
-                .zip(scalarmuls_scalars.par_iter())
+                .zip(msm_scalars.par_iter())
                 .map(|(point, scalar)| point * scalar)
                 .collect();
 
             // [F]_1 = [D]_1 + (v)[a]_1 + (v^2)[b]_1 + (v^3)[c]_1 + (v^4)[d]_1 +
             // + (v^5)[s_sigma_1]_1 + (v^6)[s_sigma_2]_1 + (v^7)[s_sigma_3]_1 +
             // + (u * v_w)[a]_1 + (u * v_w^2)[b]_1 + (u * v_w^3)[d]_1
-            let mut F: G1Projective = scalarmuls[..V_MAX_DEGREE].iter().sum();
-            F += D;
+            let mut aggregated_commitment: G1Projective =
+                msm_results[..V_MAX_DEGREE].iter().sum();
+            aggregated_commitment += linearization_commitment;
 
             // [E]_1 = E * G
-            let E = scalarmuls[V_MAX_DEGREE];
+            let e_commitment = msm_results[V_MAX_DEGREE];
 
             // Compute the G_1 element of the first pairing:
             // [W_z]_1 + u * [W_zw]_1
             //
             // Note that we negate this value to be able to subtract
             // the pairings later on, using the multi Miller loop
-            let left = G1Affine::from(
-                -(self.w_z_chall_comm.0 + scalarmuls[V_MAX_DEGREE + 1]),
+            let left_pairing_point = G1Affine::from(
+                -(self.w_z_chall_comm.0 + msm_results[V_MAX_DEGREE + 1]),
             );
 
             // Compute the G_1 element of the second pairing:
             // z * [W_z]_1 + (u * z * w) * [W_zw]_1 + [F]_1 - [E]_1
-            let right = G1Affine::from(
-                scalarmuls[V_MAX_DEGREE + 2] + scalarmuls[V_MAX_DEGREE + 3] + F
-                    - E,
+            let right_pairing_point = G1Affine::from(
+                msm_results[V_MAX_DEGREE + 2]
+                    + msm_results[V_MAX_DEGREE + 3]
+                    + aggregated_commitment
+                    - e_commitment,
             );
 
             // Compute the two pairings and subtract them
             let pairing = coset_bls12_381::multi_miller_loop(&[
-                (&left, &opening_key.prepared_x_h),
-                (&right, &opening_key.prepared_h),
+                (&left_pairing_point, &opening_key.prepared_x_h),
+                (&right_pairing_point, &opening_key.prepared_h),
             ])
             .final_exponentiation();
 
@@ -541,23 +547,23 @@ pub(crate) mod alloc {
             let domain_size = domain.size();
             let z_h_eval = -domain.evaluate_vanishing_polynomial(z_challenge);
 
-            let z_n =
+            let z_n_term =
                 z_challenge.pow(&[domain_size as u64, 0, 0, 0]) * z_h_eval;
-            let z_two_n =
+            let z_two_n_term =
                 z_challenge.pow(&[2 * domain_size as u64, 0, 0, 0]) * z_h_eval;
-            let z_three_n =
+            let z_three_n_term =
                 z_challenge.pow(&[3 * domain_size as u64, 0, 0, 0]) * z_h_eval;
 
             scalars.push(z_h_eval);
             points.push(self.t_low_comm.0);
 
-            scalars.push(z_n);
+            scalars.push(z_n_term);
             points.push(self.t_mid_comm.0);
 
-            scalars.push(z_two_n);
+            scalars.push(z_two_n_term);
             points.push(self.t_high_comm.0);
 
-            scalars.push(z_three_n);
+            scalars.push(z_three_n_term);
             points.push(self.t_fourth_comm.0);
 
             Commitment::from(msm_variable_base(&points, &scalars))
@@ -585,12 +591,12 @@ pub(crate) mod alloc {
 
         // Indices with non-zero evaluations
         #[cfg(not(feature = "std"))]
-        let range = (0..evaluations.len()).into_iter();
+        let evaluation_indices = (0..evaluations.len()).into_iter();
 
         #[cfg(feature = "std")]
-        let range = (0..evaluations.len()).into_par_iter();
+        let evaluation_indices = (0..evaluations.len()).into_par_iter();
 
-        let non_zero_evaluations: Vec<usize> = range
+        let non_zero_indices: Vec<usize> = evaluation_indices
             .filter(|&i| {
                 let evaluation = &evaluations[i];
                 evaluation != &BlsScalar::zero()
@@ -599,16 +605,17 @@ pub(crate) mod alloc {
 
         // Only compute the denominators with non-zero evaluations
         #[cfg(not(feature = "std"))]
-        let range = (0..non_zero_evaluations.len()).into_iter();
+        let non_zero_index_positions = (0..non_zero_indices.len()).into_iter();
 
         #[cfg(feature = "std")]
-        let range = (0..non_zero_evaluations.len()).into_par_iter();
+        let non_zero_index_positions =
+            (0..non_zero_indices.len()).into_par_iter();
 
-        let mut denominators: Vec<BlsScalar> = range
+        let mut denominators: Vec<BlsScalar> = non_zero_index_positions
             .clone()
             .map(|i| {
                 // index of non-zero evaluation
-                let index = non_zero_evaluations[i];
+                let index = non_zero_indices[i];
 
                 (domain.group_gen_inv.pow(&[index as u64, 0, 0, 0]) * point)
                     - BlsScalar::one()
@@ -616,12 +623,12 @@ pub(crate) mod alloc {
             .collect();
         batch_inversion(&mut denominators);
 
-        let result: BlsScalar = range
+        let result: BlsScalar = non_zero_index_positions
             .map(|i| {
-                let eval_index = non_zero_evaluations[i];
-                let eval = evaluations[eval_index];
+                let evaluation_index = non_zero_indices[i];
+                let evaluation_value = evaluations[evaluation_index];
 
-                denominators[i] * eval
+                denominators[i] * evaluation_value
             })
             .sum();
 

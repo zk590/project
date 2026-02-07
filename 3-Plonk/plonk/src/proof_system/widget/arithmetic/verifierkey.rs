@@ -45,8 +45,8 @@ impl Serializable<{ 7 * Commitment::SIZE }> for VerifierKey {
     #[allow(unused_must_use)]
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
-        let mut buff = [0u8; Self::SIZE];
-        let mut writer = &mut buff[..];
+        let mut serialized_bytes = [0u8; Self::SIZE];
+        let mut writer = &mut serialized_bytes[..];
         writer.write(&self.q_m.to_bytes());
         writer.write(&self.q_l.to_bytes());
         writer.write(&self.q_r.to_bytes());
@@ -55,7 +55,7 @@ impl Serializable<{ 7 * Commitment::SIZE }> for VerifierKey {
         writer.write(&self.q_c.to_bytes());
         writer.write(&self.q_arith.to_bytes());
 
-        buff
+        serialized_bytes
     }
 
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<VerifierKey, Self::Error> {

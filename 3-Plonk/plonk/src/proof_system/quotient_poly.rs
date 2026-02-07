@@ -63,7 +63,7 @@ pub(crate) fn compute(
         d_eval_8n.push(d_eval_8n[i]);
     }
 
-    let t_1 = compute_circuit_satisfiability_equation(
+    let circuit_satisfiability_terms = compute_circuit_satisfiability_equation(
         domain,
         (
             range_challenge,
@@ -76,7 +76,7 @@ pub(crate) fn compute(
         public_inputs_poly,
     );
 
-    let t_2 = compute_permutation_checks(
+    let permutation_check_terms = compute_permutation_checks(
         domain,
         prover_key,
         (&a_eval_8n, &b_eval_8n, &c_eval_8n, &d_eval_8n),
@@ -91,9 +91,10 @@ pub(crate) fn compute(
     let range = (0..domain_8n.size()).into_par_iter();
 
     let quotient: Vec<_> = range
-        .map(|i| {
-            let numerator = t_1[i] + t_2[i];
-            let denominator = prover_key.v_h_coset_8n()[i];
+        .map(|index| {
+            let numerator = circuit_satisfiability_terms[index]
+                + permutation_check_terms[index];
+            let denominator = prover_key.v_h_coset_8n()[index];
             numerator * denominator.invert().unwrap()
         })
         .collect();
@@ -130,72 +131,78 @@ fn compute_circuit_satisfiability_equation(
     #[cfg(feature = "std")]
     let range = (0..domain_8n.size()).into_par_iter();
 
-    let t: Vec<_> = range
-        .map(|i| {
-            let a = &a_eval_8n[i];
-            let b = &b_eval_8n[i];
-            let c = &c_eval_8n[i];
-            let d = &d_eval_8n[i];
-            let a_w = &a_eval_8n[i + 8];
-            let b_w = &b_eval_8n[i + 8];
-            let d_w = &d_eval_8n[i + 8];
-            let pi = &public_eval_8n[i];
+    let quotient_terms: Vec<_> = range
+        .map(|index| {
+            let a_eval = &a_eval_8n[index];
+            let b_eval = &b_eval_8n[index];
+            let c_eval = &c_eval_8n[index];
+            let d_eval = &d_eval_8n[index];
+            let a_shift_eval = &a_eval_8n[index + 8];
+            let b_shift_eval = &b_eval_8n[index + 8];
+            let d_shift_eval = &d_eval_8n[index + 8];
+            let public_eval = &public_eval_8n[index];
 
             let t_arith =
-                prover_key.arithmetic.compute_quotient_i(i, a, b, c, d);
+                prover_key.arithmetic.compute_quotient_i(
+                    index,
+                    a_eval,
+                    b_eval,
+                    c_eval,
+                    d_eval,
+                );
 
             let t_range = prover_key.range.compute_quotient_i(
-                i,
+                index,
                 range_challenge,
-                a,
-                b,
-                c,
-                d,
-                d_w,
+                a_eval,
+                b_eval,
+                c_eval,
+                d_eval,
+                d_shift_eval,
             );
 
             let t_logic = prover_key.logic.compute_quotient_i(
-                i,
+                index,
                 logic_challenge,
-                a,
-                a_w,
-                b,
-                b_w,
-                c,
-                d,
-                d_w,
+                a_eval,
+                a_shift_eval,
+                b_eval,
+                b_shift_eval,
+                c_eval,
+                d_eval,
+                d_shift_eval,
             );
 
             let t_fixed = prover_key.fixed_base.compute_quotient_i(
-                i,
+                index,
                 fixed_base_challenge,
-                a,
-                a_w,
-                b,
-                b_w,
-                c,
-                d,
-                d_w,
+                a_eval,
+                a_shift_eval,
+                b_eval,
+                b_shift_eval,
+                c_eval,
+                d_eval,
+                d_shift_eval,
             );
 
             let t_var = prover_key.variable_base.compute_quotient_i(
-                i,
+                index,
                 var_base_challenge,
-                a,
-                a_w,
-                b,
-                b_w,
-                c,
-                d,
-                d_w,
+                a_eval,
+                a_shift_eval,
+                b_eval,
+                b_shift_eval,
+                c_eval,
+                d_eval,
+                d_shift_eval,
             );
 
             // Multiplication by selectors and challenges
             // has already been done
-            t_arith + t_range + t_logic + t_fixed + t_var + pi
+            t_arith + t_range + t_logic + t_fixed + t_var + public_eval
         })
         .collect();
-    t
+    quotient_terms
 }
 
 fn compute_permutation_checks(
@@ -221,24 +228,24 @@ fn compute_permutation_checks(
     #[cfg(feature = "std")]
     let range = (0..domain_8n.size()).into_par_iter();
 
-    let t: Vec<_> = range
-        .map(|i| {
+    let permutation_terms: Vec<_> = range
+        .map(|index| {
             prover_key.permutation.compute_quotient_i(
-                i,
-                &a_eval_8n[i],
-                &b_eval_8n[i],
-                &c_eval_8n[i],
-                &d_eval_8n[i],
-                &z_eval_8n[i],
-                &z_eval_8n[i + 8],
+                index,
+                &a_eval_8n[index],
+                &b_eval_8n[index],
+                &c_eval_8n[index],
+                &d_eval_8n[index],
+                &z_eval_8n[index],
+                &z_eval_8n[index + 8],
                 alpha,
-                &l1_alpha_sq_evals[i],
+                &l1_alpha_sq_evals[index],
                 beta,
                 gamma,
             )
         })
         .collect();
-    t
+    permutation_terms
 }
 fn compute_first_lagrange_poly_scaled(
     domain: &EvaluationDomain,

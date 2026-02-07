@@ -43,14 +43,15 @@ impl Permutation {
     /// is always allocated in the `witness_map`.
     pub(crate) fn new_witness(&mut self) -> Witness {
         // Generate the Witness
-        let var = Witness::new(self.witness_map.keys().len());
+        let witness = Witness::new(self.witness_map.keys().len());
 
         // Allocate space for the Witness on the witness_map
         // Each vector is initialized with a capacity of 16.
         // This number is a best guess estimate.
-        self.witness_map.insert(var, Vec::with_capacity(16usize));
+        self.witness_map
+            .insert(witness, Vec::with_capacity(16usize));
 
-        var
+        witness
     }
 
     /// Checks that the [`Witness`]s are valid by determining if they have been
@@ -58,7 +59,7 @@ impl Permutation {
     fn valid_witnesses(&self, witnesses: &[Witness]) -> bool {
         witnesses
             .iter()
-            .all(|var| self.witness_map.contains_key(var))
+            .all(|witness| self.witness_map.contains_key(witness))
     }
 
     /// Maps a set of [`Witness`]s (a,b,c,d) to a set of [`Wire`](WireData)s
@@ -86,15 +87,15 @@ impl Permutation {
 
     pub(crate) fn add_witness_to_map<T: Into<Witness> + Copy>(
         &mut self,
-        var: T,
+        witness: T,
         wire_data: WireData,
     ) {
-        assert!(self.valid_witnesses(&[var.into()]));
+        assert!(self.valid_witnesses(&[witness.into()]));
 
         // Since we always allocate space for the Vec of WireData when a
         // Witness is added to the witness_map, this should never fail
-        let vec_wire_data = self.witness_map.get_mut(&var.into()).unwrap();
-        vec_wire_data.push(wire_data);
+        let mapped_wires = self.witness_map.get_mut(&witness.into()).unwrap();
+        mapped_wires.push(wire_data);
     }
 
     // Performs shift by one permutation and computes sigma_1, sigma_2 and
@@ -110,18 +111,21 @@ impl Permutation {
 
         let mut sigmas = [sigma_1, sigma_2, sigma_3, sigma_4];
 
-        for (_, wire_data) in self.witness_map.iter() {
+        for (_, wire_data_entries) in self.witness_map.iter() {
             // Gets the data for each wire associated with this witness
-            for (wire_index, current_wire) in wire_data.iter().enumerate() {
+            for (wire_index, current_wire) in
+                wire_data_entries.iter().enumerate()
+            {
                 // Fetch index of the next wire, if it is the last element
                 // We loop back around to the beginning
-                let next_index = match wire_index == wire_data.len() - 1 {
+                let next_index =
+                    match wire_index == wire_data_entries.len() - 1 {
                     true => 0,
                     false => wire_index + 1,
                 };
 
                 // Fetch the next wire
-                let next_wire = &wire_data[next_index];
+                let next_wire = &wire_data_entries[next_index];
 
                 // Map current wire to next wire
                 match current_wire {
@@ -145,22 +149,22 @@ impl Permutation {
 
         let lagrange_poly: Vec<BlsScalar> = sigma_mapping
             .iter()
-            .map(|x| match x {
+            .map(|wire_data| match wire_data {
                 WireData::Left(index) => {
-                    let root = &roots[*index];
-                    *root
+                    let domain_element = &roots[*index];
+                    *domain_element
                 }
                 WireData::Right(index) => {
-                    let root = &roots[*index];
-                    K1 * root
+                    let domain_element = &roots[*index];
+                    K1 * domain_element
                 }
                 WireData::Output(index) => {
-                    let root = &roots[*index];
-                    K2 * root
+                    let domain_element = &roots[*index];
+                    K2 * domain_element
                 }
                 WireData::Fourth(index) => {
-                    let root = &roots[*index];
-                    K3 * root
+                    let domain_element = &roots[*index];
+                    K3 * domain_element
                 }
             })
             .collect();
@@ -220,7 +224,7 @@ impl Permutation {
         let n = domain.size();
 
         // Constants defining cosets H, k1H, k2H, etc
-        let ks = vec![BlsScalar::one(), K1, K2, K3];
+        let coset_scalars = vec![BlsScalar::one(), K1, K2, K3];
 
         // Transpose wires and sigma values to get "rows" in the form [a_i,
         // b_i, c_i, d_i] where each row contains the wire and sigma
@@ -245,7 +249,7 @@ impl Permutation {
         let product_argument = izip!(roots, gatewise_sigmas, gatewise_wires)
             // Associate each wire value in a gate with the k defining its coset
             .map(|(gate_root, gate_sigmas, gate_wires)| {
-                (gate_root, izip!(gate_sigmas, gate_wires, &ks))
+                (gate_root, izip!(gate_sigmas, gate_wires, &coset_scalars))
             })
             // Now the ith element represents gate i and will have the form:
             //   (root_i, ((w0_i, s0_i, k0), (w1_i, s1_i, k1), ..., (wm_i, sm_i,
@@ -259,13 +263,17 @@ impl Permutation {
                     // Numerator product
                     wire_params
                         .clone()
-                        .map(|(_sigma, wire, k)| {
-                            wire + beta * k * gate_root + gamma
+                    .map(|(_sigma, wire_value, coset_scalar)| {
+                            wire_value
+                                + beta * coset_scalar * gate_root
+                                + gamma
                         })
                         .product::<BlsScalar>(),
                     // Denominator product
                     wire_params
-                        .map(|(sigma, wire, _k)| wire + beta * sigma + gamma)
+                        .map(|(sigma, wire_value, _coset_scalar)| {
+                            wire_value + beta * sigma + gamma
+                        })
                         .product::<BlsScalar>(),
                 )
             })
@@ -283,8 +291,8 @@ impl Permutation {
 
         // Accumulate by successively multiplying the scalars
         // Non-parallelizable?
-        for s in product_argument {
-            state *= s;
+        for product_term in product_argument {
+            state *= product_term;
             z.push(state);
         }
 

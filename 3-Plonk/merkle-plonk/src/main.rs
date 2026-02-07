@@ -92,7 +92,7 @@ struct ZKProofData {
 }
 
 // 从文件读取并使用rkyv反序列化
-fn read_and_deserialize<T: Archive>(file_path: &str) -> Result<Vec<u8>, IoError> {
+fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
         return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
@@ -109,7 +109,7 @@ fn read_and_deserialize<T: Archive>(file_path: &str) -> Result<Vec<u8>, IoError>
 /// 使用rkyv从文件中加载Merkle树的证明数据
 fn load_proof_data() -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HEIGHT }>), IoError> {
     // 使用rkyv反序列化MerkleProofData
-    let bytes = read_and_deserialize::<MerkleProofData>(MERKLE_FILE)?;
+    let bytes = read_and_deserialize(MERKLE_FILE)?;
     
     // 使用rkyv反序列化
     let proof_data = unsafe {
@@ -134,7 +134,7 @@ fn load_proof_data() -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HE
     // 使用Opening::from_slice方法反序列化证明
     let opening: Opening<(), { TREE_HEIGHT }> = match Opening::from_slice(&proof_data.proof_bytes) {
         Ok(opening) => opening,
-        Err(e) => return Err(IoError::new(ErrorKind::Other, format!("反序列化证明失败: {:?}", e)))
+        Err(error) => return Err(IoError::new(ErrorKind::Other, format!("反序列化证明失败: {:?}", error)))
     };
     
     // 验证证明中的根哈希是否与提供的根哈希一致
@@ -151,23 +151,23 @@ fn load_proof_data() -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HE
 /// 加载或编译 prover/verifier
 fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
-    if let (Ok(mut prove_file), Ok(mut verifier_file)) = (
+    if let (Ok(mut prover_file), Ok(mut verifier_file),) = (
         File::open(CIRCUIT_PROVE_FILE), 
         File::open(VERIFIER_FILE)
     ) {
         // 读取证明器数据和容量信息
-        let mut prove_buf = Vec::new();
-        prove_file.read_to_end(&mut prove_buf)?;
+        let mut prover_buffer = Vec::new();
+        prover_file.read_to_end(&mut prover_buffer)?;
         
-        if let Ok(prover_with_capacity) = bincode::deserialize::<ProverWithCapacity>(&prove_buf) {
+        if let Ok(prover_with_capacity) = bincode::deserialize::<ProverWithCapacity>(&prover_buffer) {
             // 比较容量值
             if prover_with_capacity.capacity == CAPACITY {
                 // 读取验证器数据
-                let mut verifier_buf = Vec::new();
-                verifier_file.read_to_end(&mut verifier_buf)?;
+                let mut verifier_buffer = Vec::new();
+                verifier_file.read_to_end(&mut verifier_buffer)?;
                 
                 let prover: Prover = Prover::try_from_bytes(&prover_with_capacity.prover)?;
-                let verifier: Verifier = Verifier::try_from_bytes(&verifier_buf)?;
+                let verifier: Verifier = Verifier::try_from_bytes(&verifier_buffer)?;
                 
                 println!("加载缓存的 prover/verifier 成功 (容量: {})", CAPACITY);
                 return Ok((prover, verifier));
@@ -179,10 +179,10 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
     }
     
     // 文件不存在或容量不匹配，编译电路
-    let label = b"opening-circuit";
+    let circuit_label = b"opening-circuit";
     let mut rng = rand::thread_rng();
-    let pp = PublicParameters::setup(1 << CAPACITY, &mut rng)?;
-    let (prover, verifier) = Compiler::compile::<OpeningCircuit>(&pp, label)?;
+    let public_parameters = PublicParameters::setup(1 << CAPACITY, &mut rng)?;
+    let (prover, verifier) = Compiler::compile::<OpeningCircuit>(&public_parameters, circuit_label)?;
 
     // 保存证明器和容量信息到CIRCUIT_PROVE_FILE
     let prover_with_capacity = ProverWithCapacity {
@@ -205,7 +205,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 生成零知识证明 ======");
     
     // 从文件中加载证明数据
-    let (_position, leaf_hash, _root_hash, opening) = load_proof_data()?;
+    let (_leaf_position, leaf_hash, _root_hash, opening) = load_proof_data()?;
     println!("1. 加载证明数据成功");
     println!("   - 叶子节点哈希: {:?}", leaf_hash);
     
@@ -218,7 +218,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("2. 常规验证通过，可以生成零知识证明");
 
-    let (prover, _verifier) = load_or_build_circuit()?;
+    let (prover, _cached_verifier) = load_or_build_circuit()?;
 
     // 创建电路实例
     let circuit = OpeningCircuit::new(opening, leaf);
@@ -231,7 +231,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     let proof_bytes = proof.to_bytes();
     
     // 将BlsScalar向量转换为字节数组的向量
-    let public_input_bytes: Vec<u8> = public_inputs
+    let public_inputs_flattened: Vec<u8> = public_inputs
         .iter()
         .flat_map(|scalar| scalar.to_bytes().to_vec())
         .collect();
@@ -248,7 +248,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     
     // 使用rkyv保存公开输入数据
     let public_inputs_data = ZKProofData {
-        data: public_input_bytes
+        data: public_inputs_flattened
     };
     
     let mut public_inputs_file = File::create(PLONK_PUBLICINPUTS_FILE)?;
@@ -265,7 +265,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
 /// 验证零知识证明
 pub fn verify_proof() -> Result<(), IoError> {
     // 加载证明数据
-    let (_position, _leaf_hash, _root_hash, opening) = load_proof_data()?;
+    let (_leaf_position, leaf_hash, _root_hash, opening) = load_proof_data()?;
     
     // 加载验证器
     let verifier_bytes = std::fs::read(VERIFIER_FILE)?;
@@ -274,7 +274,7 @@ pub fn verify_proof() -> Result<(), IoError> {
     })?;
     
     // 使用rkyv读取证明数据
-    let bytes = read_and_deserialize::<ZKProofData>(PLONK_PROOF_FILE)?;
+    let bytes = read_and_deserialize(PLONK_PROOF_FILE)?;
     let proof_data = unsafe {
         rkyv::archived_root::<ZKProofData>(&bytes)
     };
@@ -283,7 +283,7 @@ pub fn verify_proof() -> Result<(), IoError> {
     })?;
     
     // 使用rkyv读取公开输入数据
-    let public_inputs_bytes = read_and_deserialize::<ZKProofData>(PLONK_PUBLICINPUTS_FILE)?;
+    let public_inputs_bytes = read_and_deserialize(PLONK_PUBLICINPUTS_FILE)?;
     let public_inputs_data = unsafe {
         rkyv::archived_root::<ZKProofData>(&public_inputs_bytes)
     };
@@ -293,8 +293,8 @@ pub fn verify_proof() -> Result<(), IoError> {
     let scalar_size = 32; // BlsScalar的大小
     let num_scalars = public_inputs_data.data.len() / scalar_size;
     
-    for i in 0..num_scalars {
-        let start = i * scalar_size;
+    for scalar_index in 0..num_scalars {
+        let start = scalar_index * scalar_size;
         let end = start + scalar_size;
         let scalar_bytes = &public_inputs_data.data[start..end];
         
@@ -307,7 +307,7 @@ pub fn verify_proof() -> Result<(), IoError> {
         }
         
         let scalar = match BlsScalar::from_bytes(&fixed_bytes).into_option() {
-            Some(s) => s,
+            Some(scalar_value) => scalar_value,
             None => return Err(IoError::new(ErrorKind::Other, "解析公开输入失败")),
         };
         
@@ -323,7 +323,7 @@ pub fn verify_proof() -> Result<(), IoError> {
         println!("零知识证明验证成功");
         
         // 创建叶子节点并验证Merkle树证明
-        let leaf = PoseidonItem::new(_leaf_hash, ());
+        let leaf = PoseidonItem::new(leaf_hash, ());
         let is_valid = opening.verify(leaf);
         
         if is_valid {
@@ -367,9 +367,9 @@ fn main() {
                 println!("4. 验证失败！叶子节点不在Merkle树中或证明无效");
             }
         },
-        Err(e) => {
+        Err(error) => {
             println!(" 错误：无法加载证明数据");
-            println!("  ├── 详细信息: {}", e);
+            println!("  ├── 详细信息: {}", error);
         }
     }
     println!("===== merkle验证流程完成 ======");
@@ -388,9 +388,9 @@ fn main() {
                 }
             }
         },
-        Err(e) => {
+        Err(error) => {
             println!("错误：无法生成零知识证明");
-            println!("  ├── 详细信息: {}", e);
+            println!("  ├── 详细信息: {}", error);
         }
     }
 

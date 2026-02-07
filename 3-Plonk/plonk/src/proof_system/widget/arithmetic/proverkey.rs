@@ -60,13 +60,19 @@ impl ProverKey {
         // (a(x)b(x)q_M(x) + a(x)q_L(x) + b(X)q_R(x) + c(X)q_O(X) + d(x)q_F(X) +
         // q_C(X)) * q_arith(X)
         //
-        let a_1 = a_i * b_i * q_m_i;
-        let a_2 = a_i * q_l_i;
-        let a_3 = b_i * q_r_i;
-        let a_4 = c_i * q_o_i;
-        let a_5 = d_i * q_f_i;
-        let a_6 = q_c_i;
-        (a_1 + a_2 + a_3 + a_4 + a_5 + a_6) * q_arith_i
+        let mul_selector_term = a_i * b_i * q_m_i;
+        let left_selector_term = a_i * q_l_i;
+        let right_selector_term = b_i * q_r_i;
+        let output_selector_term = c_i * q_o_i;
+        let fourth_wire_term = d_i * q_f_i;
+        let constant_selector_term = q_c_i;
+        (mul_selector_term
+            + left_selector_term
+            + right_selector_term
+            + output_selector_term
+            + fourth_wire_term
+            + constant_selector_term)
+            * q_arith_i
     }
 
     pub(crate) fn compute_linearization(
@@ -84,28 +90,28 @@ impl ProverKey {
         // * q_o + d_eval * q_f + q_c) * q_arith_eval
         //
         // a_eval * b_eval * q_m_poly
-        let ab = evaluations.a_eval * evaluations.b_eval;
-        let a_0 = q_m_poly * &ab;
+        let witness_product = evaluations.a_eval * evaluations.b_eval;
+        let mul_selector_term = q_m_poly * &witness_product;
 
         // a_eval * q_l
-        let a_1 = q_l_poly * &evaluations.a_eval;
+        let left_selector_term = q_l_poly * &evaluations.a_eval;
 
         // b_eval * q_r
-        let a_2 = q_r_poly * &evaluations.b_eval;
+        let right_selector_term = q_r_poly * &evaluations.b_eval;
 
         //c_eval * q_o
-        let a_3 = q_o_poly * &evaluations.c_eval;
+        let output_selector_term = q_o_poly * &evaluations.c_eval;
 
         // d_eval * q_f
-        let a_4 = q_f_poly * &evaluations.d_eval;
+        let fourth_wire_term = q_f_poly * &evaluations.d_eval;
 
-        let mut a = &a_0 + &a_1;
-        a = &a + &a_2;
-        a = &a + &a_3;
-        a = &a + &a_4;
-        a = &a + q_c_poly;
-        a = &a * &evaluations.q_arith_eval;
+        let mut linearized_identity = &mul_selector_term + &left_selector_term;
+        linearized_identity = &linearized_identity + &right_selector_term;
+        linearized_identity = &linearized_identity + &output_selector_term;
+        linearized_identity = &linearized_identity + &fourth_wire_term;
+        linearized_identity = &linearized_identity + q_c_poly;
+        linearized_identity = &linearized_identity * &evaluations.q_arith_eval;
 
-        a
+        linearized_identity
     }
 }

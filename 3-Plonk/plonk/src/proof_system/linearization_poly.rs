@@ -186,7 +186,7 @@ pub(crate) fn compute(
     t_fourth_poly: &Polynomial,
     pub_inputs: &[BlsScalar],
 ) -> Polynomial {
-    let f_1 = compute_circuit_satisfiability(
+    let circuit_linearization = compute_circuit_satisfiability(
         (
             range_separation_challenge,
             logic_separation_challenge,
@@ -200,9 +200,9 @@ pub(crate) fn compute(
     let pi_eval =
         proof::alloc::compute_barycentric_eval(pub_inputs, z_challenge, domain);
 
-    let f_1 = &f_1 + &pi_eval;
+    let circuit_linearization = &circuit_linearization + &pi_eval;
 
-    let f_2 = prover_key.permutation.compute_linearization(
+    let permutation_linearization = prover_key.permutation.compute_linearization(
         z_challenge,
         (alpha, beta, gamma),
         (
@@ -226,22 +226,24 @@ pub(crate) fn compute(
     let z_two_n = z_challenge.pow(&[2 * domain_size as u64, 0, 0, 0]);
     let z_three_n = z_challenge.pow(&[3 * domain_size as u64, 0, 0, 0]);
 
-    let a = t_low_poly;
-    let b = t_mid_poly * &z_n;
-    let c = t_high_poly * &z_two_n;
-    let d = t_fourth_poly * &z_three_n;
-    let abc = &(a + &b) + &c;
+    let t_low_component = t_low_poly;
+    let t_mid_component = t_mid_poly * &z_n;
+    let t_high_component = t_high_poly * &z_two_n;
+    let t_fourth_component = t_fourth_poly * &z_three_n;
+    let quotient_prefix =
+        &(t_low_component + &t_mid_component) + &t_high_component;
 
-    let quot = &abc + &d;
+    let quotient_polynomial = &quotient_prefix + &t_fourth_component;
 
     let z_h_eval = -domain.evaluate_vanishing_polynomial(z_challenge);
 
-    let quot = &quot * &z_h_eval;
+    let quotient_polynomial = &quotient_polynomial * &z_h_eval;
 
-    let f = &f_1 + &f_2;
+    let linearized_identity =
+        &circuit_linearization + &permutation_linearization;
 
     // r_poly
-    &f + &quot
+    &linearized_identity + &quotient_polynomial
 }
 
 #[cfg(feature = "alloc")]
@@ -255,28 +257,30 @@ fn compute_circuit_satisfiability(
     evaluations: &ProofEvaluations,
     prover_key: &ProverKey,
 ) -> Polynomial {
-    let a = prover_key.arithmetic.compute_linearization(evaluations);
+    let arithmetic_component =
+        prover_key.arithmetic.compute_linearization(evaluations);
 
-    let b = prover_key
+    let range_component = prover_key
         .range
         .compute_linearization(range_separation_challenge, evaluations);
 
-    let c = prover_key
+    let logic_component = prover_key
         .logic
         .compute_linearization(logic_separation_challenge, evaluations);
 
-    let d = prover_key
+    let fixed_base_component = prover_key
         .fixed_base
         .compute_linearization(fixed_base_separation_challenge, evaluations);
 
-    let e = prover_key
+    let variable_base_component = prover_key
         .variable_base
         .compute_linearization(var_base_separation_challenge, evaluations);
 
-    let mut linearization_poly = &a + &b;
-    linearization_poly += &c;
-    linearization_poly += &d;
-    linearization_poly += &e;
+    let mut linearization_poly =
+        &arithmetic_component + &range_component;
+    linearization_poly += &logic_component;
+    linearization_poly += &fixed_base_component;
+    linearization_poly += &variable_base_component;
 
     linearization_poly
 }

@@ -33,18 +33,18 @@ where
     pub(crate) fn advance(
         &mut self,
         node: &'a Node<T, H, A>,
-        h: usize,
+        level_index: usize,
     ) -> Option<Ref<'a, T>> {
         // We are at a node before a leaf, therefore we should try to return our
         // first eligible child.
-        if h == H - 1 {
-            let index = &mut self.indices[h];
+        if level_index == H - 1 {
+            let child_cursor = &mut self.indices[level_index];
 
             // We keep iterating the stored index to ensure that when/if we
             // return to this child we start from the previous index.
-            for i in *index..A {
-                *index = i + 1;
-                if let Some(leaf) = &node.children[i] {
+            for child_index in *child_cursor..A {
+                *child_cursor = child_index + 1;
+                if let Some(leaf) = &node.children[child_index] {
                     let leaf = leaf.item();
                     if (self.walker)(&*leaf) {
                         return Some(leaf);
@@ -54,20 +54,20 @@ where
 
             // We will never return here, so we should set this to zero to
             // ensure our siblings start looking at their first child.
-            *index = 0;
+            *child_cursor = 0;
             return None;
         }
 
         // If there is no child in the path, we have never been here before.
         // Therefore we try to set the path to one of our children, starting
         // from the first.
-        if self.path[h].is_none() {
-            for i in 0..A {
-                self.indices[h] = i;
-                if let Some(child) = &node.children[i] {
+        if self.path[level_index].is_none() {
+            for child_index in 0..A {
+                self.indices[level_index] = child_index;
+                if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
                     if (self.walker)(&*child.item()) {
-                        self.path[h] = Some(child);
+                        self.path[level_index] = Some(child);
                         break;
                     }
                 }
@@ -79,19 +79,19 @@ where
         //
         // If the advance returns `Some` we just return the item, otherwise we
         // try the next child in line, and advance through it.
-        if let Some(child) = self.path[h] {
-            if let Some(item) = self.advance(child, h + 1) {
+        if let Some(child) = self.path[level_index] {
+            if let Some(item) = self.advance(child, level_index + 1) {
                 return Some(item);
             }
 
-            for i in self.indices[h] + 1..A {
-                self.indices[h] = i;
+            for child_index in self.indices[level_index] + 1..A {
+                self.indices[level_index] = child_index;
 
-                if let Some(child) = &node.children[i] {
+                if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
                     if (self.walker)(&*child.item()) {
-                        self.path[h] = Some(child);
-                        match self.advance(child, h + 1) {
+                        self.path[level_index] = Some(child);
+                        match self.advance(child, level_index + 1) {
                             Some(item) => return Some(item),
                             None => continue,
                         }
@@ -99,8 +99,8 @@ where
                 }
             }
 
-            self.path[h] = None;
-            self.indices[h] = 0;
+            self.path[level_index] = None;
+            self.indices[level_index] = 0;
         }
 
         None
