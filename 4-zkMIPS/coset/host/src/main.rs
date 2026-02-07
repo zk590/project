@@ -5,6 +5,7 @@ use std::io::{Error, ErrorKind};
 use std::path::Path;
 use std::time::Instant;
 use rkyv::{Archive, Deserialize, Serialize};
+use common::constants::{PLONK_PROOF_FILE, PLONK_PUBLICINPUTS_FILE, VERIFIER_FILE};
 
 use coset_bls12_381::BlsScalar;
 use plonk::prelude::{Verifier, Proof};
@@ -165,10 +166,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = ProverClient::new();
     let mut stdin_instance = ZKMStdin::new(); 
 
-    // 使用命令行参数或默认值
-    let proof_file = args.proof_file;
-    let public_inputs_file = args.public_inputs_file;
-    let verifier_file = args.verifier_file;
+    // 使用constants.rs中定义的常量
+    let proof_file = PLONK_PROOF_FILE;
+    let public_inputs_file = PLONK_PUBLICINPUTS_FILE;
+    let verifier_file = VERIFIER_FILE;
     
     println!("使用的证明文件: {}", proof_file);
     println!("使用的公共输入文件: {}", public_inputs_file);
@@ -217,61 +218,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    // 确定执行模式
-    match args.execute {
-        true => {
-            // 仅执行程序，不生成证明
-            let start = Instant::now();
-            let (_output, report) = client.execute(ELF, stdin_instance).run()?;
-            let duration = start.elapsed();
-            println!("程序执行成功。执行周期数: {}", report.total_instruction_count());
-            println!("程序执行耗时: {:?}", duration);
-            return Ok(());
-        },
-        false if args.core => {
-            // 生成core proof
-            let start = Instant::now();
-            let proof = client.prove(&pk, stdin_instance).core().run()?;
-            let duration = start.elapsed();
-            println!("Core证明生成完成，耗时: {:?}", duration);
-            
-            // 验证证明
-            println!("验证证明...");
-            let start_verify = Instant::now();
-            client.verify(&proof, &vk)?;
-            let duration_verify = start_verify.elapsed();
-            println!("证明验证通过，耗时: {:?}", duration_verify);
-            
-            // 保存证明到文件
-            println!("保存证明到文件: {}", args.output);
-            let mut file = File::create(&args.output)?;
-            file.write_all(&proof.bytes())?;
-            println!("证明文件保存成功");
-        },
-        false if args.compressed => {
+    if args.execute {
+        // Execute the program
+        let start_time = Instant::now();
+        let (_output, report) = client.execute(ELF, stdin_instance).run()?;
+        let elapsed = start_time.elapsed();
+        println!("Program executed successfully. Execution time: {:?}", elapsed);
+        println!("Number of cycles: {}", report.total_instruction_count());
+        return Ok(());
+    } else {
+        // Generate the proof
+        let proof = if args.core || args.compressed {
             // 生成compressed proof
-            let start = Instant::now();
+            let start_time = Instant::now();
             let proof = client.prove(&pk, stdin_instance).compressed().run()?;
-            let duration = start.elapsed();
-            println!("Compressed证明生成完成，耗时: {:?}", duration);
-            
-            // 验证证明
-            println!("验证证明...");
-            let start_verify = Instant::now();
-            client.verify(&proof, &vk)?;
-            let duration_verify = start_verify.elapsed();
-            println!("证明验证通过，耗时: {:?}", duration_verify);
-            
-            // 保存证明到文件
-            println!("保存证明到文件: {}", args.output);
-            let mut file = File::create(&args.output)?;
-            file.write_all(&proof.bytes())?;
-            println!("证明文件保存成功");
-        },
-        false if args.system.is_some() => {
-            // 根据指定的证明系统生成证明
-            let system = args.system.unwrap();
-            let start = Instant::now();
+            let duration = start_time.elapsed();
+            println!("generated compressed proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+            proof
+        } else if let Some(system) = &args.system {
+            // 根据指定的系统类型生成proof
+            let start_time = Instant::now();
             let proof = match system.as_str() {
                 "plonk" => {
                     client.prove(&pk, stdin_instance).plonk().run()?
@@ -281,42 +247,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             };
-            let duration = start.elapsed();
-            println!("{}证明生成完成，耗时: {:?}", system, duration);
-            
-            // 验证证明
-            println!("验证证明...");
-            let start_verify = Instant::now();
-            client.verify(&proof, &vk)?;
-            let duration_verify = start_verify.elapsed();
-            println!("证明验证通过，耗时: {:?}", duration_verify);
-            
-            // 保存证明到文件
-            println!("保存证明到文件: {}", args.output);
-            let mut file = File::create(&args.output)?;
-            file.write_all(&proof.bytes())?;
-            println!("证明文件保存成功");
-        },
-        _ => {
-            // 默认生成core proof
-            let start = Instant::now();
-            let proof = client.prove(&pk, stdin_instance).core().run()?;
-            let duration = start.elapsed();
-            println!("Core证明生成完成，耗时: {:?}", duration);
-            
-            // 验证证明
-            println!("验证证明...");
-            let start_verify = Instant::now();
-            client.verify(&proof, &vk)?;
-            let duration_verify = start_verify.elapsed();
-            println!("证明验证通过，耗时: {:?}", duration_verify);
-            
-            // 保存证明到文件
-            println!("保存证明到文件: {}", args.output);
-            let mut file = File::create(&args.output)?;
-            file.write_all(&proof.bytes())?;
-            println!("证明文件保存成功");
-        }
+            let duration = start_time.elapsed();
+            println!("generated {} proof in {}.{:03} seconds", system, duration.as_secs(), duration.subsec_millis());
+            proof
+        } else {
+            // 默认生成compressed proof
+            let start_time = Instant::now();
+            let proof = client.prove(&pk, stdin_instance).compressed().run()?;
+            let duration = start_time.elapsed();
+            println!("generated compressed proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+            proof
+        };
+        println!("Successfully generated proof!");
+
+        // Verify the proof.
+        let start_time = Instant::now();
+        client.verify(&proof, &vk)?;
+        let duration = start_time.elapsed();
+        println!("verified proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+        println!("Successfully verified proof!");
+
+        // 保存证明到文件
+        println!("保存证明到文件: {}", args.output);
+        let mut file = File::create(&args.output)?;
+        file.write_all(&proof.bytes())?;
+        println!("证明文件保存成功");
     }
     
     Ok(())

@@ -1,66 +1,50 @@
 use clap::Parser;
 use dotenv::dotenv;
-use ecdsa_lib::{PublicValuesStruct, DEFAULT_MESSAGE, DEFAULT_PUBLIC_KEY, DEFAULT_SIGNATURE};
+use ecdsa_lib::{PublicValuesStruct, read_and_deserialize};
+use common::constants::ECDSA_BATCH_DATA_FILE;
 use hex;
-use rkyv::{Archive, Deserialize, Serialize};
+use alloy_sol_types::SolType;
 use std::fs::File;
-use std::io::{Read, Write};
-use std::path::Path;
+use std::io::Write;
 use std::time::Instant;
-use zkm_sdk::{ZKMStdin, ProverClient};
+use zkm_sdk::{include_elf, ZKMStdin, ProverClient, HashableKey};
 
-// 定义单个ECDSA签名结果数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct EcdsaResult {
-    message: String,
-    signature_hex: String,
-    public_key_hex: String,
-    is_valid: bool,
-}
+// The ELF we want to execute inside the zkVM.
+const ELF: &[u8] = include_elf!("ecdsa");
 
-// 定义多个ECDSA签名结果的集合数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct EcdsaResults {
-    results: Vec<EcdsaResult>,
-}
 
-// 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<EcdsaResults, std::io::Error> {
-    // 检查文件是否存在
-    if !Path::new(file_path).exists() {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "文件不存在"));
-    }
-    
-    // 打开文件并读取所有字节
-    let mut file = File::open(file_path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    
-    // 使用rkyv反序列化
-    let deserialized = rkyv::from_bytes(&bytes)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "反序列化失败"))?;
-    
-    Ok(deserialized)
-}
 
-#[derive(Parser)]
+
+/// 命令行参数结构体
+#[derive(Parser, Debug)]
+#[command(about = "ECDSA zkVM Prover")]
 struct Args {
-    /// 执行模式: execute, core, compressed
-    #[clap(short, long, default_value = "execute")]
-    mode: String,
+    /// 仅执行程序，不生成证明
+    #[arg(long)]
+    execute: bool,
+    
+    /// 生成核心证明
+    #[arg(long)]
+    core: bool,
+    
+    /// 生成压缩证明
+    #[arg(long)]
+    compressed: bool,
+    
+    /// 指定证明系统类型
+    #[arg(long)]
+    system: Option<String>,
     
     /// 输入文件路径
-    #[clap(short, long)]
+    #[arg(long)]
     input: Option<String>,
     
     /// 输出证明文件路径
-    #[clap(short, long, default_value = "proof.bin")]
+    #[arg(long, default_value = "proof.bin")]
     output: String,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv().ok();
     let args = Args::parse();
     
@@ -71,112 +55,132 @@ fn main() {
     let mut stdin = ZKMStdin::new();
     
     // 处理输入数据
-    if let Some(input_path) = args.input {
-        // 从文件读取输入数据
-        let ecdsa_results = read_and_deserialize(&input_path).expect("无法从文件中反序列化数据");
+    // 使用constants.rs中定义的ECDSA_BATCH_DATA_FILE
+    // 从文件读取输入数据
+    let ecdsa_results = read_and_deserialize(ECDSA_BATCH_DATA_FILE).expect("无法从文件中反序列化数据");
+    
+    println!("从文件中加载的数据:");
+    println!("- 总共有 {} 条记录", ecdsa_results.results.len());
+    
+    // 打印前3条记录作为示例
+    let display_count = ecdsa_results.results.len().min(3);
+    for (index, result) in ecdsa_results.results.iter().take(display_count).enumerate() {
+        println!("示例记录 #{}:", index + 1);
+        println!("  消息: {}", result.message);
+        println!("  签名: {}", result.signature_hex);
+        println!("  公钥: {}", result.public_key_hex);
+        println!("  预期验证结果: {}", result.is_valid);
+    }
+    
+    // 先写入结果列表的长度
+    stdin.write(&(ecdsa_results.results.len() as u32));
+    
+    // 然后逐个写入每个ECDSA结果
+    for result in &ecdsa_results.results {
+        let message = result.message.as_bytes();
+        let signature_bytes = hex::decode(&result.signature_hex).expect("无效的hex签名数据");
+        let public_key_bytes = hex::decode(&result.public_key_hex).expect("无效的hex公钥数据");
         
-        println!("从文件中加载的数据:");
-        println!("- 总共有 {} 条记录", ecdsa_results.results.len());
-        
-        // 打印前3条记录作为示例
-        let display_count = ecdsa_results.results.len().min(3);
-        for (index, result) in ecdsa_results.results.iter().take(display_count).enumerate() {
-            println!("示例记录 #{}:", index + 1);
-            println!("  消息: {}", result.message);
-            println!("  签名: {}", result.signature_hex);
-            println!("  公钥: {}", result.public_key_hex);
-            println!("  预期验证结果: {}", result.is_valid);
-        }
-        
-        // 先写入结果列表的长度
-        stdin.write(&(ecdsa_results.results.len() as u32));
-        
-        // 然后逐个写入每个ECDSA结果
-        for result in &ecdsa_results.results {
-            let message = result.message.as_bytes();
-            let signature_bytes = hex::decode(&result.signature_hex).expect("无效的hex签名数据");
-            let public_key_bytes = hex::decode(&result.public_key_hex).expect("无效的hex公钥数据");
-            
-            // 先写入消息长度和内容
-            stdin.write(&(message.len() as u32));
-            for byte in message {
-                stdin.write(&byte);
-            }
-            
-            // 先写入签名长度和内容
-            stdin.write(&(signature_bytes.len() as u32));
-            for byte in signature_bytes {
-                stdin.write(&byte);
-            }
-            
-            // 先写入公钥长度和内容
-            stdin.write(&(public_key_bytes.len() as u32));
-            for byte in public_key_bytes {
-                stdin.write(&byte);
-            }
-        }
-    } else {
-        // 使用默认测试数据
-        println!("使用默认测试数据");
-        println!("- 消息: {}", String::from_utf8_lossy(DEFAULT_MESSAGE));
-        println!("- 公钥: {}", DEFAULT_PUBLIC_KEY);
-        println!("- 签名: {}", DEFAULT_SIGNATURE);
-        
-        // 写入结果列表的长度（1条）
-        stdin.write(&1u32);
-        
-        // 写入消息
-        let message = DEFAULT_MESSAGE;
+        // 先写入消息长度和内容
         stdin.write(&(message.len() as u32));
         for byte in message {
             stdin.write(&byte);
         }
         
-        // 写入签名
-        let signature_bytes = hex::decode(DEFAULT_SIGNATURE).expect("无效的hex签名数据");
+        // 先写入签名长度和内容
         stdin.write(&(signature_bytes.len() as u32));
         for byte in signature_bytes {
             stdin.write(&byte);
         }
         
-        // 写入公钥
-        let public_key_bytes = hex::decode(DEFAULT_PUBLIC_KEY).expect("无效的hex公钥数据");
+        // 先写入公钥长度和内容
         stdin.write(&(public_key_bytes.len() as u32));
         for byte in public_key_bytes {
             stdin.write(&byte);
         }
     }
+
     
-    // 执行证明
-    println!("执行证明...");
-    let start = Instant::now();
+    // 检查参数是否合法
+    let mut specified_count = 0;
+    if args.execute { specified_count += 1; }
+    if args.core { specified_count += 1; }
+    if args.compressed { specified_count += 1; }
+    if args.system.is_some() { specified_count += 1; }
     
-    let proof = match args.mode.as_str() {
-        "execute" => client.execute_with_stdin(stdin),
-        "core" => client.core_prove_with_stdin(stdin),
-        "compressed" => client.compressed_prove_with_stdin(stdin),
-        _ => panic!("无效的模式: {}", args.mode),
+    if specified_count != 1 {
+        eprintln!("Error: You must specify exactly one of --execute, --core, --compress, or --system");
+        std::process::exit(1);
+    }
+
+    if args.execute {
+        // Execute the program
+        let start_time = Instant::now();
+        let (output, report) = client.execute(ELF, stdin).run().unwrap();
+        let elapsed = start_time.elapsed();
+        println!("Program executed successfully. Execution time: {:?}", elapsed);
+
+        // Read the output.
+        let decoded = PublicValuesStruct::abi_decode(output.as_slice()).unwrap();
+        println!("Verification result: All signatures valid = {}", decoded.allValid);
+
+        // Record the number of cycles executed.
+        println!("Number of cycles: {}", report.total_instruction_count());
+    } else {
+        // Setup the program for proving.
+        let (pk, vk) = client.setup(ELF);
+
+        // Generate the proof
+        let proof = if args.core || args.compressed {
+            // 生成compressed proof
+            let start_time = Instant::now();
+            let proof = client.prove(&pk, stdin).compressed().run().expect("failed to generate Compressed proof");
+            let duration = start_time.elapsed();
+            println!("generated compressed proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+            proof
+        } else if let Some(system) = &args.system {
+            // 根据指定的系统类型生成proof
+            let start_time = Instant::now();
+            let proof = match system.as_str() {
+                "plonk" => {
+                    client.prove(&pk, stdin).plonk().run().expect("failed to generate Plonk proof")
+                },
+                _ => {
+                    eprintln!("Error: Unsupported proof system: {}", system);
+                    std::process::exit(1);
+                }
+            };
+            let duration = start_time.elapsed();
+            println!("generated {} proof in {}.{:03} seconds", system, duration.as_secs(), duration.subsec_millis());
+            proof
+        } else {
+            // 默认生成compressed proof
+            let start_time = Instant::now();
+            let proof = client.prove(&pk, stdin).compressed().run().expect("failed to generate default proof");
+            let duration = start_time.elapsed();
+            println!("generated compressed proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+            proof
+        };
+        println!("Successfully generated proof!");
+
+        // Verify the proof.
+        let start_time = Instant::now();
+        client.verify(&proof, &vk).expect("failed to verify proof");
+        let duration = start_time.elapsed();
+        println!("verified proof in {}.{:03} seconds", duration.as_secs(), duration.subsec_millis());
+        println!("Successfully verified proof!");
+
+        // 解析并显示公共值
+        let public_values: PublicValuesStruct = PublicValuesStruct::abi_decode(proof.public_values.as_slice())?;
+        println!("验证结果: 所有签名有效 = {}", public_values.allValid);
+        
+        // 保存证明到文件
+        println!("保存证明到文件: {}", args.output);
+        let mut file = File::create(&args.output)?;
+        file.write_all(&proof.bytes())?;
+        println!("证明文件保存成功");
+        println!("vk hash: {}", vk.bytes32());
     };
-    
-    let duration = start.elapsed();
-    println!("证明生成完成，耗时: {:?}", duration);
-    
-    // 验证证明
-    println!("验证证明...");
-    let start = Instant::now();
-    proof.verify()?;
-    let duration = start.elapsed();
-    println!("证明验证通过，耗时: {:?}", duration);
-    
-    // 解析并显示公共值
-    let public_values: PublicValuesStruct = proof.public_values()?;
-    println!("验证结果: 所有签名有效 = {}", public_values.allValid);
-    
-    // 保存证明到文件
-    println!("保存证明到文件: {}", args.output);
-    let mut file = File::create(&args.output)?;
-    file.write_all(&proof.to_bytes())?;
-    println!("证明文件保存成功");
     
     Ok(())
 }

@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 alloy-sol-types = { workspace = true }
 rsa-lib = { path = "../lib" }
+sha2-lib = { path = "../../sha2/lib"}
 zkm-zkvm = { workspace = true }
 sha2 = { git = "https://github.com/ziren-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-0.10.8", features = ["oid"] }
 rsa = { git = "https://github.com/sp1-patches/RustCrypto-RSA", tag = "patch-0.9.6-sp1-5.0.0" }

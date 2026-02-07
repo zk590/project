@@ -8,4 +8,4 @@ publish = false
 alloy-sol-types = { workspace = true }
 schnorr-lib = { path = "../lib" }
 zkm-zkvm = { workspace = true }
-k256 = { git = "https://github.com/ziren-patches/elliptic-curves", branch = "patch-k256-0.13.4", default-features = false, features = ["schnorr", "serde", "alloc"] }
+k256 = { git = "https://github.com/ziren-patches/elliptic-curves", branch = "patch-k256-0.13.4", default-features = false, features = ["schnorr", "alloc"] }

@@ -28,3 +28,7 @@ common = {path = "../common"}
 [[bin]]
 name = "some_merkle"
 path = "src/optimized_merkle.rs"
+
+[[bin]]
+name = "merkle"
+path = "src/main.rs"

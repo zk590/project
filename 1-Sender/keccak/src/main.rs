@@ -4,7 +4,7 @@ use hex;
 use std::fs::File;
 use std::io::{Write, Read};
 use std::path::Path;
-use tiny_keccak::{Hasher, Keccak};
+use tiny_keccak::{Keccak, Hasher};
 
 use common::constants::KECCAK_HASH_FILE;
 
@@ -32,11 +32,11 @@ fn main() {
     println!("处理消息: {}", args.message);
     
     // 计算KECCAK-256哈希值
-    let mut hasher = Keccak::v256();
-    hasher.update(args.message.as_bytes());
-    let mut output = [0u8; 32];
-    hasher.finalize(&mut output);
-    let hash_hex = hex::encode(output);
+    let mut keccak = Keccak::v256();
+    keccak.update(args.message.as_bytes());
+    let mut hash = [0u8; 32];
+    keccak.finalize(&mut hash);
+    let hash_hex = hex::encode(hash);
     
     println!("KECCAK-256哈希值: {}", hash_hex);
     

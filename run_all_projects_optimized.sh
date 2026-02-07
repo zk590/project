@@ -1,3 +1,113 @@
+1-Sender:
+
+##Sha3程序
+cd /opt/project/1-Sender/sha3
+cargo run --bin sha3_batch -- --input-file messages.txt
+
+##Sha2程序
+cd /opt/project/1-Sender/sha2
+cargo run --bin sha2_batch -- --input-file messages.txt
+
+##fibonacci_add
+cd /opt/project/1-Sender/fibonacci_add
+cargo run -- --n 12
+
+##fibonacci_mul
+cd /opt/project/1-Sender/fibonacci_mul
+cargo run -- --n 12
+
+##merkle
+cd /opt/project/1-Sender/merkle
+cargo run --bin some_merkle  -- --Some 3 3
+
+
+#ecdsa 
+cargo run --bin ecdsa_batch -- --input-file messages.txt
+
+
+##3-Plonk
+cd /opt/project/3-Plonk/merkle-plonk
+cargo run --bin batch_merkle_proof
+
+
+
+## 2-Receiver/plonk
+/opt/project/2-Receiver/Plonk
+cargo run
+
+## 2-Receiver/zkMIPS
+cd /opt/project/2-Receiver/zkMIPS/Plonk/host
+cargo run --release -- --algorithm fibonacci-add
+
+cargo run --release -- --algorithm sha2
+
+
+
+
+## 4-zkMIPS
+
+##fibonacci_add
+cd /opt/project/4-zkMIPS/fibonacci_add/host
+
+cargo run -- --execute
+
+cargo run --release -- --core
+
+cargo run --release -- --system plonk
+
+## fibonacci_mul
+cd /opt/project/4-zkMIPS/fibonacci_mul/host
+
+cargo run -- --execute
+
+cargo run --release -- --core
+
+##sha2
+cd /opt/project/4-zkMIPS/sha2/host
+
+## merkle
+cd /opt/project/4-zkMIPS/merkle/host
+
+cargo run -- --execute
+
+cargo run --release -- --core
+
+cargo run --release -- --system plonk
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#keccak
+cd /opt/project/1-Sender/keccak
+cargo run --bin keccak_batch -- --input-file messages.txt
+
+
+
+
+
 cargo run --bin ecdsa -- --message "Hello, world!"
 
 cargo run --bin ecdsa_batch -- --input-file messages.txt

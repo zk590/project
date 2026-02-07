@@ -1,18 +1,15 @@
-#![no_std]
+#![no_main]
+zkm_zkvm::entrypoint!(main);
 
 use k256::schnorr::{Signature, VerifyingKey};
 use k256::schnorr::signature::Verifier;
 use schnorr_lib::PublicValuesStruct;
 use zkm_zkvm::io::{read, commit_slice};
-use zkm_zkvm::println;
 use alloy_sol_types::SolType;
-
-zkm_zkvm::entrypoint!(main);
 
 pub fn main() {
     // 读取结果列表的长度
     let results_len = read::<u32>();
-    println!("收到 {} 条Schnorr结果需要验证", results_len);
 
     // 用于存储所有验证结果
     let mut all_valid = true;
@@ -28,6 +25,11 @@ pub fn main() {
         let signature_len = read::<u32>();
         // 读取签名内容
         let signature_bytes = (0..signature_len).map(|_| read::<u8>()).collect::<Vec<u8>>();
+        
+        // 验证签名长度
+        if signature_bytes.len() != 64 {
+            panic!("无效的签名长度: {}, 期望64字节", signature_bytes.len());
+        }
 
         // 读取公钥长度
         let public_key_len = read::<u32>();
@@ -35,11 +37,12 @@ pub fn main() {
         let public_key_bytes = (0..public_key_len).map(|_| read::<u8>()).collect::<Vec<u8>>();
 
         // 解析验证密钥（公钥）
+        // 注意：使用from_bytes而不是from_sec1_bytes，因为我们接收的是32字节的x坐标格式公钥
         let verifying_key = VerifyingKey::from_bytes(&public_key_bytes)
             .expect("无效的公钥数据");
 
         // 解析签名
-        let signature = Signature::try_from(&signature_bytes[..64])
+        let signature = Signature::try_from(signature_bytes.as_slice())
             .expect("无效的签名数据");
 
         // 验证签名
@@ -53,7 +56,6 @@ pub fn main() {
     }
 
     // 提交最终的总体验证结果
-    println!("所有Schnorr签名验证完成，总体结果: {}", all_valid);
 
     let bytes = PublicValuesStruct::abi_encode(&PublicValuesStruct { all_valid });
     commit_slice(&bytes);

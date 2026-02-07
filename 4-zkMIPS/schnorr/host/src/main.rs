@@ -1,58 +1,11 @@
 use alloy_sol_types::SolType;
 use clap::Parser;
-use schnorr_lib::PublicValuesStruct;
+use schnorr_lib::{PublicValuesStruct, ProofData, read_and_deserialize};
 use zkm_sdk::{ProverClient, ZKMStdin, include_elf, HashableKey};
 use hex;
-use rkyv::{Archive, Deserialize, Serialize};
-use std::fs::File;
-use std::io::{Read, Error as IoError, ErrorKind};
-use std::path::Path;
 use std::time::Instant;
 
-// 定义单个Schnorr签名结果数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct SchnorrResult {
-    message: String,
-    signature_hex: String,
-    public_key_hex: String,
-    is_valid: bool,
-}
 
-// 定义多个Schnorr签名结果的集合数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct SchnorrResults {
-    results: Vec<SchnorrResult>,
-}
-
-// 定义用于序列化证明和公共值的数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct ProofData {
-    proof: Vec<u8>,
-    public_values: Vec<u8>,
-    vk_bytes: String,
-}
-
-// 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<SchnorrResults, IoError> {
-    // 检查文件是否存在
-    if !Path::new(file_path).exists() {
-        return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
-    }
-    
-    // 打开文件并读取所有字节
-    let mut file = File::open(file_path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    
-    // 使用rkyv反序列化
-    let deserialized = rkyv::from_bytes(&bytes)
-        .map_err(|_| IoError::new(ErrorKind::Other, "反序列化失败"))?;
-    
-    Ok(deserialized)
-}
 
 /// The ELF (executable and linkable format) file for the zkMIPS zkVM.
 pub const SCHNORR_ELF: &[u8] = include_elf!("schnorr");
@@ -101,7 +54,7 @@ fn main() {
     let client = ProverClient::new();
 
     // 从文件中反序列化批量Schnorr签名结果数据
-    let file_path = args.file_path.as_deref().unwrap_or("/opt/project/1-Sender/schnorr/schnorr_data.bin");
+    let file_path = args.file_path.as_deref().unwrap_or("/opt/project/1-Sender/schnorr/schnorr_batch_data.bin");
     let schnorr_results = read_and_deserialize(file_path).expect("无法从文件中反序列化数据");
     
     println!("从文件中加载的数据:");

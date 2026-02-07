@@ -2,7 +2,7 @@ use std::env;
 use common::constants::{MERKLE_SOME_FILE, MERKLE_FILE};
 
 // 导入lib.rs中的所有功能
-use crate::lib::{create_and_save_leaves_data, verify_leaves, simulate_chain_environment};
+use merkle::{create_and_save_leaves_data, verify_leaves, simulate_chain_environment};
 
 // 打印使用说明
 fn print_usage() {

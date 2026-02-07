@@ -5,9 +5,9 @@ edition = "2024"
 
 [dependencies]
 alloy-sol-types = { workspace = true }
-sha3 = { git = "https://github.com/ziren-patches/RustCrypto-hashes", package = "sha3" }
 zkm-sdk = { workspace = true, optional = true }
 bincode = { version = "1.3.3", optional = true }
+rkyv = { version = "0.7.45", features = ["bytecheck", "std"] }
 
 [features]
 default = []

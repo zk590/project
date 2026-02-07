@@ -1,32 +1,19 @@
 [package]
 name = "aggregation-host"
-version = "1.0.0"
+version = "0.1.0"
 edition = "2024"
 publish = false
 
 [dependencies]
-alloy-sol-types = { workspace = true }
-clap = { workspace = true }
-dotenv = { workspace = true }
-hex = { workspace = true }
-serde_json = { workspace = true }
-serde = { workspace = true }
-aggregation-lib = { path = "../lib" }
-rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
-sha2 = { git = "https://github.com/ziren-patches/RustCrypto-hashes", package = "sha2", branch = "patch-sha2-0.10.8" }
 zkm-sdk = { workspace = true }
+tracing = { workspace = true }
+common = { path = "/opt/project/1-Sender/common" }
+fibonacci-add-lib = { path = "../../fibonacci_add/lib", features = ["host"] }
+fibonacci-mul-lib = { path = "../../fibonacci_mul/lib", features = ["host"] }
+sha2-lib = { path = "../../sha2/lib", features = ["host"] }
+sha3-lib = { path = "../../sha3/lib", features = ["host"] }
+rkyv = { version = "0.7.45", features = ["std", "validation"] }
+hex = "0.4.3"
 
 [build-dependencies]
 zkm-build = { workspace = true }
-
-[[bin]]
-name = "aggregation"
-path = "src/main.rs"
-
-[[bin]]
-name = "evm"
-path = "bin/evm.rs"
-
-[[bin]]
-name = "vkey"
-path = "bin/vkey.rs"

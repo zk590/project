@@ -71,7 +71,7 @@ fn verify_merkle_proof(n: Option<usize>) -> Result<(), Box<dyn std::error::Error
         None => {
             // 默认验证所有可能存在的文件
             let mut count = 0;
-            while Path::new(&format!("plonk_proof_{}.bin", count)).exists() {
+            while Path::new(&format!("{}{}", MERKLE_PROOF_FILE_PREFIX, &format!("plonk_proof_{}.bin", count + 1))).exists() {
                 count += 1;
             }
             count

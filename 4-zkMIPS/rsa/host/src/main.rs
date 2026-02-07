@@ -1,12 +1,10 @@
 use alloy_sol_types::SolType;
 use clap::Parser;
-use rsa_lib::PublicValuesStruct;
-use zkm_sdk::{ProverClient, ZKMStdin, include_elf, HashableKey};
+use rsa_lib::{PublicValuesStruct, read_and_deserialize};
+use zkm_sdk::{ProverClient, ZKMStdin, include_elf};
 use hex;
-use rkyv::{Archive, Deserialize, Serialize};
 use std::fs::File;
-use std::io::{Read, Write, Error as IoError, ErrorKind};
-use std::path::Path;
+use std::io::Write;
 use std::time::Instant;
 use dotenv::dotenv;
 
@@ -16,48 +14,7 @@ pub const RSA_ELF: &[u8] = include_elf!("rsa");
 // 包含2048位RSA密钥的DER格式数据
 const RSA_2048_PUB_DER: &[u8] = include_bytes!("../rsa2048-pub.der");
 
-// 定义单个签名结果数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct SignatureResult {
-    message: String,
-    signature_hex: String,
-}
 
-// 定义多个签名结果的集合数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct SignatureResults {
-    results: Vec<SignatureResult>,
-}
-
-// 定义用于序列化证明和公共值的数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct ProofData {
-    proof: Vec<u8>,
-    public_values: Vec<u8>,
-    vk_bytes: String,
-}
-
-// 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<SignatureResults, IoError> {
-    // 检查文件是否存在
-    if !Path::new(file_path).exists() {
-        return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
-    }
-    
-    // 打开文件并读取所有字节
-    let mut file = File::open(file_path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    
-    // 使用rkyv反序列化
-    let deserialized = rkyv::from_bytes(&bytes)
-        .map_err(|_| IoError::new(ErrorKind::Other, "反序列化失败"))?;
-    
-    Ok(deserialized)
-}
 
 /// The arguments for the command.
 #[derive(Parser, Debug)]
@@ -100,7 +57,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = ProverClient::new();
 
     // 从文件中反序列化批量签名结果数据
-    let input_path = args.input.as_deref().unwrap_or("/opt/project/1-Sender/rsa/rsa_hash.bin");
+    let input_path = args.input.as_deref().unwrap_or(common::constants::RSA_HASH_BATCH_FILE);
     let signature_results = read_and_deserialize(input_path).expect("无法从文件中反序列化数据");
     
     println!("从文件中加载的数据:");
@@ -172,13 +129,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("程序执行耗时: {:?}", duration);
          // Read the output.
         let decoded = PublicValuesStruct::abi_decode(output.as_slice()).unwrap();
-        let PublicValuesStruct { allValid } = decoded;
-        println!("All tests passed: {}", allValid);
+        let PublicValuesStruct { all_valid } = decoded;
+        println!("All tests passed: {}", all_valid);
         return Ok(());
     } else if args.core {
         // 生成core proof
         let start = Instant::now();
-        let proof = client.prove(&pk, stdin).core().run()?;
+        let proof = client.prove(&pk, stdin).compressed().run()?;
         let duration = start.elapsed();
         println!("证明生成完成，耗时: {:?}", duration);
         proof
@@ -222,7 +179,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 解析并显示公共值
     let public_values: PublicValuesStruct = PublicValuesStruct::abi_decode(proof.public_values.as_slice())?;
-    println!("验证结果: 所有签名验证有效 = {}", public_values.allValid);
+    println!("验证结果: 所有签名验证有效 = {}", public_values.all_valid);
     
     // 保存证明到文件
     println!("保存证明到文件: {}", args.output);

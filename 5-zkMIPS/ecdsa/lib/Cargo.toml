@@ -1,7 +1,0 @@
-[package]
-name = "ecdsa-lib"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-alloy-sol-types = { workspace = true }

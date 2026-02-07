@@ -1,9 +1,0 @@
-[package]
-name = "sha2-program"
-version = "1.1.0"
-edition = "2024"
-publish = false
-
-[dependencies]
-sp1-zkvm = { workspace = true }
-sha2 = { git = "https://github.com/sp1-patches/RustCrypto-hashes", package = "sha2", tag = "patch-sha2-0.10.9-sp1-4.0.0" }

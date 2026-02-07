@@ -3,7 +3,7 @@ zkm_zkvm::entrypoint!(main);
 
 use alloy_sol_types::SolType;
 use keccak_lib::PublicValuesStruct;
-use tiny_keccak::{Hasher, Keccak};
+use zkm_zkvm::lib::keccak256::keccak256;
 
 pub fn main() {
     // 先读取哈希结果列表的长度
@@ -25,10 +25,7 @@ pub fn main() {
         let hash_value = (0..hash_len).map(|_| zkm_zkvm::io::read::<u8>()).collect::<Vec<u8>>();
 
         // 计算KECCAK-256哈希值
-        let mut hasher = Keccak::v256();
-        hasher.update(&message);
-        let mut output = [0u8; 32];
-        hasher.finalize(&mut output);
+        let mut output = keccak256(&message.as_slice());
         
         // 验证计算的哈希值是否与提供的哈希值匹配
         let is_valid = &output[..] == &hash_value[..];

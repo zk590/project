@@ -15,8 +15,7 @@ path = "src/main_batch.rs"
 rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
 rkyv_derive = { version = "0.7.45" }
 common = {path="../common"}
-tiny-keccak = { git = "https://github.com/sp1-patches/tiny-keccak", branch = "patch-v2.0.2", features = [
-  "keccak",
-] }
+zkm-zkvm = { git = "https://github.com/zkMIPS/zkMIPS.git" }
 clap = { version = "4.4.8", features = ["derive"] }
 hex = "0.4.3"
+tiny-keccak = { version = "2.0", features = ["keccak"] }

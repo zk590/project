@@ -3,7 +3,7 @@ use hex;
 use std::fs::File;
 use std::io::{Write, Read};
 use std::path::Path;
-use tiny_keccak::{Hasher, Keccak};
+use tiny_keccak::{Keccak, Hasher};
 use clap::Parser;
 use common::constants::KECCAK_HASH_BATCH_FILE;
 use std::time::Instant;
@@ -48,12 +48,12 @@ fn main() {
 
             for (i, message) in messages.iter().enumerate() {            
                 // 计算KECCAK-256哈希值
-                let mut hasher = Keccak::v256();
-                hasher.update(message.as_bytes());
                 // Keccak-256标准输出大小为256位(32字节)
-                let mut output = [0u8; 32];  
-                hasher.finalize(&mut output);
-                let hash_hex = hex::encode(output);
+                let mut keccak = Keccak::v256();
+                keccak.update(message.as_bytes());
+                let mut hash = [0u8; 32];
+                keccak.finalize(&mut hash);
+                let hash_hex = hex::encode(hash);
                 if i==1 {
                     println!("The KECCAK.Preimage = {}",message);
                     println!("The KECCAK.hash = {}",hash_hex);

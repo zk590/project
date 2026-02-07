@@ -1,28 +1,12 @@
 use alloy_sol_types::SolType;
 use clap::Parser;
-use sha3_lib::{PublicValuesStruct, SerializedProof, serialize_plonk_proof, serialize_stark_proof};
-use zkm_sdk::{ProverClient, ZKMStdin, include_elf, HashableKey};
+use sha3_lib::{PublicValuesStruct, SerializedProof, serialize_plonk_proof, serialize_stark_proof, read_and_deserialize};
+use zkm_sdk::{ProverClient, ZKMStdin, include_elf};
 use hex;
 use rkyv::{Archive, Deserialize, Serialize};
-use std::fs::File;
-use std::io::{Read, Error as IoError, ErrorKind};
-use std::path::Path;
 use std::time::Instant;
 
-// 定义单个哈希结果数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct HashResult {
-    message: String,
-    hash: String,
-}
 
-// 定义多个哈希结果的集合数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct HashResults {
-    results: Vec<HashResult>,
-}
 
 // 定义用于序列化证明和公共值的数据结构
 #[derive(Archive, Serialize, Deserialize, Debug)]
@@ -33,24 +17,7 @@ struct ProofData {
     vk_bytes: Vec<u8>,
 }
 
-// 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<HashResults, IoError> {
-    // 检查文件是否存在
-    if !Path::new(file_path).exists() {
-        return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
-    }
-    
-    // 打开文件并读取所有字节
-    let mut file = File::open(file_path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    
-    // 使用rkyv反序列化
-    let deserialized = rkyv::from_bytes(&bytes)
-        .map_err(|_| IoError::new(ErrorKind::Other, "反序列化失败"))?;
-    
-    Ok(deserialized)
-}
+
 
 /// The ELF (executable and linkable format) file for the zkMIPS zkVM.
 pub const SHA3_ELF: &[u8] = include_elf!("sha3");

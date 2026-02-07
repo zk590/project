@@ -11,8 +11,8 @@ dotenv = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
-ecdsa-lib = { path = "../lib" }
-rkyv = { version = "0.7.45", features = ["std", "validation"] }
+ecdsa-lib = { path = "../lib", features = ["host"] }
+common = { path = "/opt/project/1-Sender/common" }
 zkm-sdk = { workspace = true }
 
 [build-dependencies]
@@ -21,11 +21,3 @@ zkm-build = { workspace = true }
 [[bin]]
 name = "ecdsa"
 path = "src/main.rs"
-
-[[bin]]
-name = "evm"
-path = "bin/evm.rs"
-
-[[bin]]
-name = "vkey"
-path = "bin/vkey.rs"

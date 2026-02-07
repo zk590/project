@@ -8,7 +8,8 @@ zkm_zkvm::entrypoint!(main);
 
 use alloc::vec::Vec;
 use alloy_sol_types::SolType;
-use sha3_lib::{PublicValuesStruct, sha3_256};
+use sha3_lib::{PublicValuesStruct};
+use zkm_zkvm::lib::sha3::sha3_256;
 
 pub fn main() {
     // Read the number of hash results to verify
@@ -28,7 +29,7 @@ pub fn main() {
         let hash_value = (0..hash_len).map(|_| zkm_zkvm::io::read::<u8>()).collect::<Vec<u8>>();
 
         // Compute SHA3-256 hash of the message
-        let computed_hash = sha3_256(&message);
+        let computed_hash = sha3_256(&message.as_slice());
         
         // Verify if computed hash matches the provided hash
         let is_valid = computed_hash.to_vec() == hash_value;

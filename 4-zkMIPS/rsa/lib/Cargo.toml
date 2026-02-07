@@ -5,3 +5,7 @@ edition = "2024"
 
 [dependencies]
 alloy-sol-types = { workspace = true }
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"], optional = true }
+
+[features]
+host = ["dep:rkyv"]

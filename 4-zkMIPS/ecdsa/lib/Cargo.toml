@@ -1,7 +1,11 @@
 [package]
 name = "ecdsa-lib"
 version = "0.1.0"
-edition = "2024"
+edition = "2021"
 
 [dependencies]
 alloy-sol-types = { workspace = true }
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"], optional = true }
+
+[features]
+host = ["dep:rkyv"]

@@ -196,7 +196,8 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     println!("Plonk Public_input.root = {}",hex::encode(multiple_leaves_data.root_hash));
     // 处理所有叶子节点
     for (i, leaf_info) in multiple_leaves_data.leaves_info.iter().enumerate() {
-        println!("\n处理叶子节点 {} （位置: {}）", i + 1, leaf_info.position);
+        println!("\n处理叶子节点 ");
+        // println!("\n处理叶子节点 {} （位置: {}）", i + 1, leaf_info.position);
         if i==0{
             println!("Plonk Public_input.leaf = {}",hex::encode(leaf_info.leaf_hash));
         }

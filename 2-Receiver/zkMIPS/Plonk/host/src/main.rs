@@ -38,9 +38,9 @@ struct Args {
 fn load_proof_data(algorithm: &Algorithm) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
     // 根据算法类型确定证明数据文件路径
     let proof_data_path = match algorithm {
-        Algorithm::Sha2 => "/opt/project/5-zkMIPS/sha2/host/sha2_proof_data.bin",
-        Algorithm::Sha3 => "/opt/project/5-zkMIPS/sha3/host/sha3_proof_data.bin",
-        Algorithm::FibonacciAdd => "/opt/project/5-zkMIPS/fibonacci_add/host/fibonacci_add_proof_data.bin",
+        Algorithm::Sha2 => "/opt/project/4-zkMIPS/sha2/host/sha2_proof_data.bin",
+        Algorithm::Sha3 => "/opt/project/4-zkMIPS/sha3/host/sha3_proof_data.bin",
+        Algorithm::FibonacciAdd => "/opt/project/4-zkMIPS/fibonacci_add/host/fibonacci_add_proof_data.bin",
     };
     
     // 反序列化证明数据文件

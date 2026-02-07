@@ -17,8 +17,8 @@ pub const MERKLE_FILE: &str = "/opt/project/1-Sender/merkle/merkle_data.bin"; //
 pub const MERKLE_SOME_FILE: &str = "/opt/project/1-Sender/merkle/merkle_some_data.bin"; //跟随叶子节点变化
 pub const MERKLE_TREE_STATE_FILE: &str = "/opt/project/1-Sender/merkle/merkle_tree_state.bin"; //存储Merkle树状态，用于持久化
 
-pub const PLONK_PROOF_FILE: &str = "/opt/project/3-Plonk/merkle-plonk/plonk_proof.bin"; //plonk 证明,跟随叶子节点变化
-pub const PLONK_PUBLICINPUTS_FILE: &str = "/opt/project/3-Plonk/merkle-plonk/plonk_publicinputs.bin"; //plonk 公共输入，跟随叶子节点变化
+pub const PLONK_PROOF_FILE: &str = "/opt/project/3-Plonk/merkle-plonk/plonk_proof_1.bin"; //plonk 证明,跟随叶子节点变化
+pub const PLONK_PUBLICINPUTS_FILE: &str = "/opt/project/3-Plonk/merkle-plonk/plonk_publicinputs_1.bin"; //plonk 公共输入，跟随叶子节点变化
 
 // 定义电路证明文件路径
 pub const CIRCUIT_PROVE_FILE: &str = "/opt/project/3-Plonk/merkle-plonk/circuit_prove.bin"; //跟随容量值变化

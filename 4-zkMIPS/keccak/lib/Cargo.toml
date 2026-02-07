@@ -10,6 +10,7 @@ alloy-sol-types = { workspace = true }
 zkm-sdk = { workspace = true, optional = true }
 bincode = { version = "1.3.3", optional = true }
 serde = { workspace = true, optional = true }
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"], optional = true }
 
 [features]
-host = ["dep:zkm-sdk", "dep:bincode", "dep:serde"]
+host = ["dep:zkm-sdk", "dep:bincode", "dep:serde", "dep:rkyv"]

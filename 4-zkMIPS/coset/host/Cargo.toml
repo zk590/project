@@ -6,13 +6,14 @@ publish = false
 
 [dependencies]
 alloy-sol-types = { workspace = true }
-alloy-primitives.workspace = true
+#alloy-primitives.workspace = true
 clap = { workspace = true }
 dotenv = { workspace = true }
 hex = { workspace = true }
 serde_json = { workspace = true }
 serde = { workspace = true }
 coset-lib = { path = "../lib", features = ["host"] }
+common = { path = "/opt/project/1-Sender/common" }
 coset-bls12_381.workspace = true
 coset-poseidon.workspace = true
 coset-bytes.workspace = true
@@ -28,11 +29,3 @@ zkm-build = { workspace = true }
 [[bin]]
 name = "coset"
 path = "src/main.rs"
-
-[[bin]]
-name = "evm"
-path = "bin/evm.rs"
-
-[[bin]]
-name = "vkey"
-path = "bin/vkey.rs"

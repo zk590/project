@@ -1,17 +1,17 @@
-#![no_std]
+#![no_main]
+zkm_zkvm::entrypoint!(main);
+extern crate alloc;
 
 use ecdsa_lib::PublicValuesStruct;
 use k256::ecdsa::{Signature, VerifyingKey};
 use k256::ecdsa::signature::Verifier;
-use zkm_zkvm::io::{read, commit};
-use zkm_zkvm::println;
-
-zkm_zkvm::entrypoint!(main);
+use zkm_zkvm::io::{read, commit_slice};
+use alloy_sol_types::SolType;
+use alloc::vec::Vec;
 
 pub fn main() {
     // 先读取ECDSA结果列表的长度
     let results_len = read::<u32>();
-    println!("收到 {} 条ECDSA结果需要验证", results_len);
     
     // 用于存储所有验证结果
     let mut all_valid = true;
@@ -45,19 +45,18 @@ pub fn main() {
         let is_valid = verifying_key.verify(&message, &signature).is_ok();
         
         // 输出验证结果
-        println!("ECDSA签名验证结果 #{}: {}", i + 1, is_valid);
         
         // 更新总体验证结果
         all_valid = all_valid && is_valid;
     }
     
     // 提交最终的总体验证结果
-    println!("所有ECDSA签名验证完成，总体结果: {}", all_valid);
     
     // 使用PublicValuesStruct提交结果
     let public_values = PublicValuesStruct {
         allValid: all_valid,
     };
     
-    commit(&public_values);
+    let bytes = PublicValuesStruct::abi_encode(&public_values);
+    commit_slice(&bytes);
 }

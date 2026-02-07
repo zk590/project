@@ -4,7 +4,7 @@ zkm_zkvm::entrypoint!(main);
 
 use coset_lib::PublicValuesStruct;
 use alloy_sol_types::SolType;
-use alloy_primitives::FixedBytes;
+// use alloy_primitives::FixedBytes;
 use coset_bls12_381::BlsScalar;
 use plonk::prelude::*;
 use coset_bytes::Serializable;
@@ -47,7 +47,8 @@ pub fn main() {
     }
     
     // 准备公共输入的固定字节格式
-    let public_inputs_fixed: alloy_primitives::FixedBytes<32> = FixedBytes::from_slice(&root_hash);
+    // let public_inputs_fixed: alloy_primitives::FixedBytes<32> = FixedBytes::from_slice(&root_hash);
+    let public_inputs_fixed: alloy_primitives::FixedBytes<32> = alloy_primitives::FixedBytes::repeat_byte(0);
 
     // 验证proof并处理可能的错误
     if let Err(_) = verifier.verify(&proof, &public_inputs) {

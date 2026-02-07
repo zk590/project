@@ -2,52 +2,18 @@ use clap::Parser;
 use dotenv::dotenv;
 use alloy_sol_types::SolType;
 use hex;
-use keccak_lib::{PublicValuesStruct};
+use keccak_lib::{PublicValuesStruct, read_and_deserialize};
 use common::constants::KECCAK_HASH_FILE;
 use zkm_sdk::include_elf;
 
 /// The ELF we want to execute inside the zkVM.
 const ELF: &[u8] = include_elf!("keccak");
-use rkyv::{Archive, Deserialize, Serialize};
 use std::fs::File;
-use std::io::{Read, Write};
-use std::path::Path;
+use std::io::Write;
 use std::time::Instant;
 use zkm_sdk::{ZKMStdin, ProverClient};
 
-// 定义单个哈希结果数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct HashResult {
-    message: String,
-    hash: String,
-}
 
-// 定义多个哈希结果的集合数据结构
-#[derive(Archive, Serialize, Deserialize, Debug)]
-#[archive(check_bytes)]
-struct HashResults {
-    results: Vec<HashResult>,
-}
-
-// 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<HashResults, std::io::Error> {
-    // 检查文件是否存在
-    if !Path::new(file_path).exists() {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "文件不存在"));
-    }
-    
-    // 打开文件并读取所有字节
-    let mut file = File::open(file_path)?;
-    let mut bytes = Vec::new();
-    file.read_to_end(&mut bytes)?;
-    
-    // 使用rkyv反序列化
-    let deserialized = rkyv::from_bytes(&bytes)
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "反序列化失败"))?;
-    
-    Ok(deserialized)
-}
 
 #[derive(Parser)]
 struct Args {

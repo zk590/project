@@ -7,5 +7,4 @@ publish = false
 [dependencies]
 alloy-sol-types = { workspace = true }
 sha3-lib = { path = "../lib" }
-sha3 = { version = "0.10.8", default-features = false }
 zkm-zkvm = { workspace = true }
