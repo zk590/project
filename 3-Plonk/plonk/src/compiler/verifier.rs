@@ -71,12 +71,12 @@ impl Verifier {
         (size, verifier_key, opening_key)
     }
 
-
+    /// 返回当前 verifier 的序列化字节长度。
     pub fn serialized_size(&self) -> usize {
         self.prepare_serialize().0
     }
 
-
+    /// 将 verifier（含验证键与公开输入索引）序列化为字节。
     pub fn to_bytes(&self) -> Vec<u8> {
         let (size, verifier_key, opening_key) = self.prepare_serialize();
         let mut bytes = Vec::with_capacity(size);
@@ -108,8 +108,7 @@ impl Verifier {
         bytes
     }
 
-
-
+    /// 从字节反序列化 verifier。
     pub fn try_from_bytes<B>(bytes: B) -> Result<Self, Error>
     where
         B: AsRef<[u8]>,
@@ -189,7 +188,7 @@ impl Verifier {
         ))
     }
 
-
+    /// 验证给定证明与公开输入是否匹配当前验证键。
     pub fn verify(
         &self,
         proof: &Proof,

@@ -12,6 +12,7 @@ use coset_poseidon::{Domain, HashGadget};
 
 
 
+/// 在电路中验证 Merkle opening，并返回逐层重建后的根哈希 witness。
 pub fn opening_gadget<T, const H: usize>(
     composer: &mut Composer,
     opening: &Opening<T, H>,
@@ -21,8 +22,10 @@ where
     T: Clone + Aggregate<ARITY>,
 {
 
+    // 每一层的分支哈希 witness。
     let mut level_witnesses = [[Composer::ZERO; ARITY]; H];
 
+    // 每一层位置 one-hot 位：仅真实路径索引为 1。
     let mut position_bits = [[Composer::ZERO; ARITY]; H];
     for level_index in (0..H).rev() {
         let level = &opening.branch()[level_index];
@@ -43,6 +46,7 @@ where
 
 
 
+        // 约束 one-hot 位之和必须为 1，确保每层仅选择一个分支。
         let constraint = Constraint::new()
             .left(1)
             .a(position_bits[level_index][0])
@@ -62,11 +66,13 @@ where
     }
 
 
+    // 自底向上校验路径节点并重算父层哈希。
     let mut current_hash_witness = leaf;
     for level_index in (0..H).rev() {
         for item_index in 0..ARITY {
 
 
+            // 被选中的分支哈希必须等于当前层传入哈希。
             let constraint = Constraint::new()
                 .mult(1)
                 .a(position_bits[level_index][item_index])

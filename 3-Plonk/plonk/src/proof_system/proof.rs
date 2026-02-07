@@ -200,6 +200,7 @@ pub(crate) mod alloc {
     impl Proof {
 
         #[allow(non_snake_case)]
+        /// 使用验证键、转录器与公开输入对证明执行完整验证。
         pub(crate) fn verify(
             &self,
             verifier_key: &VerifierKey,
@@ -477,7 +478,7 @@ pub(crate) mod alloc {
             Ok(())
         }
 
-
+        /// 计算线性化多项式对应的承诺点。
         #[allow(clippy::too_many_arguments)]
         fn compute_linearization_commitment(
             &self,
@@ -570,6 +571,7 @@ pub(crate) mod alloc {
         }
     }
 
+    /// 计算第一拉格朗日基函数在挑战点处的取值。
     fn compute_first_lagrange_evaluation(
         domain: &EvaluationDomain,
         z_h_eval: &BlsScalar,
@@ -580,6 +582,7 @@ pub(crate) mod alloc {
         z_h_eval * denom.invert().unwrap()
     }
 
+    /// 通过重心插值在挑战点上评估公开输入多项式。
     pub(crate) fn compute_barycentric_eval(
         evaluations: &[BlsScalar],
         point: &BlsScalar,

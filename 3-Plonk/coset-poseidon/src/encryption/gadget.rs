@@ -13,10 +13,7 @@ use crate::{Domain, Error};
 
 
 
-///
-
-///
-
+/// 电路内的 Poseidon 加密 gadget，返回密文 witness 向量。
 pub fn encrypt_gadget(
     composer: &mut Composer,
     plaintext_message: impl AsRef<[Witness]>,
@@ -36,10 +33,7 @@ pub fn encrypt_gadget(
 
 
 
-///
-
-///
-
+/// 电路内的 Poseidon 解密 gadget。
 pub fn decrypt_gadget(
     composer: &mut Composer,
     ciphertext: impl AsRef<[Witness]>,

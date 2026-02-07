@@ -62,21 +62,17 @@ impl ops::Index<Witness> for Composer {
 
 impl Composer {
 
-    ///
-
-
+    /// 常量 0 对应的 witness。
     pub const ZERO: Witness = Witness::ZERO;
 
 
-    ///
-
-
+    /// 常量 1 对应的 witness。
     pub const ONE: Witness = Witness::ONE;
 
 
     pub const IDENTITY: WitnessPoint = WitnessPoint::new(Self::ZERO, Self::ONE);
 
-
+    /// 返回当前电路中的约束数量。
     pub fn constraints(&self) -> usize {
         self.constraints.len()
     }
@@ -162,8 +158,7 @@ impl Composer {
         &mut self.runtime
     }
 
-
-
+    /// 创建一个已初始化的 `Composer`，并写入基础常量与占位门。
     pub fn initialized() -> Self {
         let mut composer = Self::uninitialized();
 
@@ -178,9 +173,7 @@ impl Composer {
         composer
     }
 
-
-    ///
-
+    /// 创建未初始化 `Composer`（不含基础常量门）。
     pub(crate) fn uninitialized() -> Self {
         Self {
             constraints: Vec::new(),
@@ -229,7 +222,7 @@ impl Composer {
         self.append_gate(constraint);
     }
 
-
+    /// 追加一个 witness，并记录运行时事件。
     pub fn append_witness<W: Into<BlsScalar>>(
         &mut self,
         witness: W,
@@ -248,7 +241,7 @@ impl Composer {
         witness
     }
 
-
+    /// 追加一条自定义约束门。
     pub fn append_custom_gate(&mut self, constraint: Constraint) {
         self.runtime()
             .event(RuntimeEvent::ConstraintAppended { c: constraint });
@@ -257,16 +250,7 @@ impl Composer {
     }
 
 
-
-    ///
-
-
-    ///
-
-
-
-
-
+    /// 追加逻辑组件约束，支持按位 `AND/XOR` 聚合。
     pub fn append_logic_component<const BIT_PAIRS: usize>(
         &mut self,
         a: Witness,

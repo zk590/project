@@ -43,13 +43,14 @@ impl Default for OpeningCircuit {
 }
 
 impl OpeningCircuit {
-
+    /// 构造一条 Merkle 开证明对应的电路实例。
     pub fn new(opening: Opening<(), { TREE_HEIGHT }>, leaf: Item<()>) -> Self {
         Self { opening, leaf }
     }
 }
 
 impl Circuit for OpeningCircuit {
+    /// 在约束系统中验证 `leaf` 与 `opening` 计算出的根是否匹配公开根。
     fn circuit(&self, composer: &mut Composer) -> Result<(), Error> {
 
         let leaf = composer.append_witness(self.leaf.hash);
@@ -201,6 +202,7 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
 }
 
 
+/// 读取 Merkle opening 并生成单条 PLONK 证明，随后落盘证明与公开输入。
 fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 生成零知识证明 ======");
     
@@ -336,6 +338,7 @@ pub fn verify_proof() -> Result<(), IoError> {
         Ok(())
 }
 
+/// CLI 入口：先生成证明，再执行一次验证。
 fn main() {
     println!("===== 验证基于Poseidon Hash的Merkle树叶子节点 ======");
     // 从文件中加载证明数据

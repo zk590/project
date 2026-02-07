@@ -465,7 +465,7 @@ const EDWARDS_D2: Fq = Fq::from_raw([
 ]);
 
 impl AffinePoint {
-
+    /// 返回仿射坐标单位元。
     pub const fn identity() -> Self {
         AffinePoint {
             u: Fq::zero(),
@@ -474,23 +474,27 @@ impl AffinePoint {
     }
 
 
+    /// 判断是否为单位元。
     pub fn is_identity(&self) -> Choice {
         ExtendedPoint::from(*self).is_identity()
     }
 
 
 
+    /// 乘以协因子 8，将点映射到素数阶子群。
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         ExtendedPoint::from(*self).mul_by_cofactor()
     }
 
 
+    /// 判断是否为小阶点（8-扭子群）。
     pub fn is_small_order(&self) -> Choice {
         ExtendedPoint::from(*self).is_small_order()
     }
 
 
 
+    /// 判断是否属于素数阶子群。
     pub fn is_torsion_free(&self) -> Choice {
         ExtendedPoint::from(*self).is_torsion_free()
     }
@@ -499,12 +503,14 @@ impl AffinePoint {
 
 
 
+    /// 判断是否为素数阶且非单位元。
     pub fn is_prime_order(&self) -> Choice {
         let extended = ExtendedPoint::from(*self);
         extended.is_torsion_free() & (!extended.is_identity())
     }
 
 
+    /// 压缩编码为 32 字节（v 坐标 + u 符号位）。
     pub fn to_bytes(&self) -> [u8; 32] {
         let mut encoded_bytes = self.v.to_bytes();
         let u_bytes = self.u.to_bytes();
@@ -519,6 +525,7 @@ impl AffinePoint {
 
 
 
+    /// 按 ZIP-216 规则从 32 字节反序列化点。
     pub fn from_bytes(b: [u8; 32]) -> CtOption<Self> {
         Self::from_bytes_inner(b, 1.into())
     }
@@ -539,6 +546,7 @@ impl AffinePoint {
     ///
 
 
+    /// 按 Pre-ZIP-216 兼容规则反序列化点。
     pub fn from_bytes_pre_zip216_compatibility(b: [u8; 32]) -> CtOption<Self> {
         Self::from_bytes_inner(b, 0.into())
     }
@@ -596,6 +604,7 @@ impl AffinePoint {
     ///
 
 
+    /// 批量反序列化点，复用批量求逆降低开销。
     #[cfg(feature = "alloc")]
     pub fn batch_from_bytes(
         items: impl Iterator<Item = [u8; 32]>,
@@ -715,6 +724,7 @@ impl AffinePoint {
     }
 
 
+    /// 转为扩展坐标表示。
     pub const fn to_extended(&self) -> ExtendedPoint {
         ExtendedPoint {
             u: self.u,
@@ -727,6 +737,7 @@ impl AffinePoint {
 
 
 
+    /// 转为 Niels 形式以加速点加法。
     pub const fn to_niels(&self) -> AffineNielsPoint {
         AffineNielsPoint {
             v_plus_u: Fq::add(&self.v, &self.u),
@@ -737,6 +748,7 @@ impl AffinePoint {
 
 
 
+    /// 从原始坐标构造点，不做合法性检查。
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> AffinePoint {
         AffinePoint { u, v }
     }
@@ -754,7 +766,7 @@ impl AffinePoint {
 }
 
 impl ExtendedPoint {
-
+    /// 返回扩展坐标单位元。
     pub const fn identity() -> Self {
         ExtendedPoint {
             u: Fq::zero(),
@@ -766,6 +778,7 @@ impl ExtendedPoint {
     }
 
 
+    /// 判断是否为单位元。
     pub fn is_identity(&self) -> Choice {
 
 
@@ -774,6 +787,7 @@ impl ExtendedPoint {
     }
 
 
+    /// 判断是否为小阶点（位于协因子子群）。
     pub fn is_small_order(&self) -> Choice {
 
 
@@ -784,6 +798,7 @@ impl ExtendedPoint {
 
 
 
+    /// 判断是否属于素数阶子群。
     pub fn is_torsion_free(&self) -> Choice {
         self.multiply(&FR_MODULUS_BYTES).is_identity()
     }
@@ -792,17 +807,20 @@ impl ExtendedPoint {
 
 
 
+    /// 判断是否为素数阶且非单位元。
     pub fn is_prime_order(&self) -> Choice {
         self.is_torsion_free() & (!self.is_identity())
     }
 
 
+    /// 乘以协因子 8。
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         self.double().double().double()
     }
 
 
 
+    /// 转为扩展 Niels 形式以加速加法。
     pub fn to_niels(&self) -> ExtendedNielsPoint {
         ExtendedNielsPoint {
             v_plus_u: self.v + self.u,
@@ -814,6 +832,7 @@ impl ExtendedPoint {
 
 
 
+    /// 点倍加（extended coordinates doubling）。
     pub fn double(&self) -> ExtendedPoint {
 
 
@@ -915,6 +934,7 @@ impl ExtendedPoint {
 
     ///
 
+    /// 批量将扩展坐标点转换为仿射坐标点。
     fn batch_normalize(projective_points: &[Self], affine_points: &mut [AffinePoint]) {
         assert_eq!(projective_points.len(), affine_points.len());
 
@@ -1167,8 +1187,7 @@ impl Default for ExtendedPoint {
 
 
 
-///
-
+/// 对扩展点切片做原地归一化，并返回仿射点迭代器。
 pub fn batch_normalize(
     points: &mut [ExtendedPoint],
 ) -> impl Iterator<Item = AffinePoint> + '_ {
@@ -1258,6 +1277,7 @@ impl SubgroupPoint {
 
     ///
 
+    /// 从原始坐标构造子群点（调用方需保证输入在子群内）。
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> Self {
         SubgroupPoint(AffinePoint::from_raw_unchecked(u, v).to_extended())
     }

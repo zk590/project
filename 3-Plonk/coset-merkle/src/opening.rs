@@ -28,6 +28,7 @@ where
 {
 
 
+    /// 基于树和目标位置构造 opening。
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
         let opening_positions = [0; H];
         let opening_branch =
@@ -44,22 +45,26 @@ where
     }
 
 
+    /// 返回 opening 对应的根值。
     pub fn root(&self) -> &T {
         &self.root
     }
 
 
+    /// 返回每一层的分支节点值。
     pub fn branch(&self) -> &[[T; A]; H] {
         &self.branch
     }
 
 
+    /// 返回每一层路径中的子索引。
     pub fn positions(&self) -> &[usize; H] {
         &self.positions
     }
 
 
 
+    /// 校验给定叶子是否匹配该 opening。
     pub fn verify(&self, item: impl Into<T>) -> bool
     where
         T: PartialEq,
@@ -95,6 +100,7 @@ where
 
 
 
+    /// 将 opening 编码为变长字节串。
     pub fn to_var_bytes<const T_SIZE: usize>(&self) -> Vec<u8>
     where
         T: Serializable<T_SIZE>,
@@ -125,13 +131,7 @@ where
     }
 
 
-    ///
-
-    ///
-
-
-
-
+    /// 从字节切片解码 opening，并校验长度。
     pub fn from_slice<const T_SIZE: usize>(
         bytes: &[u8],
     ) -> Result<Self, BytesError>
@@ -176,6 +176,7 @@ where
     }
 }
 
+/// 递归填充 opening 的分支与路径信息。
 fn fill_opening<T, const H: usize, const A: usize>(
     opening: &mut Opening<T, H, A>,
     node: &Node<T, H, A>,

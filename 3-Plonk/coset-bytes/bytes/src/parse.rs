@@ -7,8 +7,10 @@ use super::serialize::Serializable;
 
 
 
+/// 从十六进制字符串解析为定长字节结构。
 pub trait ParseHexStr<const N: usize>: Serializable<N> {
 
+    /// 解析长度为 `2*N` 的十六进制字符串并反序列化为目标类型。
     fn from_hex_str(hex_str: &str) -> Result<Self, Self::Error>
     where
         Self: Sized,
@@ -55,7 +57,7 @@ pub trait ParseHexStr<const N: usize>: Serializable<N> {
 
 
 
-///
+/// 将 ASCII 十六进制字节数组转换为原始二进制字节数组。
 
 pub const fn hex<const N: usize, const M: usize>(bytes: &[u8; N]) -> [u8; M] {
     let mut buffer = [0u8; M];

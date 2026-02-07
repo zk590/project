@@ -123,6 +123,7 @@ impl_binops_additive!(Fp2, Fp2);
 impl_binops_multiplicative!(Fp2, Fp2);
 
 impl Fp2 {
+    /// 返回 Fp2 加法单位元。
     #[inline]
     pub const fn zero() -> Fp2 {
         Fp2 {
@@ -131,6 +132,7 @@ impl Fp2 {
         }
     }
 
+    /// 返回 Fp2 乘法单位元。
     #[inline]
     pub const fn one() -> Fp2 {
         Fp2 {
@@ -139,6 +141,7 @@ impl Fp2 {
         }
     }
 
+    /// 常时间判断是否为 0。
     pub fn is_zero(&self) -> Choice {
         self.c0.is_zero() & self.c1.is_zero()
     }
@@ -152,6 +155,7 @@ impl Fp2 {
 
 
     #[inline(always)]
+    /// 在 Fp2 上应用 Frobenius 自同构。
     pub fn frobenius_map(&self) -> Self {
 
 
@@ -159,6 +163,7 @@ impl Fp2 {
     }
 
     #[inline(always)]
+    /// 共轭映射：a + bu -> a - bu。
     pub fn conjugate(&self) -> Self {
         Fp2 {
             c0: self.c0,
@@ -167,6 +172,7 @@ impl Fp2 {
     }
 
     #[inline(always)]
+    /// 乘以二次扩域的非二次剩余元 u + 1。
     pub fn mul_by_nonresidue(&self) -> Fp2 {
 
 
@@ -182,6 +188,7 @@ impl Fp2 {
 
 
     #[inline]
+    /// 判断扩域元素是否在字典序较大半区，用于压缩编码。
     pub fn lexicographically_largest(&self) -> Choice {
 
 
@@ -193,6 +200,7 @@ impl Fp2 {
             | (self.c1.is_zero() & self.c0.lexicographically_largest())
     }
 
+    /// 计算 Fp2 平方，使用 Karatsuba 形式减少乘法次数。
     pub const fn square(&self) -> Fp2 {
 
         //
@@ -216,6 +224,7 @@ impl Fp2 {
         }
     }
 
+    /// 计算 Fp2 乘法，内部用 `sum_of_products` 降低中间开销。
     pub fn mul(&self, rhs: &Fp2) -> Fp2 {
 
 
@@ -256,6 +265,7 @@ impl Fp2 {
         }
     }
 
+    /// 计算 Fp2 平方根；不存在时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
 
 
@@ -311,6 +321,7 @@ impl Fp2 {
 
 
 
+    /// 计算 Fp2 乘法逆元。
     pub fn invert(&self) -> CtOption<Self> {
 
 
@@ -335,6 +346,7 @@ impl Fp2 {
 
 
 
+    /// 变长时间幂运算，适用于公开指数场景。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {

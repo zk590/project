@@ -2,6 +2,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 
+/// 为类型自动派生 `LowerHex` / `UpperHex` 格式化实现。
 #[proc_macro_derive(Hex)]
 pub fn derive_hex(item: TokenStream) -> TokenStream {
     let input = syn::parse_macro_input!(item as syn::DeriveInput);
@@ -43,6 +44,7 @@ pub fn derive_hex(item: TokenStream) -> TokenStream {
     .into()
 }
 
+/// 在 `Hex` 基础上派生 `Debug`，并复用十六进制输出格式。
 #[proc_macro_derive(HexDebug)]
 pub fn derive_hex_debug(item: TokenStream) -> TokenStream {
     let mut hex: TokenStream = derive_hex(item.clone());

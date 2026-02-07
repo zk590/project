@@ -218,6 +218,7 @@ impl G2Affine {
     pub const RAW_SIZE: usize = 193;
 
 
+    /// 返回 G2 仿射无穷远点。
     pub fn identity() -> G2Affine {
         G2Affine {
             x: Fp2::zero(),
@@ -227,7 +228,7 @@ impl G2Affine {
     }
 
 
-
+    /// 返回 G2 仿射生成元。
     pub fn generator() -> G2Affine {
         G2Affine {
             x: Fp2 {
@@ -271,7 +272,7 @@ impl G2Affine {
     }
 
 
-
+    /// 将 G2 仿射点压缩为 96 字节编码。
     pub fn to_compressed(&self) -> [u8; 96] {
 
 
@@ -303,7 +304,7 @@ impl G2Affine {
     }
 
 
-
+    /// 将 G2 仿射点编码为 192 字节非压缩格式。
     pub fn to_uncompressed(&self) -> [u8; 192] {
         let mut uncompressed_bytes = [0; 192];
 
@@ -325,7 +326,7 @@ impl G2Affine {
     }
 
 
-
+    /// 从非压缩编码反序列化，并校验曲线方程与子群约束。
     pub fn from_uncompressed(bytes: &[u8; 192]) -> CtOption<Self> {
         Self::from_uncompressed_unchecked(bytes)
             .and_then(|p| CtOption::new(p, p.is_on_curve() & p.is_torsion_free()))
@@ -415,7 +416,7 @@ impl G2Affine {
     }
 
 
-
+    /// 从压缩编码反序列化，并校验子群约束。
     pub fn from_compressed(bytes: &[u8; 96]) -> CtOption<Self> {
 
 
@@ -503,6 +504,7 @@ impl G2Affine {
 
 
 
+    /// 判断点是否位于目标素数阶子群（无扭点）。
     pub fn is_torsion_free(&self) -> Choice {
 
 
@@ -516,6 +518,7 @@ impl G2Affine {
 
 
 
+    /// 判断仿射点是否满足曲线方程。
     pub fn is_on_curve(&self) -> Choice {
 
         let infinity = Choice::from(self.infinity);
@@ -692,6 +695,7 @@ fn mul_by_3b(x: Fp2) -> Fp2 {
 
 impl G2Projective {
 
+    /// 返回 G2 射影无穷远点。
     pub fn identity() -> G2Projective {
         G2Projective {
             x: Fp2::zero(),
@@ -701,7 +705,7 @@ impl G2Projective {
     }
 
 
-
+    /// 返回 G2 射影生成元。
     pub fn generator() -> G2Projective {
         G2Projective {
             x: Fp2 {
@@ -745,6 +749,7 @@ impl G2Projective {
     }
 
 
+    /// 射影坐标点倍加（point doubling）。
     pub fn double(&self) -> G2Projective {
 
 
@@ -781,6 +786,7 @@ impl G2Projective {
     }
 
 
+    /// 射影坐标点加法（projective + projective）。
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
 
 
@@ -826,6 +832,7 @@ impl G2Projective {
     }
 
 
+    /// 混合点加法（projective + affine）。
     pub fn add_mixed(&self, rhs: &G2Affine) -> G2Projective {
 
 
@@ -982,6 +989,7 @@ impl G2Projective {
 
 
 
+    /// 清除协因子，将点映射到 r 阶子群。
     pub fn clear_cofactor(&self) -> G2Projective {
         let t1 = self.mul_by_x();
         let t2 = self.psi();
@@ -995,6 +1003,7 @@ impl G2Projective {
 
 
 
+    /// 批量将射影点归一化为仿射点，复用一次逆元计算。
     pub fn batch_normalize(projective_points: &[Self], affine_points: &mut [G2Affine]) {
         assert_eq!(projective_points.len(), affine_points.len());
 

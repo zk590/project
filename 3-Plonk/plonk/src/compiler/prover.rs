@@ -63,12 +63,7 @@ impl Prover {
     }
 
 
-    ///
-
-    ///
-
-
-
+    /// 将 witness 多项式加盲并转为系数形式，提升零知识隐藏性。
     fn blind_poly<R>(
         rng: &mut R,
         witnesses: &[BlsScalar],
@@ -108,12 +103,12 @@ impl Prover {
         (size, prover_key, commit_key, verifier_key)
     }
 
-
+    /// 返回当前 prover 的序列化字节长度。
     pub fn serialized_size(&self) -> usize {
         self.prepare_serialize().0
     }
 
-
+    /// 将 prover（含键材料）序列化为字节。
     pub fn to_bytes(&self) -> Vec<u8> {
         let (size, prover_key, commit_key, verifier_key) =
             self.prepare_serialize();
@@ -141,8 +136,7 @@ impl Prover {
         bytes
     }
 
-
-
+    /// 从字节反序列化 prover。
     pub fn try_from_bytes<B>(bytes: B) -> Result<Self, Error>
     where
         B: AsRef<[u8]>,
@@ -216,7 +210,7 @@ impl Prover {
         ))
     }
 
-
+    /// 生成 PLONK 证明并返回对应公开输入。
     pub fn prove<C, R>(
         &self,
         rng: &mut R,

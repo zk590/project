@@ -14,6 +14,7 @@ sha2-lib = { path = "../../sha2/lib", features = ["host"] }
 sha3-lib = { path = "../../sha3/lib", features = ["host"] }
 rkyv = { version = "0.7.45", features = ["std", "validation"] }
 hex = "0.4.3"
+clap = { version = "4.4.0", features = ["derive"] }
 
 [build-dependencies]
 zkm-build = { workspace = true }

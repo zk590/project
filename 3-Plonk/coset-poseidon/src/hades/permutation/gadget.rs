@@ -20,7 +20,7 @@ pub(crate) struct GadgetPermutation<'a> {
 }
 
 impl<'a> GadgetPermutation<'a> {
-
+    /// 创建电路约束版本的 Hades 置换实例。
     pub fn new(composer: &'a mut Composer) -> Self {
         Self { composer }
     }

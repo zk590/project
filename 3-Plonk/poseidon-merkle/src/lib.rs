@@ -19,9 +19,11 @@ use coset_poseidon::{Domain, Hash};
 pub const ARITY: usize = 4;
 
 
+/// Poseidon-Merkle 四叉树类型别名。
 pub type Tree<T, const H: usize> = coset_merkle::Tree<Item<T>, H, ARITY>;
 
 
+/// Poseidon-Merkle 开证明类型别名。
 pub type Opening<T, const H: usize> = coset_merkle::Opening<Item<T>, H, ARITY>;
 
 
@@ -118,7 +120,7 @@ pub struct Item<T> {
 }
 
 impl<T> Item<T> {
-
+    /// 构造一个携带哈希和值的树节点条目。
     pub fn new(hash: BlsScalar, data: T) -> Self {
         Self { hash, data }
     }
@@ -133,6 +135,7 @@ where
         data: T::EMPTY_SUBTREE,
     };
 
+    /// 聚合一层子节点：哈希使用 Poseidon(Merkle4)，数据递归调用子类型聚合。
     fn aggregate(items: [&Self; ARITY]) -> Self {
         let empty_data = &T::EMPTY_SUBTREE;
 
@@ -160,6 +163,7 @@ where
 impl Serializable<32> for Item<()> {
     type Error = <BlsScalar as Serializable<32>>::Error;
 
+    /// 从 32 字节反序列化仅含哈希的叶子条目。
     fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Self::Error>
     where
         Self: Sized,
@@ -170,6 +174,7 @@ impl Serializable<32> for Item<()> {
         })
     }
 
+    /// 将条目序列化为 32 字节哈希。
     fn to_bytes(&self) -> [u8; 32] {
         self.hash.to_bytes()
     }

@@ -59,7 +59,7 @@ impl MillerLoopResult {
 
 
 
-
+    /// 对 Miller 循环结果做最终指数化，映射到 GT 群。
     pub fn final_exponentiation(&self) -> Gt {
         #[must_use]
         fn fp4_square(a: Fp2, b: Fp2) -> (Fp2, Fp2) {
@@ -575,8 +575,7 @@ impl From<G2Affine> for G2Prepared {
 #[cfg_attr(docsrs, doc(cfg(all(feature = "pairings", feature = "alloc"))))]
 
 
-///
-
+/// 对多组 `(G1, G2Prepared)` 同时执行 Miller 循环并合并结果。
 pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult {
     struct Adder<'a, 'b, 'c> {
         terms: &'c [(&'a G1Affine, &'b G2Prepared)],
@@ -630,6 +629,7 @@ pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult
 
 
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
+/// 计算最优 Ate 配对并返回 GT 元素。
 pub fn pairing(p: &G1Affine, q: &G2Affine) -> Gt {
     struct Adder {
         cur: G2Projective,
@@ -691,6 +691,7 @@ trait MillerLoopDriver {
 
 
 
+/// 通用 Miller 循环驱动，支持单对和多对输入。
 fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
     let mut miller_value = D::one();
 
@@ -722,6 +723,7 @@ fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
     miller_value
 }
 
+/// 将一条切线/割线系数作用到累乘值 `f` 上。
 fn ell(f: Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
     let mut c0 = coeffs.0;
     let mut c1 = coeffs.1;
@@ -735,6 +737,7 @@ fn ell(f: Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
     f.mul_by_014(&coeffs.2, &c1, &c0)
 }
 
+/// Miller 循环中的 G2 倍点步骤，返回线函数系数。
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
 
     let tmp0 = r.x.square();
@@ -766,6 +769,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
     (tmp0, tmp3, tmp6)
 }
 
+/// Miller 循环中的 G2 加点步骤，返回线函数系数。
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
 
     let zsquared = r.z.square();

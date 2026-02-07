@@ -1,19 +1,20 @@
 
 use super::errors::{BadLength, Error};
 
-
+/// 定长字节序列化/反序列化接口。
 pub trait Serializable<const N: usize> {
 
+    /// 该类型的固定字节长度。
     const SIZE: usize = N;
 
     type Error;
 
-
+    /// 从定长字节数组反序列化。
     fn from_bytes(bytes: &[u8; N]) -> Result<Self, Self::Error>
     where
         Self: Sized;
 
-
+    /// 将对象序列化为定长字节数组。
     fn to_bytes(&self) -> [u8; N];
 }
 
@@ -21,9 +22,10 @@ pub trait Serializable<const N: usize> {
 
 
 
-
+/// 为 `Serializable` 提供从切片和 reader 读取的辅助接口。
 pub trait DeserializableSlice<const N: usize>: Serializable<N> {
 
+    /// 从任意切片读取前 N 字节并反序列化。
     fn from_slice(bytes: &[u8]) -> Result<Self, Self::Error>
     where
         Self: Sized,
@@ -39,7 +41,7 @@ pub trait DeserializableSlice<const N: usize>: Serializable<N> {
     }
 
 
-
+    /// 从 reader 读取 N 字节并反序列化。
     fn from_reader<R>(reader: &mut R) -> Result<Self, Self::Error>
     where
         R: Read,
@@ -68,10 +70,11 @@ impl<T, const N: usize> DeserializableSlice<N> for T where T: Serializable<N> {}
 
 pub trait Read {
 
+    /// 返回剩余可读容量。
     fn capacity(&self) -> usize;
 
 
-
+    /// 向 `buffer` 读取字节；长度不足时返回错误。
     fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Error>;
 }
 
@@ -110,10 +113,7 @@ impl Read for &[u8] {
 
 pub trait Write {
 
-    ///
-
-
-
+    /// 将 `bytes` 写入目标缓冲区；空间不足时返回错误。
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Error>;
 }
 

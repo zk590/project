@@ -80,7 +80,7 @@ pub struct ElgamalCipher {
 impl Serializable<64> for ElgamalCipher {
     type Error = BytesError;
 
-
+    /// 序列化密文 `(gamma, delta)` 为 64 字节。
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         let gamma: JubJubAffine = self.gamma.into();
         let gamma = gamma.to_bytes();
@@ -96,7 +96,7 @@ impl Serializable<64> for ElgamalCipher {
         bytes
     }
 
-
+    /// 从 64 字节反序列化密文。
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let gamma = JubJubAffine::from_slice(&bytes[..32])?;
         let delta = JubJubAffine::from_slice(&bytes[32..])?;
@@ -107,23 +107,22 @@ impl Serializable<64> for ElgamalCipher {
 
 impl ElgamalCipher {
 
+    /// 构造 ElGamal 密文对象。
     pub fn new(gamma: JubJubExtended, delta: JubJubExtended) -> Self {
         Self { gamma, delta }
     }
 
-
+    /// 返回密文第一部分 `gamma = rG`。
     pub fn gamma(&self) -> &JubJubExtended {
         &self.gamma
     }
 
-
+    /// 返回密文第二部分 `delta = M + rPK`。
     pub fn delta(&self) -> &JubJubExtended {
         &self.delta
     }
 
-
-    ///
-
+    /// ElGamal 加密：输出 `(rG, M + rPK)`。
     pub fn encrypt(
         secret: &JubJubScalar,
         public: &JubJubExtended,
@@ -136,7 +135,7 @@ impl ElgamalCipher {
         Self::new(gamma, delta)
     }
 
-
+    /// ElGamal 解密：`delta - sk * gamma`。
     pub fn decrypt(&self, secret: &JubJubScalar) -> JubJubExtended {
         self.delta - self.gamma * secret
     }

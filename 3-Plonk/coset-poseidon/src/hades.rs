@@ -37,6 +37,7 @@ pub const WIDTH: usize = 5;
 pub(crate) use permutation::gadget::GadgetPermutation;
 pub(crate) use permutation::scalar::ScalarPermutation;
 
+/// 从字节缓冲区按小端读取一个 `u64`。
 const fn u64_from_buffer<const N: usize>(buf: &[u8; N], i: usize) -> u64 {
     u64::from_le_bytes([
         buf[i],

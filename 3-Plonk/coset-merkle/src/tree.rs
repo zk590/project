@@ -31,6 +31,7 @@ where
 {
 
     #[must_use]
+    /// 创建一棵空的 Merkle 树。
     pub const fn new() -> Self {
         Self {
             root: Node::new(),
@@ -38,10 +39,7 @@ where
         }
     }
 
-
-    ///
-
-
+    /// 在指定叶子位置插入（或覆盖）一个元素，并向上更新聚合值。
     pub fn insert(&mut self, index: u64, item: impl Into<T>) {
         let capacity = self.capacity();
 
@@ -56,7 +54,7 @@ where
     }
 
 
-
+    /// 移除指定位置的叶子元素；若位置不存在则返回 `None`。
     pub fn remove(&mut self, position: u64) -> Option<T> {
         if !self.positions.contains(&position) {
             return None;
@@ -68,7 +66,7 @@ where
         Some(item)
     }
 
-
+    /// 为指定位置生成开证明（Opening）。
     pub fn opening(&self, position: u64) -> Option<Opening<T, H, A>>
     where
         T: Clone,
@@ -79,13 +77,7 @@ where
         Some(Opening::new(self, position))
     }
 
-
-
-    ///
-
-
-
-
+    /// 按给定谓词遍历树中叶子，返回惰性迭代器。
     pub fn walk<W>(&self, walker: W) -> Walk<'_, T, W, H, A>
     where
         W: Fn(&T) -> bool,
@@ -93,12 +85,12 @@ where
         Walk::new(self, walker)
     }
 
-
+    /// 返回当前根节点聚合值。
     pub fn root(&self) -> Ref<'_, T> {
         self.root.item()
     }
 
-
+    /// 返回覆盖全部已插入元素的最小子树及其高度。
     pub fn smallest_subtree(&self) -> (Ref<'_, T>, usize) {
         let mut current_node = &self.root;
         let mut current_height = H;
@@ -130,24 +122,24 @@ where
         }
     }
 
-
+    /// 判断某个位置是否已有元素。
     pub fn contains(&self, position: u64) -> bool {
         self.positions.contains(&position)
     }
 
-
+    /// 返回当前已插入叶子数量。
     #[must_use]
     pub fn len(&self) -> u64 {
         self.positions.len() as u64
     }
 
-
+    /// 判断树是否为空。
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-
+    /// 返回该树在当前高度和分叉度下的容量。
     #[must_use]
     pub const fn capacity(&self) -> u64 {
         capacity(A as u64, H)

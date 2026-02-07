@@ -20,7 +20,7 @@ impl zeroize::DefaultIsZeroes for JubJubAffine {}
 #[cfg(feature = "zeroize")]
 impl zeroize::DefaultIsZeroes for JubJubExtended {}
 
-
+/// 基于 JubJub 的 Diffie-Hellman：`secret * public`。
 pub fn dhke(secret: &Fr, public: &JubJubExtended) -> JubJubAffine {
     public.mul(secret).into()
 }
@@ -94,11 +94,7 @@ impl Serializable<32> for JubJubAffine {
 
 
 
-
-    ///
-
-
-
+    /// 从压缩字节恢复仿射点，并进行曲线合法性检查。
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let mut encoded_bytes = *bytes;
 
@@ -146,7 +142,7 @@ impl Serializable<32> for JubJubAffine {
         .ok_or(BytesError::InvalidData)
     }
 
-
+    /// 将仿射点压缩为 32 字节（最高位携带 u 的符号位）。
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         let mut encoded_bytes = self.v.to_bytes();
         let u_bytes = self.u.to_bytes();
@@ -161,7 +157,7 @@ impl Serializable<32> for JubJubAffine {
 
 impl JubJubAffine {
 
-
+    /// 检查该仿射点是否满足 JubJub 曲线方程。
     pub fn is_on_curve(&self) -> Choice {
 
         let u2 = self.u.square();
@@ -172,7 +168,7 @@ impl JubJubAffine {
 
 impl JubJubExtended {
 
-
+    /// 将仿射点嵌入扩展坐标表示。
     pub const fn from_affine(affine: JubJubAffine) -> Self {
         Self::from_raw_unchecked(
             affine.u,
@@ -183,7 +179,7 @@ impl JubJubExtended {
         )
     }
 
-
+    /// 直接由原始坐标构造扩展点，不执行合法性检查。
     pub const fn from_raw_unchecked(
         u: BlsScalar,
         v: BlsScalar,
@@ -220,7 +216,7 @@ impl JubJubExtended {
     }
 
 
-
+    /// 返回扩展点的 `(u, v)`，用于哈希输入。
     pub fn to_hash_inputs(&self) -> [BlsScalar; 2] {
 
 
@@ -230,20 +226,7 @@ impl JubJubExtended {
     }
 
 
-
-    ///
-
-
-
-
-
-
-
-    ///
-
-
-
-
+    /// 将任意字节串哈希到 JubJub 素数阶子群点。
     pub fn hash_to_point(input: &[u8]) -> Self {
         let mut counter = 0u64;
         let mut array = [0u8; 32];
@@ -274,11 +257,7 @@ impl JubJubExtended {
 
 
 
-
-    ///
-
-
-
+    /// 将 `u64` 映射到素数阶子群点（可逆映射）。
     pub fn map_to_point(input: &u64) -> Self {
         let input_bytes = input.to_le_bytes();
 
@@ -325,7 +304,7 @@ impl JubJubExtended {
     }
 
 
-
+    /// 从 `map_to_point` 的结果中恢复原始 `u64`。
     pub fn unmap_from_point(self) -> u64 {
         let point_bytes: [u8; u64::SIZE] = JubJubAffine::from(self).to_bytes()
             [..u64::SIZE]
@@ -335,7 +314,7 @@ impl JubJubExtended {
     }
 
 
-
+    /// 检查扩展点是否满足 JubJub 曲线方程。
     pub fn is_on_curve(&self) -> Choice {
         let affine = JubJubAffine::from(*self);
 

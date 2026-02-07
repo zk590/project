@@ -198,6 +198,7 @@ const B: Fp = Fp::from_raw_unchecked([
 
 impl G1Affine {
 
+    /// 返回 G1 仿射无穷远点。
     pub fn identity() -> G1Affine {
         G1Affine {
             x: Fp::zero(),
@@ -207,7 +208,7 @@ impl G1Affine {
     }
 
 
-
+    /// 返回 G1 仿射生成元。
     pub fn generator() -> G1Affine {
         G1Affine {
             x: Fp::from_raw_unchecked([
@@ -231,7 +232,7 @@ impl G1Affine {
     }
 
 
-
+    /// 将 G1 仿射点压缩为 48 字节编码。
     pub fn to_compressed(&self) -> [u8; 48] {
 
 
@@ -256,7 +257,7 @@ impl G1Affine {
     }
 
 
-
+    /// 将 G1 仿射点编码为 96 字节非压缩格式。
     pub fn to_uncompressed(&self) -> [u8; 96] {
         let mut res = [0; 96];
 
@@ -274,7 +275,7 @@ impl G1Affine {
     }
 
 
-
+    /// 从非压缩编码反序列化，并校验曲线方程与子群约束。
     pub fn from_uncompressed(bytes: &[u8; 96]) -> CtOption<Self> {
         Self::from_uncompressed_unchecked(bytes)
             .and_then(|p| CtOption::new(p, p.is_on_curve() & p.is_torsion_free()))
@@ -336,7 +337,7 @@ impl G1Affine {
     }
 
 
-
+    /// 从压缩编码反序列化，并校验子群约束。
     pub fn from_compressed(bytes: &[u8; 48]) -> CtOption<Self> {
 
 
@@ -412,6 +413,7 @@ impl G1Affine {
 
 
 
+    /// 判断点是否位于目标素数阶子群（无扭点）。
     pub fn is_torsion_free(&self) -> Choice {
 
 
@@ -425,6 +427,7 @@ impl G1Affine {
 
 
 
+    /// 判断仿射点是否满足曲线方程。
     pub fn is_on_curve(&self) -> Choice {
 
         let infinity = Choice::from(self.infinity);
@@ -622,6 +625,7 @@ fn mul_by_3b(a: Fp) -> Fp {
 
 impl G1Projective {
 
+    /// 返回 G1 射影无穷远点。
     pub fn identity() -> G1Projective {
         G1Projective {
             x: Fp::zero(),
@@ -631,7 +635,7 @@ impl G1Projective {
     }
 
 
-
+    /// 返回 G1 射影生成元。
     pub fn generator() -> G1Projective {
         G1Projective {
             x: Fp::from_raw_unchecked([
@@ -655,6 +659,7 @@ impl G1Projective {
     }
 
 
+    /// 射影坐标点倍加（point doubling）。
     pub fn double(&self) -> G1Projective {
 
 
@@ -687,6 +692,7 @@ impl G1Projective {
     }
 
 
+    /// 射影坐标点加法（projective + projective）。
     pub fn add(&self, rhs: &G1Projective) -> G1Projective {
 
 
@@ -732,6 +738,7 @@ impl G1Projective {
     }
 
 
+    /// 混合点加法（projective + affine）。
     pub fn add_mixed(&self, rhs: &G1Affine) -> G1Projective {
 
 
@@ -817,12 +824,14 @@ impl G1Projective {
 
 
 
+    /// 清除协因子，将点映射到 r 阶子群。
     pub fn clear_cofactor(&self) -> G1Projective {
         self - self.mul_by_x()
     }
 
 
 
+    /// 批量将射影点归一化为仿射点，复用一次逆元计算。
     pub fn batch_normalize(p: &[Self], q: &mut [G1Affine]) {
         assert_eq!(p.len(), q.len());
 

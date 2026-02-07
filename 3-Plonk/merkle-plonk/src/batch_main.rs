@@ -77,13 +77,14 @@ impl Default for OpeningCircuit {
 }
 
 impl OpeningCircuit {
-
+    /// 构造单个叶子 opening 对应的电路实例。
     pub fn new(opening: Opening<(), { TREE_HEIGHT }>, leaf: Item<()>) -> Self {
         Self { opening, leaf }
     }
 }
 
 impl Circuit for OpeningCircuit {
+    /// 在电路中重建 Merkle 根，并与公开输入根做一致性约束。
     fn circuit(&self, composer: &mut Composer) -> Result<(), Error> {
         let leaf = composer.append_witness(self.leaf.hash);
         let computed_root = opening_gadget(composer, &self.opening, leaf);
@@ -113,7 +114,7 @@ fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
     Ok(bytes)
 }
 
-// 加载或编译 prover/verifier
+/// 加载缓存电路；若缓存不存在或容量不匹配则重新编译并写回。
 fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
     if let (Ok(mut prover_file), Ok(mut verifier_file)) = (
@@ -166,7 +167,7 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
     Ok((prover, verifier))
 }
 
-// 验证叶子节点的证明并为有效节点生成零知识证明
+/// 批量校验叶子 opening，并为通过校验的条目生成并验证 PLONK 证明。
 fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 批量验证叶子节点并生成零知识证明 ======");
     
@@ -302,6 +303,7 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// CLI 入口：执行批量证明流程。
 fn main() {
     println!("===== 批量验证Merkle树叶子节点并生成零知识证明 ======");
     

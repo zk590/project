@@ -172,22 +172,26 @@ impl_binops_multiplicative!(Fp, Fp);
 impl Fp {
 
     #[inline]
+    /// 返回 Fp 加法单位元。
     pub const fn zero() -> Fp {
         Fp([0, 0, 0, 0, 0, 0])
     }
 
 
     #[inline]
+    /// 返回 Fp 乘法单位元（Montgomery 形式）。
     pub const fn one() -> Fp {
         R
     }
 
+    /// 常时间判断是否为 0。
     pub fn is_zero(&self) -> Choice {
         self.ct_eq(&Fp::zero())
     }
 
 
 
+    /// 从 48 字节大端编码反序列化，并校验是否在模域范围内。
     pub fn from_bytes(bytes: &[u8; 48]) -> CtOption<Fp> {
         let mut tmp = Fp([0, 0, 0, 0, 0, 0]);
 
@@ -220,6 +224,7 @@ impl Fp {
 
 
 
+    /// 将域元素序列化为 48 字节大端编码。
     pub fn to_bytes(self) -> [u8; 48] {
 
 
@@ -282,6 +287,7 @@ impl Fp {
 
 
 
+    /// 判断当前元素是否位于字典序较大半区，用于点压缩符号位。
     pub fn lexicographically_largest(&self) -> Choice {
 
 
@@ -311,6 +317,7 @@ impl Fp {
 
 
 
+    /// 从原始 limbs 直接构造元素，不执行范围检查。
     pub const fn from_raw_unchecked(v: [u64; 6]) -> Fp {
         Fp(v)
     }
@@ -318,6 +325,7 @@ impl Fp {
 
 
 
+    /// 变长时间幂运算，适用于公开指数。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -333,6 +341,7 @@ impl Fp {
     }
 
     #[inline]
+    /// 计算平方根；非二次剩余时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
 
 
@@ -355,6 +364,7 @@ impl Fp {
 
 
 
+    /// 计算乘法逆元；0 元素返回空值。
     pub fn invert(&self) -> CtOption<Self> {
 
         let t = self.pow_vartime(&[

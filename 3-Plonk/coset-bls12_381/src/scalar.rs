@@ -246,25 +246,26 @@ impl zeroize::DefaultIsZeroes for Scalar {}
 impl Scalar {
 
     #[inline]
+    /// 返回标量域加法单位元。
     pub const fn zero() -> Scalar {
         Scalar([0, 0, 0, 0])
     }
 
-
     #[inline]
+    /// 返回标量域乘法单位元（Montgomery 形式）。
     pub const fn one() -> Scalar {
         R
     }
 
-
     #[inline]
+    /// 计算当前标量的二倍值。
     pub const fn double(&self) -> Scalar {
 
         self.add(self)
     }
 
 
-
+    /// 从 32 字节小端编码反序列化标量，并检查是否小于模数。
     pub fn from_bytes(bytes: &[u8; 32]) -> CtOption<Scalar> {
         let mut tmp = Scalar([0, 0, 0, 0]);
 
@@ -292,7 +293,7 @@ impl Scalar {
     }
 
 
-
+    /// 将标量序列化为 32 字节小端编码。
     pub fn to_bytes(&self) -> [u8; 32] {
 
 
@@ -308,7 +309,7 @@ impl Scalar {
     }
 
 
-
+    /// 从 64 字节宽输入构造标量，内部会执行模约简。
     pub fn from_bytes_wide(bytes: &[u8; 64]) -> Scalar {
         Scalar::from_u512([
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
@@ -343,7 +344,7 @@ impl Scalar {
     }
 
 
-
+    /// 将普通整数表示转换为 Montgomery 域元素。
     pub const fn from_raw(val: [u64; 4]) -> Self {
         (&Scalar(val)).mul(&R2)
     }
@@ -381,7 +382,7 @@ impl Scalar {
     }
 
 
-
+    /// 使用固定流程的平方-乘算法做幂运算（常时间路径）。
     pub fn pow(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -400,7 +401,7 @@ impl Scalar {
     ///
 
 
-
+    /// 变长时间幂运算，适合公开指数场景。
     pub fn pow_vartime(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -416,7 +417,7 @@ impl Scalar {
     }
 
 
-
+    /// 求乘法逆元；0 无逆元时返回 None。
     pub fn invert(&self) -> Option<Self> {
         if *self == Scalar::zero() {
             return None;
@@ -428,7 +429,7 @@ impl Scalar {
     }
 
 
-
+    /// 常时间逆元计算，避免分支泄露。
     pub fn invert_ct(&self) -> CtOption<Self> {
         #[inline(always)]
         fn square_assign_multi(n: &mut Scalar, num_times: usize) {

@@ -17,6 +17,7 @@ where
 {
     const INIT_NODE: Option<Box<Node<T, H, A>>> = None;
 
+    /// 创建一个空节点。
     pub(crate) const fn new() -> Self {
         debug_assert!(H > 0, "Height must be larger than zero");
         debug_assert!(A > 0, "Arity must be larger than zero");
@@ -26,7 +27,7 @@ where
             children: [Self::INIT_NODE; A],
         }
     }
-
+    /// 读取当前节点聚合值；若缓存为空则按子节点现算并缓存。
     pub(crate) fn item(&self) -> Ref<'_, T> {
 
         if self.item.borrow().is_none() {
@@ -62,7 +63,7 @@ where
 
         Ref::map(self.item.borrow(), |item| item.as_ref().unwrap())
     }
-
+    /// 计算给定高度与全局位置对应的子节点索引与子位置。
     pub(crate) fn child_location(height: usize, position: u64) -> (usize, u64) {
         let child_cap = capacity(A as u64, H - height - 1);
 
@@ -74,7 +75,7 @@ where
 
         (child_index, child_pos)
     }
-
+    /// 递归插入叶子，并使沿途节点聚合缓存失效。
     pub(crate) fn insert(
         &mut self,
         height: usize,
@@ -99,11 +100,7 @@ where
         Self::insert(selected_child, height + 1, child_pos, item);
     }
 
-
-
-    ///
-
-
+    /// 递归删除叶子，并返回 `(被删元素, 当前节点是否仍有子节点)`。
     pub(crate) fn remove(&mut self, height: usize, position: u64) -> (T, bool) {
         if height == H {
 

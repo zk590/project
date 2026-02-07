@@ -15,7 +15,7 @@ use crate::hades::{MDS_MATRIX, ROUND_CONSTANTS, WIDTH};
 pub(crate) struct ScalarPermutation();
 
 impl ScalarPermutation {
-
+    /// 创建标量域下的 Hades 置换实例。
     pub fn new() -> Self {
         Self()
     }

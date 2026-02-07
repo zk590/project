@@ -11,9 +11,7 @@ use crate::hades::WIDTH;
 
 
 
-///
-
-
+/// Poseidon 置换使用的 MDS 矩阵常量（从二进制资源加载）。
 pub const MDS_MATRIX: [[BlsScalar; WIDTH]; WIDTH] = {
     let bytes = include_bytes!("../../assets/mds.bin");
     let mut mds = [[BlsScalar::zero(); WIDTH]; WIDTH];

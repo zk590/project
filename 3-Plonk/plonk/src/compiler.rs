@@ -25,8 +25,7 @@ pub struct Compiler;
 
 impl Compiler {
 
-    ///
-
+    /// 使用 `Circuit::default()` 构建电路并完成预处理，返回 prover/verifier。
     pub fn compile<C>(
         pp: &PublicParameters,
         label: &[u8],
@@ -41,8 +40,7 @@ impl Compiler {
     }
 
 
-    ///
-
+    /// 使用给定电路实例进行编译，适合外部传入已配置好的电路参数。
     pub fn compile_with_circuit<C>(
         pp: &PublicParameters,
         label: &[u8],
@@ -58,7 +56,7 @@ impl Compiler {
     }
 
 
-
+    /// 从压缩电路描述恢复 `Composer` 并执行编译。
     pub fn compile_with_compressed(
         pp: &PublicParameters,
         label: &[u8],
@@ -70,8 +68,7 @@ impl Compiler {
     }
 
 
-    ///
-
+    /// 基于 `Composer` 进行统一编译入口：确定规模、裁剪参数并预处理键。
     fn compile_with_composer(
         pp: &PublicParameters,
         label: &[u8],

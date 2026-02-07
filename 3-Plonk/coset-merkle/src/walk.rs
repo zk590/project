@@ -19,6 +19,7 @@ where
     T: Aggregate<A>,
     W: Fn(&T) -> bool,
 {
+    /// 创建树遍历器，按 `walker` 过滤节点。
     pub(crate) fn new(tree: &'a Tree<T, H, A>, walker: W) -> Self {
         Self {
             root: &tree.root,
@@ -29,7 +30,7 @@ where
     }
 
 
-
+    /// 深度优先推进到下一个满足谓词的叶子项。
     pub(crate) fn advance(
         &mut self,
         node: &'a Node<T, H, A>,

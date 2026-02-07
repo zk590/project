@@ -255,25 +255,28 @@ impl Default for Fr {
 impl Fr {
 
     #[inline]
+    /// 返回标量域加法单位元。
     pub const fn zero() -> Fr {
         Fr([0, 0, 0, 0])
     }
 
 
     #[inline]
+    /// 返回标量域乘法单位元（Montgomery 形式）。
     pub const fn one() -> Fr {
         R
     }
 
 
     #[inline]
+    /// 计算当前标量的二倍值。
     pub const fn double(&self) -> Fr {
         self.add(self)
     }
 
 
 
-
+    /// 从 32 字节小端编码反序列化标量，并检查是否小于模数。
     pub fn from_bytes(bytes: &[u8; 32]) -> CtOption<Fr> {
         let mut tmp = Fr([0, 0, 0, 0]);
 
@@ -301,7 +304,7 @@ impl Fr {
     }
 
 
-
+    /// 将标量序列化为 32 字节小端编码。
     pub fn to_bytes(&self) -> [u8; 32] {
 
 
@@ -319,7 +322,7 @@ impl Fr {
     }
 
 
-
+    /// 从 64 字节宽输入构造标量，内部会执行模约简。
     pub fn from_bytes_wide(bytes: &[u8; 64]) -> Fr {
         Fr::from_u512([
             u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
@@ -357,7 +360,7 @@ impl Fr {
     }
 
 
-
+    /// 将普通整数表示转换为 Montgomery 域表示。
     pub const fn from_raw(val: [u64; 4]) -> Self {
         (&Fr(val)).mul(&R2)
     }
@@ -394,7 +397,7 @@ impl Fr {
         Fr::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
     }
 
-
+    /// 计算平方根；不存在时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
 
 
@@ -413,7 +416,7 @@ impl Fr {
     }
 
 
-
+    /// 常时间幂运算实现。
     pub fn pow(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -432,7 +435,7 @@ impl Fr {
     ///
 
 
-
+    /// 变长时间幂运算，适用于公开指数。
     pub fn pow_vartime(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -448,7 +451,7 @@ impl Fr {
     }
 
 
-
+    /// 计算乘法逆元；0 元素返回空值。
     pub fn invert(&self) -> CtOption<Self> {
         #[inline(always)]
         fn square_assign_multi(n: &mut Fr, num_times: usize) {

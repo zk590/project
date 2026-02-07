@@ -1,5 +1,6 @@
 use crate::{Error, Serializable};
 
+/// 为基础整数类型批量实现 `Serializable`（小端编码）。
 macro_rules! impl_serializable {
     ($ty:ty) => {
         impl Serializable<{ core::mem::size_of::<$ty>() }> for $ty {

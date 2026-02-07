@@ -59,6 +59,7 @@ impl From<Domain> for u64 {
 
 
 
+/// 根据输入分段和输出长度构造 sponge 的 IO 模式，并执行域约束检查。
 fn build_io_pattern<T>(
     domain: Domain,
     input_segments: &[&[T]],
@@ -99,6 +100,7 @@ pub struct Hash<'a> {
 
 impl<'a> Hash<'a> {
 
+    /// 创建指定域分离标签的 Poseidon 哈希上下文。
     pub fn new(domain: Domain) -> Self {
         Self {
             domain,
@@ -110,6 +112,7 @@ impl<'a> Hash<'a> {
 
 
 
+    /// 设置输出域元素个数（仅 `Domain::Other` 生效）。
     pub fn output_len(&mut self, output_len: usize) {
         if self.domain == Domain::Other && output_len > 0 {
             self.output_len = output_len;
@@ -117,16 +120,13 @@ impl<'a> Hash<'a> {
     }
 
 
+    /// 追加一段输入数据。
     pub fn update(&mut self, input: &'a [BlsScalar]) {
         self.input.push(input);
     }
 
 
-    ///
-
-
-
-
+    /// 执行 sponge 并返回完整域元素输出。
     pub fn finalize(&self) -> Vec<BlsScalar> {
 
 
@@ -158,11 +158,7 @@ impl<'a> Hash<'a> {
 
 
 
-    ///
-
-
-
-
+    /// 执行哈希并将结果截断到 JubJub 标量位宽。
     pub fn finalize_truncated(&self) -> Vec<JubJubScalar> {
 
 
@@ -187,11 +183,7 @@ impl<'a> Hash<'a> {
     }
 
 
-    ///
-
-
-
-
+    /// 便捷接口：一次性计算 `digest`。
     pub fn digest(domain: Domain, input: &'a [BlsScalar]) -> Vec<BlsScalar> {
         let mut poseidon_hash = Self::new(domain);
         poseidon_hash.update(input);
@@ -199,11 +191,7 @@ impl<'a> Hash<'a> {
     }
 
 
-    ///
-
-
-
-
+    /// 便捷接口：一次性计算截断后的 `digest`。
     pub fn digest_truncated(
         domain: Domain,
         input: &'a [BlsScalar],
