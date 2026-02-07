@@ -49,10 +49,10 @@ impl TranscriptProtocol for Transcript {
     }
 
     fn challenge_scalar(&mut self, label: &'static [u8]) -> BlsScalar {
-        let mut buf = [0u8; 64];
-        self.challenge_bytes(label, &mut buf);
+        let mut challenge_buffer = [0u8; 64];
+        self.challenge_bytes(label, &mut challenge_buffer);
 
-        BlsScalar::from_bytes_wide(&buf)
+        BlsScalar::from_bytes_wide(&challenge_buffer)
     }
 
     fn circuit_domain_sep(&mut self, n: u64) {

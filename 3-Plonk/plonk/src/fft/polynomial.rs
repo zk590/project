@@ -112,7 +112,7 @@ impl Polynomial {
         while self
             .coeffs
             .last()
-            .map_or(false, |c| c == &BlsScalar::zero())
+            .map_or(false, |coefficient| coefficient == &BlsScalar::zero())
         {
             self.coeffs.pop();
         }
@@ -157,11 +157,11 @@ impl Polynomial {
             .map(BlsScalar::from_slice)
             .collect::<Result<Vec<BlsScalar>, coset_bytes::Error>>()?;
 
-        let mut p = Polynomial { coeffs };
+        let mut polynomial = Polynomial { coeffs };
         // If the leading coefficients end up being zero, pop them off.
-        p.truncate_leading_zeros();
+        polynomial.truncate_leading_zeros();
 
-        Ok(p)
+        Ok(polynomial)
     }
 
     /// Returns an iterator over the polynomial coefficients.
@@ -195,14 +195,18 @@ impl<'a, 'b> Add<&'a Polynomial> for &'b Polynomial {
             self.clone()
         } else if self.degree() >= other.degree() {
             let mut result = self.clone();
-            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                *a += b
+            for (result_coefficient, other_coefficient) in
+                result.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *result_coefficient += other_coefficient
             }
             result
         } else {
             let mut result = other.clone();
-            for (a, b) in result.coeffs.iter_mut().zip(&self.coeffs) {
-                *a += b
+            for (result_coefficient, self_coefficient) in
+                result.coeffs.iter_mut().zip(&self.coeffs)
+            {
+                *result_coefficient += self_coefficient
             }
             result
         };
@@ -219,14 +223,18 @@ impl<'a> AddAssign<&'a Polynomial> for Polynomial {
             self.coeffs.extend_from_slice(&other.coeffs);
         } else if other.is_zero() {
         } else if self.degree() >= other.degree() {
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a += b
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient += other_coefficient
             }
         } else {
             // Add the necessary number of zero coefficients.
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a += b
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient += other_coefficient
             }
         }
         // If the leading coefficients end up being zero, pop them off.
@@ -235,21 +243,30 @@ impl<'a> AddAssign<&'a Polynomial> for Polynomial {
 }
 
 impl<'a> AddAssign<(BlsScalar, &'a Polynomial)> for Polynomial {
-    fn add_assign(&mut self, (f, other): (BlsScalar, &'a Polynomial)) {
+    fn add_assign(
+        &mut self,
+        (factor, other): (BlsScalar, &'a Polynomial),
+    ) {
         if self.is_zero() {
             self.coeffs.truncate(0);
             self.coeffs.extend_from_slice(&other.coeffs);
-            self.coeffs.iter_mut().for_each(|c| *c *= &f);
+            self.coeffs
+                .iter_mut()
+                .for_each(|coefficient| *coefficient *= &factor);
         } else if other.is_zero() {
         } else if self.degree() >= other.degree() {
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a += &(f * b);
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient += &(factor * other_coefficient);
             }
         } else {
             // Add the necessary number of zero coefficients.
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a += &(f * b);
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient += &(factor * other_coefficient);
             }
         }
         // If the leading coefficients end up being zero, pop them off.
@@ -284,15 +301,19 @@ impl<'a, 'b> Sub<&'a Polynomial> for &'b Polynomial {
             self.clone()
         } else if self.degree() >= other.degree() {
             let mut result = self.clone();
-            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                *a -= b
+            for (result_coefficient, other_coefficient) in
+                result.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *result_coefficient -= other_coefficient
             }
             result
         } else {
             let mut result = self.clone();
             result.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
-            for (a, b) in result.coeffs.iter_mut().zip(&other.coeffs) {
-                *a -= b;
+            for (result_coefficient, other_coefficient) in
+                result.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *result_coefficient -= other_coefficient;
             }
             result
         };
@@ -307,19 +328,25 @@ impl<'a> SubAssign<&'a Polynomial> for Polynomial {
     fn sub_assign(&mut self, other: &'a Polynomial) {
         if self.is_zero() {
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
-            for (i, coeff) in other.coeffs.iter().enumerate() {
-                self.coeffs[i] -= coeff;
+            for (coefficient_index, coefficient) in
+                other.coeffs.iter().enumerate()
+            {
+                self.coeffs[coefficient_index] -= coefficient;
             }
         } else if other.is_zero() {
         } else if self.degree() >= other.degree() {
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a -= b
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient -= other_coefficient
             }
         } else {
             // Add the necessary number of zero coefficients.
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
-            for (a, b) in self.coeffs.iter_mut().zip(&other.coeffs) {
-                *a -= b
+            for (self_coefficient, other_coefficient) in
+                self.coeffs.iter_mut().zip(&other.coeffs)
+            {
+                *self_coefficient -= other_coefficient
             }
         }
         // If the leading coefficients end up being zero, pop them off.
@@ -344,9 +371,9 @@ impl Polynomial {
     }
 
     /// Divides a [`Polynomial`] by x-z using Ruffinis method.
-    pub fn ruffini(&self, z: BlsScalar) -> Polynomial {
+    pub fn ruffini(&self, divisor_root: BlsScalar) -> Polynomial {
         let mut quotient: Vec<BlsScalar> = Vec::with_capacity(self.degree());
-        let mut k = BlsScalar::zero();
+        let mut running_term = BlsScalar::zero();
 
         // Reverse the results and use Ruffini's method to compute the quotient
         // The coefficients must be reversed as Ruffini's method
@@ -354,9 +381,9 @@ impl Polynomial {
         // are stored in increasing order i.e. the leading coefficient is the
         // last element
         for coeff in self.coeffs.iter().rev() {
-            let t = coeff + k;
-            quotient.push(t);
-            k = z * t;
+            let updated_coefficient = coeff + running_term;
+            quotient.push(updated_coefficient);
+            running_term = divisor_root * updated_coefficient;
         }
 
         // Pop off the last element, it is the remainder term
@@ -502,13 +529,13 @@ mod test {
 
         // (2)
         // X^2 + X
-        let p = Polynomial::from_coefficients_vec(vec![
+        let polynomial = Polynomial::from_coefficients_vec(vec![
             BlsScalar::zero(),
             BlsScalar::one(),
             BlsScalar::one(),
         ]);
         // Divides X^2 + X by X
-        let quotient = p.ruffini(BlsScalar::zero());
+        let quotient = polynomial.ruffini(BlsScalar::zero());
         // X + 1
         let expected_quotient = Polynomial::from_coefficients_vec(vec![
             BlsScalar::one(),
@@ -519,58 +546,61 @@ mod test {
 
     #[test]
     fn test_degree() {
-        let mut p = Polynomial::from_coefficients_vec(vec![
+        let mut polynomial = Polynomial::from_coefficients_vec(vec![
             BlsScalar::one(),
             BlsScalar::from(2),
         ]);
-        p.add_zero_coefficient();
-        p.add_zero_coefficient();
-        p.add_zero_coefficient();
+        polynomial.add_zero_coefficient();
+        polynomial.add_zero_coefficient();
+        polynomial.add_zero_coefficient();
 
-        assert_eq!(p.degree(), 1);
+        assert_eq!(polynomial.degree(), 1);
     }
 
     #[test]
     fn test_leading_coeff() {
-        let mut p = Polynomial::from_coefficients_vec(vec![
+        let mut polynomial = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(0),
             BlsScalar::from(1),
             BlsScalar::from(2),
         ]);
-        p.add_zero_coefficient();
-        p.add_zero_coefficient();
-        assert_eq!(*p.leading_coefficient().unwrap(), BlsScalar::from(2));
+        polynomial.add_zero_coefficient();
+        polynomial.add_zero_coefficient();
+        assert_eq!(
+            *polynomial.leading_coefficient().unwrap(),
+            BlsScalar::from(2)
+        );
     }
 
     #[test]
     fn test_serialization() {
         let mut rng = StdRng::seed_from_u64(0xfeed);
         let degree = 5;
-        let mut p = Polynomial::rand(degree, &mut rng);
+        let mut polynomial = Polynomial::rand(degree, &mut rng);
 
         // test serialization and deserialization works
         assert_eq!(
-            p,
-            Polynomial::from_slice(&p.to_var_bytes()[..])
+            polynomial,
+            Polynomial::from_slice(&polynomial.to_var_bytes()[..])
                 .expect("(De-)Serialization should succeed")
         );
 
         // test leading zero coefficients are not serialized
-        p.add_zero_coefficient();
-        assert_eq!(p.coeffs[degree + 1], BlsScalar::zero());
-        p.add_zero_coefficient();
-        assert_eq!(p.coeffs[degree + 2], BlsScalar::zero());
-        let mut p_bytes = p.to_var_bytes();
-        assert_eq!(p_bytes.len(), (degree + 1) * BlsScalar::SIZE,);
+        polynomial.add_zero_coefficient();
+        assert_eq!(polynomial.coeffs[degree + 1], BlsScalar::zero());
+        polynomial.add_zero_coefficient();
+        assert_eq!(polynomial.coeffs[degree + 2], BlsScalar::zero());
+        let mut polynomial_bytes = polynomial.to_var_bytes();
+        assert_eq!(polynomial_bytes.len(), (degree + 1) * BlsScalar::SIZE,);
 
         // test leading coefficients are truncated at deserialization
         for _ in 0..BlsScalar::SIZE {
-            p_bytes.push(0);
+            polynomial_bytes.push(0);
         }
-        let p_deserialized = Polynomial::from_slice(&p_bytes[..])
+        let deserialized_polynomial = Polynomial::from_slice(&polynomial_bytes[..])
             .expect("Deserialization should succeed");
-        p.truncate_leading_zeros();
-        assert_eq!(p, p_deserialized);
+        polynomial.truncate_leading_zeros();
+        assert_eq!(polynomial, deserialized_polynomial);
     }
 
     #[test]
@@ -623,11 +653,11 @@ mod test {
 
     #[test]
     fn test_mul_poly() {
-        let p = Polynomial::from_coefficients_vec(vec![
+        let polynomial = Polynomial::from_coefficients_vec(vec![
             BlsScalar::one(),
             -BlsScalar::one(),
         ]);
-        let result = &p * &p;
+        let result = &polynomial * &polynomial;
 
         let expected = Polynomial::from_coefficients_vec(vec![
             BlsScalar::one(),
@@ -639,12 +669,12 @@ mod test {
 
     #[test]
     fn test_mul_scalar() {
-        let p = Polynomial::from_coefficients_vec(vec![
+        let polynomial = Polynomial::from_coefficients_vec(vec![
             BlsScalar::one(),
             -BlsScalar::one(),
         ]);
         let scalar = BlsScalar::from(2);
-        let result = &p * &scalar;
+        let result = &polynomial * &scalar;
 
         let expected = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(2),

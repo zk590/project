@@ -66,8 +66,8 @@ impl Serializable<{ u64::SIZE + u32::SIZE + 5 * BlsScalar::SIZE }>
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
 
-        let mut buf = [0u8; Self::SIZE];
-        let mut writer = &mut buf[..];
+        let mut serialized_domain = [0u8; Self::SIZE];
+        let mut writer = &mut serialized_domain[..];
         writer.write(&self.size.to_bytes());
         writer.write(&self.log_size_of_group.to_bytes());
         writer.write(&self.size_as_field_element.to_bytes());
@@ -76,20 +76,20 @@ impl Serializable<{ u64::SIZE + u32::SIZE + 5 * BlsScalar::SIZE }>
         writer.write(&self.group_gen_inv.to_bytes());
         writer.write(&self.generator_inv.to_bytes());
 
-        buf
+        serialized_domain
     }
 
     fn from_bytes(
-        buf: &[u8; Self::SIZE],
+        serialized_domain: &[u8; Self::SIZE],
     ) -> Result<EvaluationDomain, Self::Error> {
-        let mut buffer = &buf[..];
-        let size = u64::from_reader(&mut buffer)?;
-        let log_size_of_group = u32::from_reader(&mut buffer)?;
-        let size_as_field_element = BlsScalar::from_reader(&mut buffer)?;
-        let size_inv = BlsScalar::from_reader(&mut buffer)?;
-        let group_gen = BlsScalar::from_reader(&mut buffer)?;
-        let group_gen_inv = BlsScalar::from_reader(&mut buffer)?;
-        let generator_inv = BlsScalar::from_reader(&mut buffer)?;
+        let mut domain_reader = &serialized_domain[..];
+        let size = u64::from_reader(&mut domain_reader)?;
+        let log_size_of_group = u32::from_reader(&mut domain_reader)?;
+        let size_as_field_element = BlsScalar::from_reader(&mut domain_reader)?;
+        let size_inv = BlsScalar::from_reader(&mut domain_reader)?;
+        let group_gen = BlsScalar::from_reader(&mut domain_reader)?;
+        let group_gen_inv = BlsScalar::from_reader(&mut domain_reader)?;
+        let generator_inv = BlsScalar::from_reader(&mut domain_reader)?;
 
         Ok(EvaluationDomain {
             size,
@@ -351,27 +351,30 @@ pub(crate) mod alloc {
             }
         }
 
-        let mut m = 1;
+        let mut butterfly_step = 1;
         for _ in 0..log_n {
-            let w_m = omega.pow(&[(n / (2 * m)) as u64, 0, 0, 0]);
+            let root_step =
+                omega.pow(&[(n / (2 * butterfly_step)) as u64, 0, 0, 0]);
 
-            let mut k = 0;
-            while k < n {
+            let mut block_start = 0;
+            while block_start < n {
                 let mut w = BlsScalar::one();
-                for j in 0..m {
-                    let mut t = a[(k + j + m) as usize];
-                    t *= &w;
-                    let mut tmp = a[(k + j) as usize];
-                    tmp -= &t;
-                    a[(k + j + m) as usize] = tmp;
-                    a[(k + j) as usize] += &t;
-                    w.mul_assign(&w_m);
+                for offset in 0..butterfly_step {
+                    let mut right_value =
+                        a[(block_start + offset + butterfly_step) as usize];
+                    right_value *= &w;
+                    let mut left_value = a[(block_start + offset) as usize];
+                    left_value -= &right_value;
+                    a[(block_start + offset + butterfly_step) as usize] =
+                        left_value;
+                    a[(block_start + offset) as usize] += &right_value;
+                    w.mul_assign(&root_step);
                 }
 
-                k += 2 * m;
+                block_start += 2 * butterfly_step;
             }
 
-            m *= 2;
+            butterfly_step *= 2;
         }
     }
 

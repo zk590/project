@@ -23,61 +23,74 @@ where
     // append the siblings and position to the circuit
     let mut level_witnesses = [[Composer::ZERO; ARITY]; H];
     // if i == position: pos_bits[i] = 1 else: pos_bits[i] = 0
-    let mut pos_bits = [[Composer::ZERO; ARITY]; H];
-    for h in (0..H).rev() {
-        let level = &opening.branch()[h];
-        for (i, item) in level.iter().enumerate() {
-            if i == opening.positions()[h] {
-                pos_bits[h][i] = composer.append_witness(BlsScalar::one());
+    let mut position_bits = [[Composer::ZERO; ARITY]; H];
+    for level_index in (0..H).rev() {
+        let level = &opening.branch()[level_index];
+        for (item_index, item) in level.iter().enumerate() {
+            if item_index == opening.positions()[level_index] {
+                position_bits[level_index][item_index] =
+                    composer.append_witness(BlsScalar::one());
             } else {
-                pos_bits[h][i] = composer.append_witness(BlsScalar::zero());
+                position_bits[level_index][item_index] =
+                    composer.append_witness(BlsScalar::zero());
             }
 
-            level_witnesses[h][i] = composer.append_witness(item.hash);
+            level_witnesses[level_index][item_index] =
+                composer.append_witness(item.hash);
             // ensure that the entries of pos_bits are either 0 or 1
-            composer.component_boolean(pos_bits[h][i]);
+            composer.component_boolean(position_bits[level_index][item_index]);
         }
 
         // ensure there is *exactly* one bit turned on in the array, by
         // checking that the sum of all position bits equals 1
         let constraint = Constraint::new()
             .left(1)
-            .a(pos_bits[h][0])
+            .a(position_bits[level_index][0])
             .right(1)
-            .b(pos_bits[h][1])
+            .b(position_bits[level_index][1])
             .fourth(1)
-            .d(pos_bits[h][2]);
-        let mut sum = composer.gate_add(constraint);
+            .d(position_bits[level_index][2]);
+        let mut position_bits_sum = composer.gate_add(constraint);
         let constraint =
-            Constraint::new().left(1).a(sum).right(1).b(pos_bits[h][3]);
-        sum = composer.gate_add(constraint);
-        composer.assert_equal_constant(sum, BlsScalar::one(), None);
+            Constraint::new()
+                .left(1)
+                .a(position_bits_sum)
+                .right(1)
+                .b(position_bits[level_index][3]);
+        position_bits_sum = composer.gate_add(constraint);
+        composer.assert_equal_constant(position_bits_sum, BlsScalar::one(), None);
     }
 
     // keep track of the computed hash along our path with needle
-    let mut needle = leaf;
-    for h in (0..H).rev() {
-        for i in 0..ARITY {
+    let mut current_hash_witness = leaf;
+    for level_index in (0..H).rev() {
+        for item_index in 0..ARITY {
             // assert that:
             // pos_bits[h][i] * level_hash[i] = pos_bits[h][i] * needle
             let constraint = Constraint::new()
                 .mult(1)
-                .a(pos_bits[h][i])
-                .b(level_witnesses[h][i]);
-            let result = composer.gate_mul(constraint);
+                .a(position_bits[level_index][item_index])
+                .b(level_witnesses[level_index][item_index]);
+            let level_hash_constrained = composer.gate_mul(constraint);
             let constraint =
-                Constraint::new().mult(1).a(pos_bits[h][i]).b(needle);
-            let needle_result = composer.gate_mul(constraint);
+                Constraint::new()
+                    .mult(1)
+                    .a(position_bits[level_index][item_index])
+                    .b(current_hash_witness);
+            let current_hash_constrained = composer.gate_mul(constraint);
             // ensure the computed hash matches the stored one
-            composer.assert_equal(result, needle_result);
+            composer
+                .assert_equal(level_hash_constrained, current_hash_constrained);
         }
 
         // hash the current level
-        needle =
-            HashGadget::digest(composer, Domain::Merkle4, &level_witnesses[h])
-                [0];
+        current_hash_witness = HashGadget::digest(
+            composer,
+            Domain::Merkle4,
+            &level_witnesses[level_index],
+        )[0];
     }
 
     // return the computed root as a witness in the circuit
-    needle
+    current_hash_witness
 }

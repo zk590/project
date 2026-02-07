@@ -133,7 +133,7 @@ where
     // available, we will want that instead, but for the time being we use
     // this implementation.
     pub fn from_slice<const T_SIZE: usize>(
-        buf: &[u8],
+        bytes: &[u8],
     ) -> Result<Self, BytesError>
     where
         T: Serializable<T_SIZE>,
@@ -141,31 +141,31 @@ where
         coset_bytes::Error: From<<T as Serializable<T_SIZE>>::Error>,
     {
         let expected_len = (1 + H * A) * T_SIZE + H * (u32::BITS as usize / 8);
-        if buf.len() != expected_len {
+        if bytes.len() != expected_len {
             return Err(BytesError::BadLength {
-                found: (buf.len()),
+                found: (bytes.len()),
                 expected: (expected_len),
             });
         }
 
-        let mut bytes = buf;
+        let mut reader = bytes;
 
         // deserialize root
-        let root = T::from_reader(&mut bytes)?;
+        let root = T::from_reader(&mut reader)?;
 
         // deserialize branch
         let mut branch: [[T; A]; H] =
             init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
         for level in &mut branch {
             for item in &mut *level {
-                *item = T::from_reader(&mut bytes)?;
+                *item = T::from_reader(&mut reader)?;
             }
         }
 
         // deserialize positions
         let mut positions = [0usize; H];
         for position_slot in &mut positions {
-            *position_slot = u32::from_reader(&mut bytes)? as usize;
+            *position_slot = u32::from_reader(&mut reader)? as usize;
         }
 
         Ok(Self {
@@ -196,9 +196,9 @@ fn fill_opening<T, const H: usize, const A: usize>(
 
     fill_opening(opening, child, height + 1, child_position);
 
-    for i in 0..A {
-        if let Some(child) = &node.children[i] {
-            opening.branch[height][i] = child.item().clone();
+    for child_index in 0..A {
+        if let Some(child) = &node.children[child_index] {
+            opening.branch[height][child_index] = child.item().clone();
         }
     }
     opening.positions[height] = child_index;

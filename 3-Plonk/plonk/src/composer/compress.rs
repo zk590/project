@@ -190,13 +190,13 @@ impl CompressedCircuit {
             polynomials,
             constraints,
         };
-        let mut buf = Vec::with_capacity(
+        let mut packed_bytes = Vec::with_capacity(
             1 + compressed.scalars.len() * BlsScalar::SIZE
                 + compressed.polynomials.len() * 88
                 + compressed.constraints.len() * 40,
         );
-        compressed.pack(&mut buf);
-        miniz_oxide::deflate::compress_to_vec(&buf, 10)
+        compressed.pack(&mut packed_bytes);
+        miniz_oxide::deflate::compress_to_vec(&packed_bytes, 10)
     }
 
     pub fn from_bytes(compressed: &[u8]) -> Result<Composer, Error> {
@@ -240,7 +240,7 @@ impl CompressedCircuit {
         });
 
         for (
-            i,
+            constraint_index,
             CompressedConstraint {
                 polynomial,
                 a,
@@ -334,8 +334,10 @@ impl CompressedCircuit {
                 .c(c)
                 .d(d);
 
-            if let Some(idx) = public_inputs.get(public_input_cursor) {
-                if idx == &i {
+            if let Some(public_input_index) =
+                public_inputs.get(public_input_cursor)
+            {
+                if public_input_index == &constraint_index {
                     public_input_cursor += 1;
                     constraint = constraint.public(BlsScalar::zero());
                 }

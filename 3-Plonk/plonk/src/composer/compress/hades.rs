@@ -18,27 +18,28 @@ const ROUNDS: usize = 59 + 8;
 const CONSTANTS: usize = ROUNDS * WIDTH;
 
 pub fn constants() -> [BlsScalar; CONSTANTS] {
-    let mut cnst = [BlsScalar::zero(); CONSTANTS];
-    let mut p = BlsScalar::one();
+    let mut round_constants = [BlsScalar::zero(); CONSTANTS];
+    let mut previous_constant = BlsScalar::one();
     let mut bytes = b"poseidon-for-plonk".to_vec();
 
-    cnst.iter_mut().for_each(|c| {
+    round_constants.iter_mut().for_each(|constant_slot| {
         bytes = Sha512::digest(bytes.as_slice()).to_vec();
 
-        let mut v = [0x00u8; 64];
-        v.copy_from_slice(&bytes[0..64]);
+        let mut wide_bytes = [0x00u8; 64];
+        wide_bytes.copy_from_slice(&bytes[0..64]);
 
-        *c = BlsScalar::from_bytes_wide(&v) + p;
-        p = *c;
+        *constant_slot =
+            BlsScalar::from_bytes_wide(&wide_bytes) + previous_constant;
+        previous_constant = *constant_slot;
     });
 
-    cnst
+    round_constants
 }
 
 pub fn mds() -> [[BlsScalar; WIDTH]; WIDTH] {
     let mut matrix = [[BlsScalar::zero(); WIDTH]; WIDTH];
-    let mut xs = [BlsScalar::zero(); WIDTH];
-    let mut ys = [BlsScalar::zero(); WIDTH];
+    let mut x_values = [BlsScalar::zero(); WIDTH];
+    let mut y_values = [BlsScalar::zero(); WIDTH];
 
     // Generate x and y values deterministically for the cauchy matrix
     // where x[i] != y[i] to allow the values to be inverted
@@ -48,16 +49,16 @@ pub fn mds() -> [[BlsScalar; WIDTH]; WIDTH] {
     // det(M) = (ad - bc) ; if a == b and c == d => det(M) =0
     // For an MDS matrix, every possible mxm submatrix, must have det(M) != 0
     (0..WIDTH).for_each(|i| {
-        xs[i] = BlsScalar::from(i as u64);
-        ys[i] = BlsScalar::from((i + WIDTH) as u64);
+        x_values[i] = BlsScalar::from(i as u64);
+        y_values[i] = BlsScalar::from((i + WIDTH) as u64);
     });
 
-    let mut m = 0;
+    let mut row_index = 0;
     (0..WIDTH).for_each(|i| {
         (0..WIDTH).for_each(|j| {
-            matrix[m][j] = (xs[i] + ys[j]).invert().unwrap();
+            matrix[row_index][j] = (x_values[i] + y_values[j]).invert().unwrap();
         });
-        m += 1;
+        row_index += 1;
     });
 
     matrix

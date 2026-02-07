@@ -241,21 +241,23 @@ impl Serializable<{ G1Affine::SIZE + G2Affine::SIZE * 2 }> for OpeningKey {
     #[allow(unused_must_use)]
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
-        let mut buf = [0u8; Self::SIZE];
-        let mut writer = &mut buf[..];
+        let mut serialized_opening_key = [0u8; Self::SIZE];
+        let mut writer = &mut serialized_opening_key[..];
         // This can't fail therefore we don't care about the Result nor use it.
         writer.write(&self.g.to_bytes());
         writer.write(&self.h.to_bytes());
         writer.write(&self.x_h.to_bytes());
 
-        buf
+        serialized_opening_key
     }
 
-    fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
-        let mut buffer = &buf[..];
-        let g = G1Affine::from_reader(&mut buffer)?;
-        let h = G2Affine::from_reader(&mut buffer)?;
-        let beta_h = G2Affine::from_reader(&mut buffer)?;
+    fn from_bytes(
+        serialized_opening_key: &[u8; Self::SIZE],
+    ) -> Result<Self, Self::Error> {
+        let mut opening_key_reader = &serialized_opening_key[..];
+        let g = G1Affine::from_reader(&mut opening_key_reader)?;
+        let h = G2Affine::from_reader(&mut opening_key_reader)?;
+        let beta_h = G2Affine::from_reader(&mut opening_key_reader)?;
 
         Ok(Self::new(g, h, beta_h))
     }

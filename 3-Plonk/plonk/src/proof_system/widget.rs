@@ -416,7 +416,7 @@ pub(crate) mod alloc {
         /// Deserializes a slice of bytes into a [`ProverKey`].
         pub fn from_slice(bytes: &[u8]) -> Result<ProverKey, Error> {
             let mut buffer = bytes;
-            let n = u64::from_reader(&mut buffer)? as usize;
+            let circuit_size = u64::from_reader(&mut buffer)? as usize;
             let evaluations_size = u64::from_reader(&mut buffer)? as usize;
             // let domain = crate::fft::EvaluationDomain::new(4 * size)?;
             // TODO: By creating this we can avoid including the
@@ -424,26 +424,28 @@ pub(crate) mod alloc {
             // dusk-network/plonk#436
 
             let poly_from_reader =
-                |buf: &mut &[u8]| -> Result<Polynomial, Error> {
+                |reader: &mut &[u8]| -> Result<Polynomial, Error> {
                     let serialized_poly_len =
-                        u64::from_reader(buf)? as usize * BlsScalar::SIZE;
+                        u64::from_reader(reader)? as usize * BlsScalar::SIZE;
                     // If the announced len is zero, simply return an empty poly
                     // and leave the buffer intact.
                     if serialized_poly_len == 0 {
                         return Ok(Polynomial::zero());
                     }
-                    let (a, b) = buf.split_at(serialized_poly_len);
-                    let poly = Polynomial::from_slice(a);
-                    *buf = b;
+                    let (serialized_poly, remaining_bytes) =
+                        reader.split_at(serialized_poly_len);
+                    let poly = Polynomial::from_slice(serialized_poly);
+                    *reader = remaining_bytes;
 
                     poly
                 };
 
             let evals_from_reader =
-                |buf: &mut &[u8]| -> Result<Evaluations, Error> {
-                    let (a, b) = buf.split_at(evaluations_size);
-                    let eval = Evaluations::from_slice(a);
-                    *buf = b;
+                |reader: &mut &[u8]| -> Result<Evaluations, Error> {
+                    let (serialized_evaluations, remaining_bytes) =
+                        reader.split_at(evaluations_size);
+                    let eval = Evaluations::from_slice(serialized_evaluations);
+                    *reader = remaining_bytes;
 
                     eval
                 };
@@ -551,7 +553,7 @@ pub(crate) mod alloc {
             };
 
             let prover_key = ProverKey {
-                n,
+                n: circuit_size,
                 arithmetic,
                 logic,
                 range,
@@ -582,46 +584,46 @@ mod test {
     use coset_bls12_381::BlsScalar;
     use rand_core::OsRng;
 
-    fn rand_poly_eval(n: usize) -> (Polynomial, Evaluations) {
-        let polynomial = Polynomial::rand(n, &mut OsRng);
-        (polynomial, rand_evaluations(n))
+    fn rand_poly_eval(circuit_size: usize) -> (Polynomial, Evaluations) {
+        let polynomial = Polynomial::rand(circuit_size, &mut OsRng);
+        (polynomial, rand_evaluations(circuit_size))
     }
 
-    fn rand_evaluations(n: usize) -> Evaluations {
-        let domain = EvaluationDomain::new(4 * n).unwrap();
+    fn rand_evaluations(circuit_size: usize) -> Evaluations {
+        let domain = EvaluationDomain::new(4 * circuit_size).unwrap();
         let values: Vec<_> =
-            (0..4 * n).map(|_| BlsScalar::random(&mut OsRng)).collect();
+            (0..4 * circuit_size).map(|_| BlsScalar::random(&mut OsRng)).collect();
 
         Evaluations::from_vec_and_domain(values, domain)
     }
 
     #[test]
     fn test_serialize_deserialize_prover_key() {
-        let n = 1 << 11;
+        let circuit_size = 1 << 11;
 
-        let q_m = rand_poly_eval(n);
-        let q_l = rand_poly_eval(n);
-        let q_r = rand_poly_eval(n);
-        let q_o = rand_poly_eval(n);
-        let q_c = rand_poly_eval(n);
-        let q_f = rand_poly_eval(n);
-        let q_arith = rand_poly_eval(n);
+        let q_m = rand_poly_eval(circuit_size);
+        let q_l = rand_poly_eval(circuit_size);
+        let q_r = rand_poly_eval(circuit_size);
+        let q_o = rand_poly_eval(circuit_size);
+        let q_c = rand_poly_eval(circuit_size);
+        let q_f = rand_poly_eval(circuit_size);
+        let q_arith = rand_poly_eval(circuit_size);
 
-        let q_logic = rand_poly_eval(n);
+        let q_logic = rand_poly_eval(circuit_size);
 
-        let q_range = rand_poly_eval(n);
+        let q_range = rand_poly_eval(circuit_size);
 
-        let q_fixed_group_add = rand_poly_eval(n);
+        let q_fixed_group_add = rand_poly_eval(circuit_size);
 
-        let q_variable_group_add = rand_poly_eval(n);
+        let q_variable_group_add = rand_poly_eval(circuit_size);
 
-        let s_sigma_1 = rand_poly_eval(n);
-        let s_sigma_2 = rand_poly_eval(n);
-        let s_sigma_3 = rand_poly_eval(n);
-        let s_sigma_4 = rand_poly_eval(n);
-        let linear_evaluations = rand_evaluations(n);
+        let s_sigma_1 = rand_poly_eval(circuit_size);
+        let s_sigma_2 = rand_poly_eval(circuit_size);
+        let s_sigma_3 = rand_poly_eval(circuit_size);
+        let s_sigma_4 = rand_poly_eval(circuit_size);
+        let linear_evaluations = rand_evaluations(circuit_size);
 
-        let v_h_coset_8n = rand_evaluations(n);
+        let v_h_coset_8n = rand_evaluations(circuit_size);
 
         let arithmetic = arithmetic::ProverKey {
             q_m,
@@ -660,7 +662,7 @@ mod test {
         };
 
         let prover_key = ProverKey {
-            n,
+            n: circuit_size,
             arithmetic,
             logic,
             fixed_base,
@@ -671,10 +673,14 @@ mod test {
         };
 
         let prover_key_bytes = prover_key.to_var_bytes();
-        let pk = ProverKey::from_slice(&prover_key_bytes).unwrap();
+        let deserialized_prover_key =
+            ProverKey::from_slice(&prover_key_bytes).unwrap();
 
-        assert_eq!(pk, prover_key);
-        assert_eq!(pk.to_var_bytes(), prover_key.to_var_bytes());
+        assert_eq!(deserialized_prover_key, prover_key);
+        assert_eq!(
+            deserialized_prover_key.to_var_bytes(),
+            prover_key.to_var_bytes()
+        );
     }
 
     #[test]
@@ -682,7 +688,7 @@ mod test {
         use crate::commitment_scheme::Commitment;
         use coset_bls12_381::G1Affine;
 
-        let n = 2usize.pow(5);
+        let circuit_size = 2usize.pow(5);
 
         let q_m = Commitment(G1Affine::generator());
         let q_l = Commitment(G1Affine::generator());
@@ -735,7 +741,7 @@ mod test {
         };
 
         let verifier_key = VerifierKey {
-            n,
+            n: circuit_size,
             arithmetic,
             logic,
             range,
@@ -745,8 +751,9 @@ mod test {
         };
 
         let verifier_key_bytes = verifier_key.to_bytes();
-        let got = VerifierKey::from_bytes(&verifier_key_bytes).unwrap();
+        let deserialized_verifier_key =
+            VerifierKey::from_bytes(&verifier_key_bytes).unwrap();
 
-        assert_eq!(got, verifier_key);
+        assert_eq!(deserialized_verifier_key, verifier_key);
     }
 }

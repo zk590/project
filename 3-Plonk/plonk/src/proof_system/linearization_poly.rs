@@ -90,8 +90,8 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
 
-        let mut buf = [0u8; Self::SIZE];
-        let mut writer = &mut buf[..];
+        let mut serialized_evaluations = [0u8; Self::SIZE];
+        let mut writer = &mut serialized_evaluations[..];
         writer.write(&self.a_eval.to_bytes());
         writer.write(&self.b_eval.to_bytes());
         writer.write(&self.c_eval.to_bytes());
@@ -108,28 +108,28 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
         writer.write(&self.s_sigma_3_eval.to_bytes());
         writer.write(&self.z_eval.to_bytes());
 
-        buf
+        serialized_evaluations
     }
 
     fn from_bytes(
-        buf: &[u8; Self::SIZE],
+        serialized_evaluations: &[u8; Self::SIZE],
     ) -> Result<ProofEvaluations, Self::Error> {
-        let mut buffer = &buf[..];
-        let a_eval = BlsScalar::from_reader(&mut buffer)?;
-        let b_eval = BlsScalar::from_reader(&mut buffer)?;
-        let c_eval = BlsScalar::from_reader(&mut buffer)?;
-        let d_eval = BlsScalar::from_reader(&mut buffer)?;
-        let a_w_eval = BlsScalar::from_reader(&mut buffer)?;
-        let b_w_eval = BlsScalar::from_reader(&mut buffer)?;
-        let d_w_eval = BlsScalar::from_reader(&mut buffer)?;
-        let q_arith_eval = BlsScalar::from_reader(&mut buffer)?;
-        let q_c_eval = BlsScalar::from_reader(&mut buffer)?;
-        let q_l_eval = BlsScalar::from_reader(&mut buffer)?;
-        let q_r_eval = BlsScalar::from_reader(&mut buffer)?;
-        let s_sigma_1_eval = BlsScalar::from_reader(&mut buffer)?;
-        let s_sigma_2_eval = BlsScalar::from_reader(&mut buffer)?;
-        let s_sigma_3_eval = BlsScalar::from_reader(&mut buffer)?;
-        let z_eval = BlsScalar::from_reader(&mut buffer)?;
+        let mut evaluation_reader = &serialized_evaluations[..];
+        let a_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let b_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let c_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let d_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let a_w_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let b_w_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let d_w_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let q_arith_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let q_c_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let q_l_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let q_r_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let s_sigma_1_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let s_sigma_2_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let s_sigma_3_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
+        let z_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
 
         Ok(ProofEvaluations {
             a_eval,

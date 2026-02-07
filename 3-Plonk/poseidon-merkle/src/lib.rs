@@ -134,16 +134,19 @@ where
     };
 
     fn aggregate(items: [&Self; ARITY]) -> Self {
-        let empty = &T::EMPTY_SUBTREE;
+        let empty_data = &T::EMPTY_SUBTREE;
 
         let mut level_hashes = [BlsScalar::zero(); ARITY];
-        let mut level_data = [empty; ARITY];
+        let mut level_data = [empty_data; ARITY];
 
         // grab hashes and data
-        items.into_iter().enumerate().for_each(|(i, item)| {
-            level_hashes[i] = item.hash;
-            level_data[i] = &item.data;
-        });
+        items
+            .into_iter()
+            .enumerate()
+            .for_each(|(item_index, item)| {
+                level_hashes[item_index] = item.hash;
+                level_data[item_index] = &item.data;
+            });
 
         // create new aggregated item with the hash being the poseidon hash of
         // the previous level
@@ -157,12 +160,12 @@ where
 impl Serializable<32> for Item<()> {
     type Error = <BlsScalar as Serializable<32>>::Error;
 
-    fn from_bytes(buf: &[u8; 32]) -> Result<Self, Self::Error>
+    fn from_bytes(bytes: &[u8; 32]) -> Result<Self, Self::Error>
     where
         Self: Sized,
     {
         Ok(Item {
-            hash: <BlsScalar as Serializable<32>>::from_bytes(buf)?,
+            hash: <BlsScalar as Serializable<32>>::from_bytes(bytes)?,
             data: (),
         })
     }

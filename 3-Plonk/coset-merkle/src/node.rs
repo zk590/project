@@ -27,18 +27,19 @@ where
         }
     }
 
-    pub(crate) fn item(&self) -> Ref<T> {
+    pub(crate) fn item(&self) -> Ref<'_, T> {
         // a leaf will always have a computed item, so we never go into it
         if self.item.borrow().is_none() {
             // compute our item, recursing into the children.
             let empty_subtree = &T::EMPTY_SUBTREE;
             let mut item_refs = [empty_subtree; A];
 
-            let child_items: [Option<Ref<T>>; A] = init_array(|child_index| {
-                self.children[child_index]
-                    .as_ref()
-                    .map(|child_node| child_node.item())
-            });
+            let child_items: [Option<Ref<'_, T>>; A] =
+                init_array(|child_index| {
+                    self.children[child_index]
+                        .as_ref()
+                        .map(|child_node| child_node.item())
+                });
 
             let mut has_children = false;
             item_refs

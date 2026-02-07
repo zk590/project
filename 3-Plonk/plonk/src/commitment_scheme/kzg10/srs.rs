@@ -162,16 +162,16 @@ impl PublicParameters {
         if bytes.len() <= OpeningKey::SIZE {
             return Err(Error::NotEnoughBytes);
         }
-        let mut buf = bytes;
-        let opening_key = OpeningKey::from_reader(&mut buf)?;
-        let commit_key = CommitKey::from_slice(buf)?;
+        let mut byte_reader = bytes;
+        let opening_key = OpeningKey::from_reader(&mut byte_reader)?;
+        let commit_key = CommitKey::from_slice(byte_reader)?;
 
-        let pp = PublicParameters {
+        let public_parameters = PublicParameters {
             commit_key,
             opening_key,
         };
 
-        Ok(pp)
+        Ok(public_parameters)
     }
 
     /// Trim truncates the [`PublicParameters`] to allow the prover to commit to
@@ -213,8 +213,8 @@ mod test {
 
         let powers_of_x = util::powers_of(&x, degree as usize);
 
-        for (i, x_i) in powers_of_x.iter().enumerate() {
-            assert_eq!(*x_i, x.pow(&[i as u64, 0, 0, 0]))
+        for (power_index, power_value) in powers_of_x.iter().enumerate() {
+            assert_eq!(*power_value, x.pow(&[power_index as u64, 0, 0, 0]))
         }
 
         let last_element = powers_of_x.last().unwrap();
@@ -223,28 +223,56 @@ mod test {
 
     #[test]
     fn test_serialize_deserialize_public_parameter() {
-        let pp = PublicParameters::setup(1 << 7, &mut OsRng).unwrap();
+        let public_parameters =
+            PublicParameters::setup(1 << 7, &mut OsRng).unwrap();
 
-        let got_pp = PublicParameters::from_slice(&pp.to_var_bytes()).unwrap();
+        let deserialized_parameters =
+            PublicParameters::from_slice(&public_parameters.to_var_bytes())
+                .unwrap();
 
-        assert_eq!(got_pp.commit_key.powers_of_g, pp.commit_key.powers_of_g);
-        assert_eq!(got_pp.opening_key.g, pp.opening_key.g);
-        assert_eq!(got_pp.opening_key.h, pp.opening_key.h);
-        assert_eq!(got_pp.opening_key.x_h, pp.opening_key.x_h);
+        assert_eq!(
+            deserialized_parameters.commit_key.powers_of_g,
+            public_parameters.commit_key.powers_of_g
+        );
+        assert_eq!(
+            deserialized_parameters.opening_key.g,
+            public_parameters.opening_key.g
+        );
+        assert_eq!(
+            deserialized_parameters.opening_key.h,
+            public_parameters.opening_key.h
+        );
+        assert_eq!(
+            deserialized_parameters.opening_key.x_h,
+            public_parameters.opening_key.x_h
+        );
     }
 
     #[test]
     fn public_parameters_bytes_unchecked() {
-        let pp = PublicParameters::setup(1 << 7, &mut OsRng).unwrap();
+        let public_parameters =
+            PublicParameters::setup(1 << 7, &mut OsRng).unwrap();
 
-        let pp_p = unsafe {
-            let bytes = pp.to_raw_var_bytes();
+        let deserialized_parameters = unsafe {
+            let bytes = public_parameters.to_raw_var_bytes();
             PublicParameters::from_slice_unchecked(&bytes)
         };
 
-        assert_eq!(pp.commit_key, pp_p.commit_key);
-        assert_eq!(pp.opening_key.g, pp_p.opening_key.g);
-        assert_eq!(pp.opening_key.h, pp_p.opening_key.h);
-        assert_eq!(pp.opening_key.x_h, pp_p.opening_key.x_h);
+        assert_eq!(
+            public_parameters.commit_key,
+            deserialized_parameters.commit_key
+        );
+        assert_eq!(
+            public_parameters.opening_key.g,
+            deserialized_parameters.opening_key.g
+        );
+        assert_eq!(
+            public_parameters.opening_key.h,
+            deserialized_parameters.opening_key.h
+        );
+        assert_eq!(
+            public_parameters.opening_key.x_h,
+            deserialized_parameters.opening_key.x_h
+        );
     }
 }

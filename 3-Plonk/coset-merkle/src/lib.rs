@@ -51,10 +51,10 @@ where //开始定义泛型约束
     // 不安全操作，创建未初始化的数组
         unsafe { MaybeUninit::uninit().assume_init() };
 
-    let mut i = 0;
-    while i < N {
-        array[i].write(closure(i)); //调用闭包初始化第 i 个元素
-        i += 1;
+    let mut index = 0;
+    while index < N {
+        array[index].write(closure(index)); //调用闭包初始化第 i 个元素
+        index += 1;
     }
     //获取数组的原始指针
     let array_ptr = array.as_ptr();

@@ -69,36 +69,42 @@ pub(crate) fn slow_multiscalar_mul_single_base(
 // while we do not have batch inversion for scalars
 use core::ops::MulAssign;
 
-pub fn batch_inversion(v: &mut [BlsScalar]) {
+pub fn batch_inversion(scalars: &mut [BlsScalar]) {
     // Montgomery’s Trick and Fast Implementation of Masked AES
     // Genelle, Prouff and Quisquater
     // Section 3.2
 
     // First pass: compute [a, ab, abc, ...]
-    let mut prod = Vec::with_capacity(v.len());
-    let mut tmp = BlsScalar::one();
-    for f in v.iter().filter(|f| f != &&BlsScalar::zero()) {
-        tmp.mul_assign(f);
-        prod.push(tmp);
+    let mut prefix_products = Vec::with_capacity(scalars.len());
+    let mut running_product = BlsScalar::one();
+    for scalar in scalars.iter().filter(|scalar| scalar != &&BlsScalar::zero()) {
+        running_product.mul_assign(scalar);
+        prefix_products.push(running_product);
     }
 
-    // Invert `tmp`.
-    tmp = tmp.invert().unwrap(); // Guaranteed to be nonzero.
+    // Invert the accumulated product.
+    running_product = running_product.invert().unwrap(); // Guaranteed to be nonzero.
 
     // Second pass: iterate backwards to compute inverses
-    for (f, s) in v
+    for (scalar, prefix_product) in scalars
         .iter_mut()
         // Backwards
         .rev()
         // Ignore normalized elements
-        .filter(|f| f != &&BlsScalar::zero())
+        .filter(|scalar| scalar != &&BlsScalar::zero())
         // Backwards, skip last element, fill in one for last term.
-        .zip(prod.into_iter().rev().skip(1).chain(Some(BlsScalar::one())))
+        .zip(
+            prefix_products
+                .into_iter()
+                .rev()
+                .skip(1)
+                .chain(Some(BlsScalar::one())),
+        )
     {
-        // tmp := tmp * f; f := tmp * s = 1/f
-        let new_tmp = tmp * *f;
-        *f = tmp * s;
-        tmp = new_tmp;
+        // running_product := running_product * scalar; scalar := running_product * prefix_product = 1/scalar
+        let next_running_product = running_product * *scalar;
+        *scalar = running_product * prefix_product;
+        running_product = next_running_product;
     }
 }
 #[cfg(test)]
