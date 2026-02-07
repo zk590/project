@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::composer::permutation::constants::{K1, K2, K3};
 use crate::fft::{EvaluationDomain, Evaluations, Polynomial};
@@ -34,12 +34,7 @@ pub(crate) struct ProverKey {
     pub(crate) s_sigma_4: (Polynomial, Evaluations),
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) linear_evaluations: Evaluations,
-    /* Evaluations of f(x) = X
-     * [XXX: Remove this and
-     * benchmark if it makes a
-     * considerable difference
-     * -- These are just the
-     * domain elements] */
+    
 }
 
 impl ProverKey {
@@ -66,8 +61,8 @@ impl ProverKey {
         let one_check_term = self.compute_quotient_term_check_one_i(z_i, l1_alpha_sq);
         identity_term + copy_term + one_check_term
     }
-    // (a(x) + beta * X + gamma) (b(X) + beta * k1 * X + gamma) (o(X) + beta *
-    // k2 * X + gamma)(d(X) + beta * k3 * X + gamma)z(X) * alpha
+
+
     fn compute_quotient_identity_range_check_i(
         &self,
         index: usize,
@@ -89,9 +84,9 @@ impl ProverKey {
             * z_i
             * alpha
     }
-    // (a(x) + beta* Sigma1(X) + gamma) (b(X) + beta * Sigma2(X) + gamma) (o(X)
-    // + beta * Sigma3(X) + gamma)(d(X) + beta * Sigma4(X) + gamma) Z(X.omega) *
-    // alpha
+
+
+
     fn compute_quotient_copy_range_check_i(
         &self,
         index: usize,
@@ -118,7 +113,7 @@ impl ProverKey {
 
         -product
     }
-    // L_1(X)[Z(X) - 1]
+
     fn compute_quotient_term_check_one_i(
         &self,
         z_i: &BlsScalar,
@@ -161,7 +156,7 @@ impl ProverKey {
             &self.s_sigma_4.0,
         );
 
-        // the poly is increased by 2 after blinding it
+
         let domain = EvaluationDomain::new(z_poly.degree() - 2).unwrap();
         let one_check_linearization = self.compute_linearizer_check_is_one(
             &domain,
@@ -171,8 +166,8 @@ impl ProverKey {
         );
         &(&identity_linearization + &copy_linearization) + &one_check_linearization
     }
-    // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1 * z_challenge +
-    // gamma)(c_eval + beta * K2 * z_challenge + gamma) * alpha z(X)
+
+
     fn compute_linearizer_identity_range_check(
         &self,
         (a_eval, b_eval, c_eval, d_eval): (
@@ -187,21 +182,21 @@ impl ProverKey {
     ) -> Polynomial {
         let beta_z = beta * z_challenge;
 
-        // a_eval + beta * z_challenge + gamma
+
         let mut a_term = a_eval + beta_z;
         a_term += gamma;
 
-        // b_eval + beta * K1 * z_challenge + gamma
+
         let beta_z_k1 = K1 * beta_z;
         let mut b_term = b_eval + beta_z_k1;
         b_term += gamma;
 
-        // c_eval + beta * K2 * z_challenge + gamma
+
         let beta_z_k2 = K2 * beta_z;
         let mut c_term = c_eval + beta_z_k2;
         c_term += gamma;
 
-        // d_eval + beta * K3 * z_challenge + gamma
+
         let beta_z_k3 = K3 * beta_z;
         let mut d_term = d_eval + beta_z_k3;
         d_term += gamma;
@@ -209,15 +204,15 @@ impl ProverKey {
         let mut accumulator = a_term * b_term;
         accumulator *= c_term;
         accumulator *= d_term;
-        accumulator *= alpha; // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1 *
-                    // z_challenge + gamma)(c_eval + beta * K2 * z_challenge + gamma)(d_eval
-                    // + beta * K3 * z_challenge + gamma) * alpha
-        z_poly * &accumulator // (a_eval + beta * z_challenge + gamma)(b_eval + beta * K1
-                    // * z_challenge + gamma)(c_eval + beta * K2 * z_challenge +
-                    // gamma) * alpha z(X)
+        accumulator *= alpha;
+
+
+        z_poly * &accumulator
+
+
     }
-    // -(a_eval + beta * sigma_1 + gamma)(b_eval + beta * sigma_2 + gamma)
-    // (c_eval + beta * sigma_3 + gamma) * beta *z_eval * alpha^2 * Sigma_4(X)
+
+
     fn compute_linearizer_copy_range_check(
         &self,
         (a_eval, b_eval, c_eval): (&BlsScalar, &BlsScalar, &BlsScalar),
@@ -228,17 +223,17 @@ impl ProverKey {
         (alpha, beta, gamma): (&BlsScalar, &BlsScalar, &BlsScalar),
         s_sigma_4_poly: &Polynomial,
     ) -> Polynomial {
-        // a_eval + beta * sigma_1 + gamma
+
         let beta_sigma_1 = beta * sigma_1_eval;
         let mut a_term = a_eval + beta_sigma_1;
         a_term += gamma;
 
-        // b_eval + beta * sigma_2 + gamma
+
         let beta_sigma_2 = beta * sigma_2_eval;
         let mut b_term = b_eval + beta_sigma_2;
         b_term += gamma;
 
-        // c_eval + beta * sigma_3 + gamma
+
         let beta_sigma_3 = beta * sigma_3_eval;
         let mut c_term = c_eval + beta_sigma_3;
         c_term += gamma;
@@ -247,13 +242,13 @@ impl ProverKey {
 
         let mut accumulator = a_term * b_term * c_term;
         accumulator *= beta_z_eval;
-        accumulator *= alpha; // (a_eval + beta * sigma_1 + gamma)(b_eval + beta * sigma_2 +
-                    // gamma)(c_eval + beta * sigma_3 + gamma) * beta * z_eval * alpha
+        accumulator *= alpha;
 
-        s_sigma_4_poly * &-accumulator // -(a_eval + beta * sigma_1 + gamma)(b_eval +
-                             // beta * sigma_2 + gamma) (c_eval + beta *
-                             // sigma_3 + gamma) * beta * z_eval * alpha^2 *
-                             // Sigma_4(X)
+
+        s_sigma_4_poly * &-accumulator
+
+
+
     }
 
     fn compute_linearizer_check_is_one(
@@ -263,7 +258,7 @@ impl ProverKey {
         alpha_sq: &BlsScalar,
         z_coeffs: &Polynomial,
     ) -> Polynomial {
-        // Evaluate l_1(z)
+
         let l_1_z = domain.evaluate_all_lagrange_coefficients(*z_challenge)[0];
 
         z_coeffs * &(l_1_z * alpha_sq)

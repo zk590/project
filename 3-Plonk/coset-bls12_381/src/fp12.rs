@@ -14,7 +14,7 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-/// This represents an element $c_0 + c_1 w$ of $\mathbb{F}_{p^12} = \mathbb{F}_{p^6} / w^2 - v$.
+
 #[cfg_attr(
     feature = "rkyv-impl",
     derive(Archive, RkyvSerialize, RkyvDeserialize),
@@ -150,13 +150,13 @@ impl Fp12 {
         }
     }
 
-    /// Raises this element to p.
+
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
         let c1 = self.c1.frobenius_map();
 
-        // c1 = c1 * (u + 1)^((p - 1) / 6)
+
         let c1 = c1
             * Fp6::from(Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -621,9 +621,9 @@ fn test_arithmetic() {
         },
     };
 
-    // because a and b and c are similar to each other and
-    // I was lazy, this is just some arbitrary way to make
-    // them a little more different
+
+
+
     let a = a.square().invert().unwrap().square() + c;
     let b = b.square().invert().unwrap().square() + a;
     let c = c.square().invert().unwrap().square() + b;

@@ -1,5 +1,5 @@
-//! This module provides an implementation of the BLS12-381 base field `GF(p)`
-//! where `p = 0x1a0111ea397fe69a4b1ba7b6434bacd764774b84f38512bf6730d2a0f6b0f6241eabfffeb153ffffb9feffffffffaaab`
+
+
 
 mod coset;
 
@@ -15,9 +15,9 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-// The internal representation of this type is six 64-bit unsigned
-// integers in little-endian order. `Fp` values are always in
-// Montgomery form; i.e., Scalar(a) = aR mod p, with R = 2^384.
+
+
+
 #[derive(Copy, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -78,7 +78,7 @@ impl ConditionallySelectable for Fp {
     }
 }
 
-/// p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787
+
 const MODULUS: [u64; 6] = [
     0xb9fe_ffff_ffff_aaab,
     0x1eab_fffe_b153_ffff,
@@ -88,10 +88,10 @@ const MODULUS: [u64; 6] = [
     0x1a01_11ea_397f_e69a,
 ];
 
-/// INV = -(p^{-1} mod 2^64) mod 2^64
+
 const INV: u64 = 0x89f3_fffc_fffc_fffd;
 
-/// R = 2^384 mod p
+
 const R: Fp = Fp([
     0x7609_0000_0002_fffd,
     0xebf4_000b_c40c_0002,
@@ -101,7 +101,7 @@ const R: Fp = Fp([
     0x15f6_5ec3_fa80_e493,
 ]);
 
-/// R2 = 2^(384*2) mod p
+
 const R2: Fp = Fp([
     0xf4df_1f34_1c34_1746,
     0x0a76_e6a6_09d1_04f1,
@@ -111,7 +111,7 @@ const R2: Fp = Fp([
     0x1198_8fe5_92ca_e3aa,
 ]);
 
-/// R3 = 2^(384*3) mod p
+
 const R3: Fp = Fp([
     0xed48_ac6b_d94c_a1e0,
     0x315f_831e_03a7_adf8,
@@ -170,13 +170,13 @@ impl_binops_additive!(Fp, Fp);
 impl_binops_multiplicative!(Fp, Fp);
 
 impl Fp {
-    /// Returns zero, the additive identity.
+
     #[inline]
     pub const fn zero() -> Fp {
         Fp([0, 0, 0, 0, 0, 0])
     }
 
-    /// Returns one, the multiplicative identity.
+
     #[inline]
     pub const fn one() -> Fp {
         R
@@ -186,8 +186,8 @@ impl Fp {
         self.ct_eq(&Fp::zero())
     }
 
-    /// Attempts to convert a big-endian byte representation of
-    /// a scalar into an `Fp`, failing if the input is not canonical.
+
+
     pub fn from_bytes(bytes: &[u8; 48]) -> CtOption<Fp> {
         let mut tmp = Fp([0, 0, 0, 0, 0, 0]);
 
@@ -198,7 +198,7 @@ impl Fp {
         tmp.0[1] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap());
         tmp.0[0] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap());
 
-        // Try to subtract the modulus
+
         let (_, borrow) = sbb(tmp.0[0], MODULUS[0], 0);
         let (_, borrow) = sbb(tmp.0[1], MODULUS[1], borrow);
         let (_, borrow) = sbb(tmp.0[2], MODULUS[2], borrow);
@@ -206,23 +206,23 @@ impl Fp {
         let (_, borrow) = sbb(tmp.0[4], MODULUS[4], borrow);
         let (_, borrow) = sbb(tmp.0[5], MODULUS[5], borrow);
 
-        // If the element is smaller than MODULUS then the
-        // subtraction will underflow, producing a borrow value
-        // of 0xffff...ffff. Otherwise, it'll be zero.
+
+
+
         let is_some = (borrow as u8) & 1;
 
-        // Convert to Montgomery form by computing
-        // (a.R^0 * R^2) / R = a.R
+
+
         tmp *= &R2;
 
         CtOption::new(tmp, Choice::from(is_some))
     }
 
-    /// Converts an element of `Fp` into a byte representation in
-    /// big-endian byte order.
+
+
     pub fn to_bytes(self) -> [u8; 48] {
-        // Turn into canonical form by computing
-        // (a.R) / R = a
+
+
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
@@ -242,7 +242,7 @@ impl Fp {
         let mut bytes = [0u8; 96];
         rng.fill_bytes(&mut bytes);
 
-        // Parse the random bytes as a big-endian number, to match Fp encoding order.
+
         Fp::from_u768([
             u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
             u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
@@ -259,36 +259,36 @@ impl Fp {
         ])
     }
 
-    /// Reduces a big-endian 64-bit limb representation of a 768-bit number.
+
     fn from_u768(limbs: [u64; 12]) -> Fp {
-        // We reduce an arbitrary 768-bit number by decomposing it into two 384-bit digits
-        // with the higher bits multiplied by 2^384. Thus, we perform two reductions
+
+
         //
-        // 1. the lower bits are multiplied by R^2, as normal
-        // 2. the upper bits are multiplied by R^2 * 2^384 = R^3
+
+
         //
-        // and computing their sum in the field. It remains to see that arbitrary 384-bit
-        // numbers can be placed into Montgomery form safely using the reduction. The
-        // reduction works so long as the product is less than R=2^384 multiplied by
-        // the modulus. This holds because for any `c` smaller than the modulus, we have
-        // that (2^384 - 1)*c is an acceptable product for the reduction. Therefore, the
-        // reduction always works so long as `c` is in the field; in this case it is either the
-        // constant `R2` or `R3`.
+
+
+
+
+
+
+
         let d1 = Fp([limbs[11], limbs[10], limbs[9], limbs[8], limbs[7], limbs[6]]);
         let d0 = Fp([limbs[5], limbs[4], limbs[3], limbs[2], limbs[1], limbs[0]]);
-        // Convert to Montgomery form
+
         d0 * R2 + d1 * R3
     }
 
-    /// Returns whether or not this element is strictly lexicographically
-    /// larger than its negation.
-    pub fn lexicographically_largest(&self) -> Choice {
-        // This can be determined by checking to see if the element is
-        // larger than (p - 1) // 2. If we subtract by ((p - 1) // 2) + 1
-        // and there is no underflow, then the element must be larger than
-        // (p - 1) // 2.
 
-        // First, because self is in Montgomery form we need to reduce it
+
+    pub fn lexicographically_largest(&self) -> Choice {
+
+
+
+
+
+
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
@@ -300,24 +300,24 @@ impl Fp {
         let (_, borrow) = sbb(tmp.0[4], 0x258d_d3db_21a5_d66b, borrow);
         let (_, borrow) = sbb(tmp.0[5], 0x0d00_88f5_1cbf_f34d, borrow);
 
-        // If the element was smaller, the subtraction will underflow
-        // producing a borrow value of 0xffff...ffff, otherwise it will
-        // be zero. We create a Choice representing true if there was
-        // overflow (and so this element is not lexicographically larger
-        // than its negation) and then negate it.
+
+
+
+
+
 
         !Choice::from((borrow as u8) & 1)
     }
 
-    /// Constructs an element of `Fp` without checking that it is
-    /// canonical.
+
+
     pub const fn from_raw_unchecked(v: [u64; 6]) -> Fp {
         Fp(v)
     }
 
-    /// Although this is labeled "vartime", it is only
-    /// variable time with respect to the exponent. It
-    /// is also not exposed in the public API.
+
+
+
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -334,10 +334,10 @@ impl Fp {
 
     #[inline]
     pub fn sqrt(&self) -> CtOption<Self> {
-        // We use Shank's method, as p = 3 (mod 4). This means
-        // we only need to exponentiate by (p+1)/4. This only
-        // works for elements that are actually quadratic residue,
-        // so we check that we got the correct result at the end.
+
+
+
+
 
         let sqrt = self.pow_vartime(&[
             0xee7f_bfff_ffff_eaab,
@@ -352,11 +352,11 @@ impl Fp {
     }
 
     #[inline]
-    /// Computes the multiplicative inverse of this field
-    /// element, returning None in the case that this element
-    /// is zero.
+
+
+
     pub fn invert(&self) -> CtOption<Self> {
-        // Exponentiate by p - 2
+
         let t = self.pow_vartime(&[
             0xb9fe_ffff_ffff_aaa9,
             0x1eab_fffe_b153_ffff,
@@ -378,8 +378,8 @@ impl Fp {
         let (r4, borrow) = sbb(self.0[4], MODULUS[4], borrow);
         let (r5, borrow) = sbb(self.0[5], MODULUS[5], borrow);
 
-        // If underflow occurred on the final limb, borrow = 0xfff...fff, otherwise
-        // borrow = 0x000...000. Thus, we use it as a mask!
+
+
         let r0 = (self.0[0] & borrow) | (r0 & !borrow);
         let r1 = (self.0[1] & borrow) | (r1 & !borrow);
         let r2 = (self.0[2] & borrow) | (r2 & !borrow);
@@ -399,8 +399,8 @@ impl Fp {
         let (d4, carry) = adc(self.0[4], rhs.0[4], carry);
         let (d5, _) = adc(self.0[5], rhs.0[5], carry);
 
-        // Attempt to subtract the modulus, to ensure the value
-        // is smaller than the modulus.
+
+
         (&Fp([d0, d1, d2, d3, d4, d5])).subtract_p()
     }
 
@@ -413,8 +413,8 @@ impl Fp {
         let (d4, borrow) = sbb(MODULUS[4], self.0[4], borrow);
         let (d5, _) = sbb(MODULUS[5], self.0[5], borrow);
 
-        // Let's use a mask if `self` was zero, which would mean
-        // the result of the subtraction is p.
+
+
         let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3] | self.0[4] | self.0[5]) == 0)
             as u64)
             .wrapping_sub(1);
@@ -434,36 +434,36 @@ impl Fp {
         (&rhs.neg()).add(self)
     }
 
-    /// Returns `c = a.zip(b).fold(0, |acc, (a_i, b_i)| acc + a_i * b_i)`.
+
     ///
-    /// Implements Algorithm 2 from Patrick Longa's
-    /// [ePrint 2022-367](https://eprint.iacr.org/2022/367) §3.
+
+
     #[inline]
     pub(crate) fn sum_of_products<const T: usize>(a: [Fp; T], b: [Fp; T]) -> Fp {
-        // For a single `a x b` multiplication, operand scanning (schoolbook) takes each
-        // limb of `a` in turn, and multiplies it by all of the limbs of `b` to compute
-        // the result as a double-width intermediate representation, which is then fully
-        // reduced at the end. Here however we have pairs of multiplications (a_i, b_i),
-        // the results of which are summed.
-        //
-        // The intuition for this algorithm is two-fold:
-        // - We can interleave the operand scanning for each pair, by processing the jth
-        //   limb of each `a_i` together. As these have the same offset within the overall
-        //   operand scanning flow, their results can be summed directly.
-        // - We can interleave the multiplication and reduction steps, resulting in a
-        //   single bitshift by the limb size after each iteration. This means we only
-        //   need to store a single extra limb overall, instead of keeping around all the
-        //   intermediate results and eventually having twice as many limbs.
 
-        // Algorithm 2, line 2
+
+
+
+
+        //
+
+
+
+
+
+
+
+
+
+
         let (u0, u1, u2, u3, u4, u5) =
             (0..6).fold((0, 0, 0, 0, 0, 0), |(u0, u1, u2, u3, u4, u5), j| {
-                // Algorithm 2, line 3
-                // For each pair in the overall sum of products:
+
+
                 let (t0, t1, t2, t3, t4, t5, t6) = (0..T).fold(
                     (u0, u1, u2, u3, u4, u5, 0),
                     |(t0, t1, t2, t3, t4, t5, t6), i| {
-                        // Compute digit_j x row and accumulate into `u`.
+
                         let (t0, carry) = mac(t0, a[i].0[j], b[i].0[0], 0);
                         let (t1, carry) = mac(t1, a[i].0[j], b[i].0[1], carry);
                         let (t2, carry) = mac(t2, a[i].0[j], b[i].0[2], carry);
@@ -476,8 +476,8 @@ impl Fp {
                     },
                 );
 
-                // Algorithm 2, lines 4-5
-                // This is a single step of the usual Montgomery reduction process.
+
+
                 let k = t0.wrapping_mul(INV);
                 let (_, carry) = mac(t0, k, MODULUS[0], 0);
                 let (r1, carry) = mac(t1, k, MODULUS[1], carry);
@@ -490,8 +490,8 @@ impl Fp {
                 (r1, r2, r3, r4, r5, r6)
             });
 
-        // Because we represent F_p elements in non-redundant form, we need a final
-        // conditional subtraction to ensure the output is in range.
+
+
         (&Fp([u0, u1, u2, u3, u4, u5])).subtract_p()
     }
 
@@ -510,9 +510,9 @@ impl Fp {
         t10: u64,
         t11: u64,
     ) -> Self {
-        // The Montgomery reduction here is based on Algorithm 14.32 in
-        // Handbook of Applied Cryptography
-        // <http://cacr.uwaterloo.ca/hac/about/chap14.pdf>.
+
+
+
 
         let k = t0.wrapping_mul(INV);
         let (_, carry) = mac(t0, k, MODULUS[0], 0);
@@ -568,8 +568,8 @@ impl Fp {
         let (r10, carry) = mac(r10, k, MODULUS[5], carry);
         let (r11, _) = adc(t11, r11, carry);
 
-        // Attempt to subtract the modulus, to ensure the value
-        // is smaller than the modulus.
+
+
         (&Fp([r6, r7, r8, r9, r10, r11])).subtract_p()
     }
 
@@ -620,7 +620,7 @@ impl Fp {
         Self::montgomery_reduce(t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
     }
 
-    /// Squares this element.
+
     #[inline]
     pub const fn square(&self) -> Self {
         let (t1, carry) = mac(0, self.0[0], self.0[1], 0);
@@ -903,7 +903,7 @@ fn test_from_bytes() {
 
 #[test]
 fn test_sqrt() {
-    // a = 4
+
     let a = Fp::from_raw_unchecked([
         0xaa27_0000_000c_fff3,
         0x53cc_0032_fc34_000a,
@@ -914,7 +914,7 @@ fn test_sqrt() {
     ]);
 
     assert_eq!(
-        // sqrt(4) = -2
+
         -a.sqrt().unwrap(),
         // 2
         Fp::from_raw_unchecked([

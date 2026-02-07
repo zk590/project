@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use core::cmp::{Ord, Ordering, PartialOrd};
 use core::convert::TryInto;
@@ -18,25 +18,25 @@ use crate::util::sbb;
 impl zeroize::DefaultIsZeroes for Fr {}
 
 impl Fr {
-    /// Creates a `Fr` from arbitrary bytes by hashing the input with BLAKE2b
-    /// into a 512-bits number, and then converting the number into its scalar
-    /// representation by reducing it by the modulo.
+
+
+
     ///
-    /// By treating the output of the BLAKE2b hash as a random oracle, this
-    /// implementation follows the first conversion of
-    /// https://hackmd.io/zV6qe1_oSU-kYU6Tt7pO7Q with concrete numbers:
-    /// ```text
-    /// p = 0x0e7db4ea6533afa906673b0101343b00a6682093ccc81082d0970e5ed6f72cb7
-    /// p = 6554484396890773809930967563523245729705921265872317281365359162392183254199
+
+
+
+
+
+
     ///
-    /// l = 2
+
     ///
-    /// s^l = (2^256)^2 = 2^512
-    /// s = 13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096
+
+
     ///
-    /// r' = 2045593080716281616348203381729468609728209645786990242449482205581148743408809
+
     ///
-    /// m' = 2244478849891746936202736009816130624903096691796347063256129649283183245105
+
     /// ```
     pub fn hash_to_scalar(input: &[u8]) -> Self {
         let state = blake2b_simd::Params::new()
@@ -59,7 +59,7 @@ impl Fr {
         ])
     }
 
-    /// SHR impl: shifts bits n times, equivalent to division by 2^n.
+
     #[inline]
     pub fn divn(&mut self, mut n: u32) {
         if n >= 256 {
@@ -86,35 +86,35 @@ impl Fr {
         }
     }
 
-    /// Reduces bit representation of numbers, such that
-    /// they can be evaluated in terms of the least significant bit.
+
+
     pub fn reduce(&self) -> Self {
         Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0u64, 0u64, 0u64, 0u64,
         )
     }
 
-    /// Evaluate if a `Scalar, from Fr` is even or not.
+
     pub fn is_even(&self) -> bool {
         self.0[0] % 2 == 0
     }
 
-    /// Compute the result from `Scalar (mod 2^k)`.
+
     ///
-    /// # Panics
+
     ///
-    /// If the given k is > 32 (5 bits) as the value gets
-    /// greater than the limb.  
+
+
     pub fn mod_2_pow_k(&self, k: u8) -> u8 {
         (self.0[0] & ((1 << k) - 1)) as u8
     }
 
-    /// Compute the result from `Scalar (mods k)`.
+
     ///
-    /// # Panics
+
     ///
-    /// If the given `k > 32 (5 bits)` || `k == 0` as the value gets
-    /// greater than the limb.   
+
+
     pub fn mods_2_pow_k(&self, w: u8) -> i8 {
         assert!(w < 32u8);
         let modulus = self.mod_2_pow_k(w) as i8;
@@ -126,15 +126,15 @@ impl Fr {
         }
     }
 
-    /// Computes the windowed-non-adjacent form for a given an element in
-    /// the JubJub Scalar field.
+
+
     ///
-    /// The wnaf of a scalar is its breakdown:
-    ///     scalar = sum_i{wnaf[i]*2^i}
-    /// where for all i:
-    ///     -2^{w-1} < wnaf[i] < 2^{w-1}
-    /// and
-    ///     wnaf[i] * wnaf[i+1] = 0
+
+
+
+
+
+
     pub fn compute_windowed_naf(&self, width: u8) -> [i8; 256] {
         let mut reduced_scalar = self.reduce();
         let mut naf_index = 0;
@@ -157,9 +157,9 @@ impl Fr {
     }
 }
 
-// TODO implement From<T> for any integer type smaller than 128-bit
+
 impl From<i8> for Fr {
-    // FIXME this could really be better if we removed the match
+
     fn from(val: i8) -> Fr {
         match (val >= 0, val < 0) {
             (true, false) => Fr([val.unsigned_abs() as u64, 0u64, 0u64, 0u64]),
@@ -174,9 +174,9 @@ impl From<Fr> for BlsScalar {
         let bls_scalar =
             <BlsScalar as Serializable<32>>::from_bytes(&scalar.to_bytes());
 
-        // The order of a JubJub's Scalar field is shorter than a BLS
-        // Scalar, so convert any jubjub scalar to a BLS' Scalar
-        // should always be safe.
+
+
+
         assert!(
             bls_scalar.is_ok(),
             "Failed to convert a Scalar from JubJub to BLS"
@@ -223,9 +223,9 @@ impl Ord for Fr {
 impl Serializable<32> for Fr {
     type Error = BytesError;
 
-    /// Attempts to convert a little-endian byte representation of
-    /// a field element into an element of `Fr`, failing if the input
-    /// is not canonical (is not smaller than r).
+
+
+
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let mut scalar = Fr([0, 0, 0, 0]);
 
@@ -234,33 +234,33 @@ impl Serializable<32> for Fr {
         scalar.0[2] = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
         scalar.0[3] = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
 
-        // Try to subtract the modulus
+
         let (_, borrow) = sbb(scalar.0[0], MODULUS.0[0], 0);
         let (_, borrow) = sbb(scalar.0[1], MODULUS.0[1], borrow);
         let (_, borrow) = sbb(scalar.0[2], MODULUS.0[2], borrow);
         let (_, borrow) = sbb(scalar.0[3], MODULUS.0[3], borrow);
 
-        // If the element is smaller than MODULUS then the
-        // subtraction will underflow, producing a borrow value
-        // of 0xffff...ffff. Otherwise, it'll be zero.
+
+
+
         let is_some = (borrow as u8) & 1;
 
         if is_some == 0 {
             return Err(BytesError::InvalidData);
         }
 
-        // Convert to Montgomery form by computing
-        // (a.R^0 * R^2) / R = a.R
+
+
         scalar *= &R2;
 
         Ok(scalar)
     }
 
-    /// Converts an element of `Fr` into a byte representation in
-    /// little-endian byte order.
+
+
     fn to_bytes(&self) -> [u8; Self::SIZE] {
-        // Turn into canonical form by computing
-        // (a.R) / R = a
+
+
         let canonical_scalar = Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
@@ -380,7 +380,7 @@ mod fuzz {
     use crate::util::sbb;
 
     fn is_scalar_in_range(scalar: &Fr) -> bool {
-        // subtraction against modulus must underflow
+
         let borrow = scalar
             .0
             .iter()

@@ -8,7 +8,7 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-/// Wrapper for a [`subtle::Choice`]
+
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",

@@ -8,7 +8,7 @@ use coset_bls12_381::*;
 use criterion::{black_box, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    // G1Projective
+
     {
         let name = "G1Projective";
 
@@ -35,7 +35,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             })
         });
     }
-    // G2Projective
+
     {
         let name = "G2Projective";
 

@@ -1,4 +1,4 @@
-//! Multiscalar multiplication implementation using pippenger algorithm.
+
 use crate::{
     g1::{G1Affine, G1Projective},
     scalar::Scalar,
@@ -6,9 +6,9 @@ use crate::{
 
 use alloc::vec::*;
 
-/// Performs multiscalar multiplication reliying on Pippenger's algorithm.
-/// This method was taken from `curve25519-dalek` and was originally made by
-/// Oleg Andreev <oleganza@gmail.com>.
+
+
+
 #[cfg(feature = "byteorder")]
 pub fn pippenger<P, I>(points: P, scalars: I) -> G1Projective
 where
@@ -17,9 +17,9 @@ where
 {
     let size = scalars.size_hint().0;
 
-    // Digit width in bits. As digit width grows,
-    // number of point additions goes down, but amount of
-    // buckets and bucket additions grows exponentially.
+
+
+
     let window_bits = if size < 500 {
         6
     } else if size < 800 {
@@ -30,31 +30,31 @@ where
 
     let max_digit: usize = 1 << window_bits;
     let digits_count: usize = to_radix_2w_size_hint(window_bits);
-    let buckets_count: usize = max_digit / 2; // digits are signed+centered hence 2^w/2, excluding 0-th bucket
+    let buckets_count: usize = max_digit / 2;
 
-    // Collect optimized scalars and points in buffers for repeated access
-    // (scanning the whole set per digit position).
+
+
     let scalars = scalars.map(|scalar| to_radix_2w(&scalar, window_bits));
     let scalars_points = scalars.zip(points).collect::<Vec<_>>();
 
-    // Prepare 2^w/2 buckets.
-    // buckets[i] corresponds to a multiplication factor (i+1).
+
+
     let mut buckets: Vec<_> = (0..buckets_count)
         .map(|_| G1Projective::identity())
         .collect();
 
     let mut columns = (0..digits_count).rev().map(|digit_index| {
-        // Clear the buckets when processing another digit.
+
         for item in buckets.iter_mut() {
             *item = G1Projective::identity();
         }
 
-        // Iterate over pairs of (point, scalar)
-        // and add/sub the point to the corresponding bucket.
-        // Note: if we add support for precomputed lookup tables,
-        // we'll be adding/subtracting point premultiplied by `digits[i]` to buckets[0].
+
+
+
+
         for (digits, pt) in scalars_points.iter() {
-            // Widen digit so that we don't run into edge cases when w=8.
+
             let digit = digits[digit_index] as i16;
             #[allow(clippy::comparison_chain)]
             if digit > 0 {
@@ -66,14 +66,14 @@ where
             }
         }
 
-        // Add the buckets applying the multiplication factor to each bucket.
-        // The most efficient way to do that is to have a single sum with two running sums:
-        // an intermediate sum from last bucket to the first, and a sum of intermediate sums.
+
+
+
         //
-        // For example, to add buckets 1*A, 2*B, 3*C we need to add these points:
-        //   C
-        //   C B
-        //   C B A   Sum = C + (C+B) + (C+B+A)
+
+
+
+
         let mut buckets_intermediate_sum = buckets[buckets_count - 1];
         let mut buckets_sum = buckets[buckets_count - 1];
         for i in (0..(buckets_count - 1)).rev() {
@@ -84,8 +84,8 @@ where
         buckets_sum
     });
 
-    // Take the high column as an initial value to avoid wasting time doubling the identity element in `fold()`.
-    // `unwrap()` always succeeds because we know we have more than zero digits.
+
+
     let hi_column = columns.next().unwrap();
 
     columns.fold(hi_column, |total, column_sum| {
@@ -93,7 +93,7 @@ where
     })
 }
 
-/// Compute \\([2\^k] P \\) by successive doublings. Requires \\( k > 0 \\).
+
 #[cfg(feature = "byteorder")]
 pub(crate) fn mul_by_pow_2(point: &G1Projective, k: u32) -> G1Projective {
     debug_assert!(k > 0);
@@ -103,12 +103,12 @@ pub(crate) fn mul_by_pow_2(point: &G1Projective, k: u32) -> G1Projective {
         doubled_point = current_point.double();
         current_point = &doubled_point;
     }
-    // Unroll last iteration so we can go directly to_extended()
+
     current_point.double()
 }
 
-/// Returns a size hint indicating how many entries of the return
-/// value of `to_radix_2w` are nonzero.
+
+
 #[cfg(feature = "byteorder")]
 fn to_radix_2w_size_hint(w: usize) -> usize {
     debug_assert!(w >= 6);
@@ -117,7 +117,7 @@ fn to_radix_2w_size_hint(w: usize) -> usize {
     let digits_count = match w {
         6 => (256 + w - 1) / w,
         7 => (256 + w - 1) / w,
-        // See comment in to_radix_2w on handling the terminal carry.
+
         8 => (256 + w - 1) / w + 1,
         _ => panic!("invalid radix parameter"),
     };
@@ -133,7 +133,7 @@ fn to_radix_2w(scalar: &Scalar, w: usize) -> [i8; 43] {
 
     use byteorder::{ByteOrder, LittleEndian};
 
-    // Scalar formatted as four `u64`s with carry bit packed into the highest bit.
+
     let mut scalar64x4 = [0u64; 4];
     LittleEndian::read_u64_into(&scalar.to_bytes(), &mut scalar64x4[0..4]);
 
@@ -144,36 +144,36 @@ fn to_radix_2w(scalar: &Scalar, w: usize) -> [i8; 43] {
     let mut digits = [0i8; 43];
     let digits_count = (256 + w - 1) / w;
     for i in 0..digits_count {
-        // Construct a buffer of bits of the scalar, starting at `bit_offset`.
+
         let bit_offset = i * w;
         let u64_idx = bit_offset / 64;
         let bit_idx = bit_offset % 64;
 
-        // Read the bits from the scalar
+
         let bit_buf: u64 = match bit_idx < 64 - w || u64_idx == 3 {
-            // This window's bits are contained in a single u64,
-            // or it's the last u64 anyway.
+
+
             true => scalar64x4[u64_idx] >> bit_idx,
-            // Combine the current u64's bits with the bits from the next u64
+
             false => (scalar64x4[u64_idx] >> bit_idx) | (scalar64x4[1 + u64_idx] << (64 - bit_idx)),
         };
 
-        // Read the actual coefficient value from the window
-        let coef = carry + (bit_buf & window_mask); // coef = [0, 2^r)
 
-        // Recenter coefficients from [0,2^w) to [-2^w/2, 2^w/2)
+        let coef = carry + (bit_buf & window_mask);
+
+
         carry = (coef + (radix / 2)) >> w;
         digits[i] = ((coef as i64) - (carry << w) as i64) as i8;
     }
 
-    // When w < 8, we can fold the final carry onto the last digit d,
-    // because d < 2^w/2 so d + carry*2^w = d + 1*2^w < 2^(w+1) < 2^8.
+
+
     //
-    // When w = 8, we can't fit carry*2^w into an i8.  This should
-    // not happen anyways, because the final carry will be 0 for
-    // reduced scalars, but the Scalar invariant allows 255-bit scalars.
-    // To handle this, we expand the size_hint by 1 when w=8,
-    // and accumulate the final carry onto another digit.
+
+
+
+
+
     match w {
         8 => digits[digits_count] += carry as i8,
         _ => digits[digits_count - 1] += (carry << w) as i8,
@@ -182,7 +182,7 @@ fn to_radix_2w(scalar: &Scalar, w: usize) -> [i8; 43] {
     digits
 }
 
-/// Performs a Variable Base Multiscalar Multiplication.
+
 pub fn msm_variable_base(points: &[G1Affine], scalars: &[Scalar]) -> G1Projective {
     #[cfg(feature = "parallel")]
     use rayon::prelude::*;
@@ -204,13 +204,13 @@ pub fn msm_variable_base(points: &[G1Affine], scalars: &[Scalar]) -> G1Projectiv
     #[cfg(not(feature = "parallel"))]
     let window_starts_iter = window_starts.into_iter();
 
-    // Each window is of size `c`.
-    // We divide up the bits 0..num_bits into windows of size `c`, and
-    // in parallel process each such window.
+
+
+
     let window_sums: Vec<_> = window_starts_iter
         .map(|window_start| {
             let mut window_sum = zero;
-            // We don't need the "zero" bucket, so we only have 2^c - 1 buckets
+
             let mut buckets = alloc::vec![zero; (1 << window_size) - 1];
             scalars
                 .iter()
@@ -218,24 +218,24 @@ pub fn msm_variable_base(points: &[G1Affine], scalars: &[Scalar]) -> G1Projectiv
                 .filter(|(scalar, _)| *scalar != &Scalar::zero())
                 .for_each(|(&scalar, base)| {
                     if scalar == fr_one {
-                        // We only process unit scalars once in the first window.
+
                         if window_start == 0 {
                             window_sum = window_sum.add_mixed(base);
                         }
                     } else {
                         let mut reduced_scalar = scalar.reduce();
 
-                        // We right-shift by w_start, thus getting rid of the
-                        // lower bits.
+
+
                         reduced_scalar.divn(window_start as u32);
 
-                        // We mod the remaining bits by the window size.
+
                         let scalar_window_value =
                             reduced_scalar.0[0] % (1 << window_size);
 
-                        // If the scalar is non-zero, we update the corresponding
-                        // bucket.
-                        // (Recall that `buckets` doesn't have a zero bucket.)
+
+
+
                         if scalar_window_value != 0 {
                             buckets[(scalar_window_value - 1) as usize] =
                                 buckets[(scalar_window_value - 1) as usize]
@@ -254,9 +254,9 @@ pub fn msm_variable_base(points: &[G1Affine], scalars: &[Scalar]) -> G1Projectiv
         })
         .collect();
 
-    // We store the sum for the lowest window.
+
     let lowest = *window_sums.first().unwrap();
-    // We're traversing windows from high to low.
+
     window_sums[1..]
         .iter()
         .rev()
@@ -271,7 +271,7 @@ pub fn msm_variable_base(points: &[G1Affine], scalars: &[Scalar]) -> G1Projectiv
 }
 
 fn ln_without_floats(value: usize) -> usize {
-    // log2(a) * ln(2)
+
     (log2(value) * 69 / 100) as usize
 }
 fn log2(value: usize) -> u32 {
@@ -290,7 +290,7 @@ mod tests {
     #[cfg(feature = "byteorder")]
     #[test]
     fn pippenger_test() {
-        // Reuse points across different tests
+
         let mut sample_size = 512;
         let arithmetic_start = Scalar::from(2128506u64).invert().unwrap();
         let arithmetic_step = Scalar::from(4443282u64).invert().unwrap();
@@ -299,7 +299,7 @@ mod tests {
             .collect::<Vec<_>>();
         let scalars = (0..sample_size)
             .map(|i| arithmetic_start + (Scalar::from(i as u64) * arithmetic_step))
-            .collect::<Vec<_>>(); // fast way to make ~random but deterministic scalars
+            .collect::<Vec<_>>();
         let premultiplied: Vec<G1Projective> = scalars
             .iter()
             .zip(points.iter())

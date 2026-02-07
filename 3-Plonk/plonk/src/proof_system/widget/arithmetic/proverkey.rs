@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -57,8 +57,8 @@ impl ProverKey {
         let q_c_i = &self.q_c.1[index];
         let q_arith_i = &self.q_arith.1[index];
 
-        // (a(x)b(x)q_M(x) + a(x)q_L(x) + b(X)q_R(x) + c(X)q_O(X) + d(x)q_F(X) +
-        // q_C(X)) * q_arith(X)
+
+
         //
         let mul_selector_term = a_i * b_i * q_m_i;
         let left_selector_term = a_i * q_l_i;
@@ -86,23 +86,23 @@ impl ProverKey {
         let q_f_poly = &self.q_f.0;
         let q_c_poly = &self.q_c.0;
 
-        // (a_eval * b_eval * q_m_poly + a_eval * q_l + b_eval * q_r + c_eval
-        // * q_o + d_eval * q_f + q_c) * q_arith_eval
+
+
         //
-        // a_eval * b_eval * q_m_poly
+
         let witness_product = evaluations.a_eval * evaluations.b_eval;
         let mul_selector_term = q_m_poly * &witness_product;
 
-        // a_eval * q_l
+
         let left_selector_term = q_l_poly * &evaluations.a_eval;
 
-        // b_eval * q_r
+
         let right_selector_term = q_r_poly * &evaluations.b_eval;
 
-        //c_eval * q_o
+
         let output_selector_term = q_o_poly * &evaluations.c_eval;
 
-        // d_eval * q_f
+
         let fourth_wire_term = q_f_poly * &evaluations.d_eval;
 
         let mut linearized_identity = &mul_selector_term + &left_selector_term;

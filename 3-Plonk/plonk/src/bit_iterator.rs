@@ -1,23 +1,23 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Code taken from zcash repo and generalized as we do not have access to the
-//! limbs
+
+
+//
+
+
+
+
 use core::mem;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BitIterator8<E> {
-    // scalar is the slice of integers that wish to iterate over
+
     scalar: E,
-    // num_of_total_bits represents the sum of all of the bits of each
-    // integer If we have 2 u32s then the total number of bits will
-    // be 32 * 2 = 64 bits
+
+
+
     num_of_total_bits: usize,
-    // bit_len represents the bit length of each integer.
-    // If we have a slice of u32s, then bit_len will be 32
+
+
     bit_len: usize,
 }
 

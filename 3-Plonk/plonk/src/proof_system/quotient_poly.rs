@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::{
     error::Error,
@@ -14,8 +14,8 @@ use coset_bls12_381::BlsScalar;
 #[cfg(feature = "std")]
 use rayon::prelude::*;
 
-/// Computes the Quotient [`Polynomial`] given the [`EvaluationDomain`], a
-/// [`ProverKey`] and some other info.
+
+
 pub(crate) fn compute(
     domain: &EvaluationDomain,
     prover_key: &ProverKey,
@@ -45,7 +45,7 @@ pub(crate) fn compute(
         BlsScalar,
     ),
 ) -> Result<Polynomial, Error> {
-    // Compute 8n evals
+
     let domain_8n = EvaluationDomain::new(8 * domain.size())?;
 
     let mut z_eval_8n = domain_8n.coset_fft(z_poly);
@@ -59,7 +59,7 @@ pub(crate) fn compute(
         z_eval_8n.push(z_eval_8n[i]);
         a_eval_8n.push(a_eval_8n[i]);
         b_eval_8n.push(b_eval_8n[i]);
-        // c_eval_8n push not required
+
         d_eval_8n.push(d_eval_8n[i]);
     }
 
@@ -104,7 +104,7 @@ pub(crate) fn compute(
     Ok(Polynomial::from_coefficients_vec(coset))
 }
 
-// Ensures that the circuit is satisfied
+
 fn compute_circuit_satisfiability_equation(
     domain: &EvaluationDomain,
     (
@@ -197,8 +197,8 @@ fn compute_circuit_satisfiability_equation(
                 d_shift_eval,
             );
 
-            // Multiplication by selectors and challenges
-            // has already been done
+
+
             t_arith + t_range + t_logic + t_fixed + t_var + public_eval
         })
         .collect();

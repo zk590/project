@@ -1,5 +1,5 @@
-//! This module implements message expansion consistent with the
-//! hash-to-curve RFC drafts 7 through 10
+
+
 
 use core::{
     fmt::{self, Debug, Formatter},
@@ -18,21 +18,21 @@ use alloc::vec::Vec;
 
 const OVERSIZE_DST_SALT: &[u8] = b"H2C-OVERSIZE-DST-";
 
-/// The domain separation tag for a message expansion.
+
 ///
-/// Implements [section 5.4.3 of `draft-irtf-cfrg-hash-to-curve-12`][dst].
+
 ///
-/// [dst]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.4.3
+
 #[derive(Debug)]
 enum ExpandMsgDst<'x, L: ArrayLength<u8>> {
-    /// DST produced by hashing a very long (> 255 chars) input DST.
+
     Hashed(GenericArray<u8, L>),
-    /// A raw input DST (<= 255 chars).
+
     Raw(&'x [u8]),
 }
 
 impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
-    /// Produces a DST for use with `expand_message_xof`.
+
     pub fn process_xof<H>(dst: &'x [u8]) -> Self
     where
         H: Default + Update + ExtendableOutputDirty,
@@ -50,7 +50,7 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
-    /// Produces a DST for use with `expand_message_xmd`.
+
     pub fn process_xmd<H>(dst: &'x [u8]) -> Self
     where
         H: Digest<OutputSize = L>,
@@ -62,7 +62,7 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
-    /// Returns the raw bytes of the DST.
+
     pub fn data(&'x self) -> &'x [u8] {
         match self {
             Self::Hashed(arr) => &arr[..],
@@ -70,7 +70,7 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
-    /// Returns the length of the DST.
+
     pub fn len(&'x self) -> usize {
         match self {
             Self::Hashed(_) => L::to_usize(),
@@ -79,34 +79,34 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
     }
 }
 
-/// A trait for message expansion methods supported by hash-to-curve.
+
 pub trait ExpandMessage: for<'x> InitExpandMessage<'x> {
-    // This intermediate is likely only necessary until GATs allow
-    // associated types with lifetimes.
+
+
 }
 
-/// Trait for constructing a new message expander.
+
 pub trait InitExpandMessage<'x> {
-    /// The state object used during message expansion.
+
     type Expander: ExpandMessageState<'x>;
 
-    /// Initializes a message expander.
+
     fn init_expand(message: &[u8], dst: &'x [u8], len_in_bytes: usize) -> Self::Expander;
 }
 
-// Automatically derive trait
+
 impl<X: for<'x> InitExpandMessage<'x>> ExpandMessage for X {}
 
-/// Trait for types implementing the `expand_message` interface for `hash_to_field`.
+
 pub trait ExpandMessageState<'x> {
-    /// Reads bytes from the generated output.
+
     fn read_into(&mut self, output: &mut [u8]) -> usize;
 
-    /// Retrieves the number of bytes remaining in the generator.
+
     fn remain(&self) -> usize;
 
     #[cfg(feature = "alloc")]
-    /// Constructs a `Vec` containing the remaining bytes of the output.
+
     fn into_vec(mut self) -> Vec<u8>
     where
         Self: Sized,
@@ -117,13 +117,13 @@ pub trait ExpandMessageState<'x> {
     }
 }
 
-/// A generator for the output of `expand_message_xof` for a given
-/// extendable hash function, message, DST, and output length.
+
+
 ///
-/// Implements [section 5.4.2 of `draft-irtf-cfrg-hash-to-curve-12`][expand_message_xof]
-/// with `k = 128`.
+
+
 ///
-/// [expand_message_xof]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.4.2
+
 pub struct ExpandMsgXof<H: ExtendableOutputDirty> {
     hash: <H as ExtendableOutputDirty>::Reader,
     remain: usize,
@@ -160,7 +160,7 @@ where
     type Expander = Self;
 
     fn init_expand(message: &[u8], dst: &[u8], len_in_bytes: usize) -> Self {
-        // Use U32 here for k = 128.
+
         let dst = ExpandMsgDst::<U32>::process_xof::<H>(dst);
         let hash = H::default()
             .chain(message)
@@ -175,21 +175,21 @@ where
     }
 }
 
-/// Constructor for `expand_message_xmd` for a given digest hash function, message, DST,
-/// and output length.
+
+
 ///
-/// Implements [section 5.4.1 of `draft-irtf-cfrg-hash-to-curve-12`][expand_message_xmd].
+
 ///
-/// [expand_message_xmd]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.4.1
+
 #[derive(Debug)]
 pub struct ExpandMsgXmd<H: Digest>(PhantomData<H>);
 
-/// A generator for the output of `expand_message_xmd` for a given
-/// digest hash function, message, DST, and output length.
+
+
 ///
-/// Implements [section 5.4.1 of `draft-irtf-cfrg-hash-to-curve-12`][expand_message_xmd].
+
 ///
-/// [expand_message_xmd]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-5.4.1
+
 pub struct ExpandMsgXmdState<'x, H: Digest> {
     dst: ExpandMsgDst<'x, H::OutputSize>,
     b_0: GenericArray<u8, H::OutputSize>,
@@ -228,7 +228,7 @@ where
             .chain(dst.data())
             .chain([dst.len() as u8])
             .finalize();
-        // init with b_1
+
         let b_i = H::new()
             .chain(&b_0)
             .chain([1u8])
@@ -294,7 +294,7 @@ mod tests {
     use sha2::{Sha256, Sha512};
     use sha3::{Shake128, Shake256};
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.1>
+
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha256() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA256-128";
@@ -457,7 +457,7 @@ mod tests {
         );
     }
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.2>
+
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha256_long_dst() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA256-128-long-DST-111111\
@@ -624,7 +624,7 @@ mod tests {
         );
     }
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.3>
+
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha512() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA512-256";
@@ -787,7 +787,7 @@ mod tests {
         );
     }
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.4>
+
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake128() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE128";
@@ -950,7 +950,7 @@ mod tests {
         );
     }
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.5>
+
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake128_long_dst() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE128-long-DST-11111111\
@@ -1117,7 +1117,7 @@ mod tests {
         );
     }
 
-    /// From <https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-12#appendix-K.6>
+
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake256() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE256";

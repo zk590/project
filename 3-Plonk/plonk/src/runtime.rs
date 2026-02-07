@@ -1,10 +1,10 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! PLONK runtime controller
+
+
+//
+
+
+
 
 use coset_bls12_381::BlsScalar;
 
@@ -13,29 +13,29 @@ use crate::prelude::{Constraint, Witness};
 #[cfg(feature = "debug")]
 use crate::debugger::Debugger;
 
-/// Runtime events
+
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum RuntimeEvent {
-    /// A witness was appended to the constraint system
+
     WitnessAppended {
-        /// Appended witness
+
         w: Witness,
-        /// Witness value
+
         v: BlsScalar,
     },
 
-    /// A constraint was appended
+
     ConstraintAppended {
-        /// Appended constraint
+
         c: Constraint,
     },
 
-    /// The proof construction was finished
+
     ProofFinished,
 }
 
-/// Runtime structure with debugger
+
 #[derive(Debug, Clone)]
 pub struct Runtime {
     #[cfg(feature = "debug")]
@@ -49,7 +49,7 @@ impl Default for Runtime {
 }
 
 impl Runtime {
-    /// Create a new PLONK runtime
+
     #[allow(unused_variables)]
     pub fn new() -> Self {
         Self {

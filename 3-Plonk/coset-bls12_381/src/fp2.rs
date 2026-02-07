@@ -1,4 +1,4 @@
-//! This module implements arithmetic over the quadratic extension field Fp2.
+
 
 #[cfg(feature = "serde")]
 mod coset;
@@ -150,11 +150,11 @@ impl Fp2 {
         }
     }
 
-    /// Raises this element to p.
+
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
-        // This is always just a conjugation. If you're curious why, here's
-        // an article about it: https://alicebob.cryptoland.net/the-frobenius-endomorphism-with-finite-fields/
+
+
         self.conjugate()
     }
 
@@ -168,10 +168,10 @@ impl Fp2 {
 
     #[inline(always)]
     pub fn mul_by_nonresidue(&self) -> Fp2 {
-        // Multiply a + bu by u + 1, getting
-        // au + a + bu^2 + bu
-        // and because u^2 = -1, we get
-        // (a - b) + (a + b)u
+
+
+
+
 
         Fp2 {
             c0: self.c0 - self.c1,
@@ -179,32 +179,32 @@ impl Fp2 {
         }
     }
 
-    /// Returns whether or not this element is strictly lexicographically
-    /// larger than its negation.
+
+
     #[inline]
     pub fn lexicographically_largest(&self) -> Choice {
-        // If this element's c1 coefficient is lexicographically largest
-        // then it is lexicographically largest. Otherwise, in the event
-        // the c1 coefficient is zero and the c0 coefficient is
-        // lexicographically largest, then this element is lexicographically
-        // largest.
+
+
+
+
+
 
         self.c1.lexicographically_largest()
             | (self.c1.is_zero() & self.c0.lexicographically_largest())
     }
 
     pub const fn square(&self) -> Fp2 {
-        // Complex squaring:
+
         //
-        // v0  = c0 * c1
-        // c0' = (c0 + c1) * (c0 + \beta*c1) - v0 - \beta * v0
-        // c1' = 2 * v0
+
+
+
         //
-        // In BLS12-381's F_{p^2}, our \beta is -1 so we
-        // can modify this formula:
+
+
         //
-        // c0' = (c0 + c1) * (c0 - c1)
-        // c1' = 2 * c0 * c1
+
+
 
         let a = (&self.c0).add(&self.c1);
         let b = (&self.c0).sub(&self.c1);
@@ -217,17 +217,17 @@ impl Fp2 {
     }
 
     pub fn mul(&self, rhs: &Fp2) -> Fp2 {
-        // F_{p^2} x F_{p^2} multiplication implemented with operand scanning (schoolbook)
-        // computes the result as:
+
+
         //
-        //   a·b = (a_0 b_0 + a_1 b_1 β) + (a_0 b_1 + a_1 b_0)i
+
         //
-        // In BLS12-381's F_{p^2}, our β is -1, so the resulting F_{p^2} element is:
+
         //
-        //   c_0 = a_0 b_0 - a_1 b_1
-        //   c_1 = a_0 b_1 + a_1 b_0
+
+
         //
-        // Each of these is a "sum of products", which we can compute efficiently.
+
 
         Fp2 {
             c0: Fp::sum_of_products([self.c0, -self.c1], [rhs.c0, rhs.c1]),
@@ -257,11 +257,11 @@ impl Fp2 {
     }
 
     pub fn sqrt(&self) -> CtOption<Self> {
-        // Algorithm 9, https://eprint.iacr.org/2012/685.pdf
-        // with constant time modifications.
+
+
 
         CtOption::new(Fp2::zero(), self.is_zero()).or_else(|| {
-            // a1 = self^((p - 3) / 4)
+
             let a1 = self.pow_vartime(&[
                 0xee7f_bfff_ffff_eaaa,
                 0x07aa_ffff_ac54_ffff,
@@ -271,16 +271,16 @@ impl Fp2 {
                 0x0680_447a_8e5f_f9a6,
             ]);
 
-            // alpha = a1^2 * self = self^((p - 3) / 2 + 1) = self^((p - 1) / 2)
+
             let alpha = a1.square() * self;
 
-            // x0 = self^((p + 1) / 4)
+
             let x0 = a1 * self;
 
-            // In the event that alpha = -1, the element is order p - 1 and so
-            // we're just trying to get the square of an element of the subfield
-            // Fp. This is given by x0 * u, since u = sqrt(-1). Since the element
-            // x0 = a + bu has b = 0, the solution is therefore au.
+
+
+
+
             CtOption::new(
                 Fp2 {
                     c0: -x0.c1,
@@ -288,7 +288,7 @@ impl Fp2 {
                 },
                 alpha.ct_eq(&(&Fp2::one()).neg()),
             )
-            // Otherwise, the correct solution is (1 + alpha)^((q - 1) // 2) * x0
+
             .or_else(|| {
                 CtOption::new(
                     (alpha + Fp2::one()).pow_vartime(&[
@@ -302,29 +302,29 @@ impl Fp2 {
                     Choice::from(1),
                 )
             })
-            // Only return the result if it's really the square root (and so
-            // self is actually quadratic nonresidue)
+
+
             .and_then(|sqrt| CtOption::new(sqrt, sqrt.square().ct_eq(self)))
         })
     }
 
-    /// Computes the multiplicative inverse of this field
-    /// element, returning None in the case that this element
-    /// is zero.
+
+
+
     pub fn invert(&self) -> CtOption<Self> {
-        // We wish to find the multiplicative inverse of a nonzero
-        // element a + bu in Fp2. We leverage an identity
+
+
         //
-        // (a + bu)(a - bu) = a^2 + b^2
+
         //
-        // which holds because u^2 = -1. This can be rewritten as
+
         //
-        // (a + bu)(a - bu)/(a^2 + b^2) = 1
+
         //
-        // because a^2 + b^2 = 0 has no nonzero solutions for (a, b).
-        // This gives that (a - bu)/(a^2 + b^2) is the inverse
-        // of (a + bu). Importantly, this can be computing using
-        // only a single inversion in Fp.
+
+
+
+
 
         (self.c0.square() + self.c1.square()).invert().map(|t| Fp2 {
             c0: self.c0 * t,
@@ -332,9 +332,9 @@ impl Fp2 {
         })
     }
 
-    /// Although this is labeled "vartime", it is only
-    /// variable time with respect to the exponent. It
-    /// is also not exposed in the public API.
+
+
+
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -349,8 +349,8 @@ impl Fp2 {
         res
     }
 
-    /// Vartime exponentiation for larger exponents, only
-    /// used in testing and not exposed through the public API.
+
+
     #[cfg(all(test, feature = "experimental"))]
     pub(crate) fn pow_vartime_extended(&self, by: &[u64]) -> Self {
         let mut res = Self::one();
@@ -699,7 +699,7 @@ fn test_negation() {
 
 #[test]
 fn test_sqrt() {
-    // a = 1488924004771393321054797166853618474668089414631333405711627789629391903630694737978065425271543178763948256226639*u + 784063022264861764559335808165825052288770346101304131934508881646553551234697082295473567906267937225174620141295
+
     let a = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x2bee_d146_27d7_f9e9,
@@ -721,8 +721,8 @@ fn test_sqrt() {
 
     assert_eq!(a.sqrt().unwrap().square(), a);
 
-    // b = 5, which is a generator of the p - 1 order
-    // multiplicative subgroup
+
+
     let b = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x6631_0000_0010_5545,
@@ -737,8 +737,8 @@ fn test_sqrt() {
 
     assert_eq!(b.sqrt().unwrap().square(), b);
 
-    // c = 25, which is a generator of the (p - 1) / 2 order
-    // multiplicative subgroup
+
+
     let c = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x44f6_0000_0051_ffae,
@@ -753,8 +753,8 @@ fn test_sqrt() {
 
     assert_eq!(c.sqrt().unwrap().square(), c);
 
-    // 2155129644831861015726826462986972654175647013268275306775721078997042729172900466542651176384766902407257452753362*u + 2796889544896299244102912275102369318775038861758288697415827248356648685135290329705805931514906495247464901062529
-    // is nonsquare.
+
+
     assert!(bool::from(
         Fp2 {
             c0: Fp::from_raw_unchecked([

@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use alloc::vec::Vec;
 
@@ -16,31 +16,31 @@ use crate::Error;
 #[cfg(feature = "zk")]
 pub(crate) mod gadget;
 
-/// The Domain Separation for Poseidon
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Domain {
-    /// Domain to specify hashing of 4-arity merkle tree.
-    /// Note that selecting this domain-separator means that the total hash
-    /// input must be exactly 4 `BlsScalar` long, and any empty slots of the
-    /// merkle tree level need to be filled with the zero element.
+
+
+
+
     Merkle4,
-    /// Domain to specify hashing of 2-arity merkle tree
-    /// Note that selecting this domain-separator means that the total hash
-    /// input must be exactly 2 `BlsScalar` long, and any empty slots of the
-    /// merkle tree level need to be filled with the zero element.
+
+
+
+
     Merkle2,
-    /// Domain to specify hash used for encryption
+
     Encryption,
-    /// Domain to specify hash for any other input
+
     Other,
 }
 
 impl From<Domain> for u64 {
-    /// Encryption for the domain-separator are taken from section 4.2 of the
-    /// paper adapted to u64.
-    /// When `Other` is selected we set the domain-separator to zero. We can do
-    /// this since the io-pattern will be encoded in the tag in any case,
-    /// ensuring safety from collision attacks.
+
+
+
+
+
     fn from(domain: Domain) -> Self {
         match domain {
             // 2^4 - 1
@@ -55,17 +55,17 @@ impl From<Domain> for u64 {
     }
 }
 
-// This function, which is called during the finalization step of the hash, will
-// always produce a valid io-pattern based on the input.
-// The function will return an error if a merkle domain is selected but the
-// given input elements don't add up to the specified arity.
+
+
+
+
 fn build_io_pattern<T>(
     domain: Domain,
     input_segments: &[&[T]],
     output_len: usize,
 ) -> Result<Vec<Call>, Error> {
     let mut io_calls = Vec::new();
-    // check total input length against domain
+
     let total_input_len = input_segments
         .iter()
         .fold(0, |accumulator, segment| accumulator + segment.len());
@@ -86,11 +86,11 @@ fn build_io_pattern<T>(
     Ok(io_calls)
 }
 
-/// Hash any given input into one or several scalar using the Hades
-/// permutation strategy. The Hash can absorb multiple chunks of input but will
-/// only call `squeeze` once at the finalization of the hash.
-/// The output length is set to 1 element per default, but this can be
-/// overridden with [`Hash::output_len`].
+
+
+
+
+
 pub struct Hash<'a> {
     domain: Domain,
     input: Vec<&'a [BlsScalar]>,
@@ -98,7 +98,7 @@ pub struct Hash<'a> {
 }
 
 impl<'a> Hash<'a> {
-    /// Create a new hash.
+
     pub fn new(domain: Domain) -> Self {
         Self {
             domain,
@@ -107,29 +107,29 @@ impl<'a> Hash<'a> {
         }
     }
 
-    /// Override the length of the hash output (default value is 1) when using
-    /// the hash for anything other than hashing a merkle tree or
-    /// encryption.
+
+
+
     pub fn output_len(&mut self, output_len: usize) {
         if self.domain == Domain::Other && output_len > 0 {
             self.output_len = output_len;
         }
     }
 
-    /// Update the hash input.
+
     pub fn update(&mut self, input: &'a [BlsScalar]) {
         self.input.push(input);
     }
 
-    /// Finalize the hash.
+
     ///
-    /// # Panics
-    /// This function panics when the io-pattern can not be created with the
-    /// given domain and input, e.g. using [`Domain::Merkle4`] with an input
-    /// anything other than 4 Scalar.
+
+
+
+
     pub fn finalize(&self) -> Vec<BlsScalar> {
-        // Generate the hash using the sponge framework:
-        // initialize the sponge
+
+
         let mut poseidon_sponge = Sponge::start(
             ScalarPermutation::new(),
             build_io_pattern(self.domain, &self.input, self.output_len)
@@ -138,34 +138,34 @@ impl<'a> Hash<'a> {
         )
         .expect("at this point the io-pattern is valid");
 
-        // absorb the input
+
         for segment in self.input.iter() {
             poseidon_sponge
                 .absorb(segment.len(), segment)
                 .expect("at this point the io-pattern is valid");
         }
 
-        // squeeze output_len elements
+
         poseidon_sponge
             .squeeze(self.output_len)
             .expect("at this point the io-pattern is valid");
 
-        // return the result
+
         poseidon_sponge
             .finish()
             .expect("at this point the io-pattern is valid")
     }
 
-    /// Finalize the hash and output the result as a `JubJubScalar` by
-    /// truncating the `BlsScalar` output to 250 bits.
+
+
     ///
-    /// # Panics
-    /// This function panics when the io-pattern can not be created with the
-    /// given domain and input, e.g. using [`Domain::Merkle4`] with an input
-    /// anything other than 4 Scalar.
+
+
+
+
     pub fn finalize_truncated(&self) -> Vec<JubJubScalar> {
-        // bit-mask to 'cast' a bls-scalar result to a jubjub-scalar by
-        // truncating the 6 highest bits
+
+
         const TRUNCATION_MASK: BlsScalar = BlsScalar::from_raw([
             0xffff_ffff_ffff_ffff,
             0xffff_ffff_ffff_ffff,
@@ -173,7 +173,7 @@ impl<'a> Hash<'a> {
             0x03ff_ffff_ffff_ffff,
         ]);
 
-        // finalize the hash as bls-scalar
+
         let field_elements = self.finalize();
 
         field_elements
@@ -186,24 +186,24 @@ impl<'a> Hash<'a> {
             .collect()
     }
 
-    /// Digest an input and calculate the hash immediately
+
     ///
-    /// # Panics
-    /// This function panics when the io-pattern can not be created with the
-    /// given domain and input, e.g. using [`Domain::Merkle4`] with an input
-    /// anything other than 4 Scalar.
+
+
+
+
     pub fn digest(domain: Domain, input: &'a [BlsScalar]) -> Vec<BlsScalar> {
         let mut poseidon_hash = Self::new(domain);
         poseidon_hash.update(input);
         poseidon_hash.finalize()
     }
 
-    /// Digest an input and calculate the hash as jubjub-scalar immediately
+
     ///
-    /// # Panics
-    /// This function panics when the io-pattern can not be created with the
-    /// given domain and input, e.g. using [`Domain::Merkle4`] with an input
-    /// anything other than 4 Scalar.
+
+
+
+
     pub fn digest_truncated(
         domain: Domain,
         input: &'a [BlsScalar],

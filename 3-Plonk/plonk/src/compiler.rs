@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use coset_bls12_381::BlsScalar;
 
@@ -20,13 +20,13 @@ mod verifier;
 pub use prover::Prover;
 pub use verifier::Verifier;
 
-/// Generate the arguments to prove and verify a circuit
+
 pub struct Compiler;
 
 impl Compiler {
-    /// Create a new arguments set from a given circuit instance
+
     ///
-    /// Use the default implementation of the circuit
+
     pub fn compile<C>(
         pp: &PublicParameters,
         label: &[u8],
@@ -40,9 +40,9 @@ impl Compiler {
         Self::compile_with_composer(pp, label, &composer)
     }
 
-    /// Create a new arguments set from a given circuit instance
+
     ///
-    /// Use the provided circuit instead of the default implementation
+
     pub fn compile_with_circuit<C>(
         pp: &PublicParameters,
         label: &[u8],
@@ -57,8 +57,8 @@ impl Compiler {
         Self::compile_with_composer(pp, label, &composer)
     }
 
-    /// Generates a [Prover] and [Verifier] from a buffer created by
-    /// [Circuit::compress].
+
+
     pub fn compile_with_compressed(
         pp: &PublicParameters,
         label: &[u8],
@@ -69,9 +69,9 @@ impl Compiler {
         Self::compile_with_composer(pp, label, &composer)
     }
 
-    /// Create a new arguments set from a given circuit instance
+
     ///
-    /// Use the default implementation of the circuit
+
     fn compile_with_composer(
         pp: &PublicParameters,
         label: &[u8],
@@ -100,10 +100,10 @@ impl Compiler {
 
         let domain = EvaluationDomain::new(size - 1)?;
 
-        // 1. pad circuit to a power of two
+
         //
-        // we use allocated vectors because the current ifft api only accepts
-        // slices
+
+
         let mut q_m = vec![BlsScalar::zero(); size];
         let mut q_l = vec![BlsScalar::zero(); size];
         let mut q_r = vec![BlsScalar::zero(); size];
@@ -160,7 +160,7 @@ impl Compiler {
         let q_variable_group_add_poly =
             Polynomial::from_coefficients_vec(q_variable_group_add_poly);
 
-        // 2. compute the sigma polynomials
+
         let [s_sigma_1_poly, s_sigma_2_poly, s_sigma_3_poly, s_sigma_4_poly] =
             perm.compute_sigma_polynomials(size, &domain);
 
@@ -185,7 +185,7 @@ impl Compiler {
         let s_sigma_3_comm = commit_key.commit(&s_sigma_3_poly)?;
         let s_sigma_4_comm = commit_key.commit(&s_sigma_4_poly)?;
 
-        // verifier Key for arithmetic circuits
+
         let arithmetic_verifier_key = widget::arithmetic::VerifierKey {
             q_m: q_m_comm,
             q_l: q_l_comm,
@@ -196,18 +196,18 @@ impl Compiler {
             q_arith: q_arith_comm,
         };
 
-        // verifier Key for range circuits
+
         let range_verifier_key = widget::range::VerifierKey {
             q_range: q_range_comm,
         };
 
-        // verifier Key for logic circuits
+
         let logic_verifier_key = widget::logic::VerifierKey {
             q_c: q_c_comm,
             q_logic: q_logic_comm,
         };
 
-        // verifier Key for ecc circuits
+
         let ecc_verifier_key =
             widget::ecc::scalar_mul::fixed_base::VerifierKey {
                 q_l: q_l_comm,
@@ -215,13 +215,13 @@ impl Compiler {
                 q_fixed_group_add: q_fixed_group_add_comm,
             };
 
-        // verifier Key for curve addition circuits
+
         let curve_addition_verifier_key =
             widget::ecc::curve_addition::VerifierKey {
                 q_variable_group_add: q_variable_group_add_comm,
             };
 
-        // verifier Key for permutation argument
+
         let permutation_verifier_key = widget::permutation::VerifierKey {
             s_sigma_1: s_sigma_1_comm,
             s_sigma_2: s_sigma_2_comm,
@@ -257,10 +257,10 @@ impl Compiler {
             s_sigma_4: s_sigma_4_poly,
         };
 
-        // The polynomial needs an evaluation domain of 4n.
-        // Plus, adding the blinding factors translates to
-        // the polynomial not fitting in 4n, so now we need
-        // 8n, the next power of 2
+
+
+
+
         let domain_8n = EvaluationDomain::new(8 * domain.size())?;
 
         let q_m_eval_8n = Evaluations::from_vec_and_domain(

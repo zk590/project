@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use alloc::vec::Vec;
 
@@ -17,7 +17,7 @@ use crate::transcript::TranscriptProtocol;
 
 use super::Composer;
 
-/// Verify proofs of a given circuit
+
 pub struct Verifier {
     label: Vec<u8>,
     verifier_key: VerifierKey,
@@ -71,12 +71,12 @@ impl Verifier {
         (size, verifier_key, opening_key)
     }
 
-    /// Serialized size in bytes
+
     pub fn serialized_size(&self) -> usize {
         self.prepare_serialize().0
     }
 
-    /// Serialize the verifier into bytes
+
     pub fn to_bytes(&self) -> Vec<u8> {
         let (size, verifier_key, opening_key) = self.prepare_serialize();
         let mut bytes = Vec::with_capacity(size);
@@ -108,8 +108,8 @@ impl Verifier {
         bytes
     }
 
-    /// Attempt to deserialize the prover from bytes generated via
-    /// [`Self::to_bytes`]
+
+
     pub fn try_from_bytes<B>(bytes: B) -> Result<Self, Error>
     where
         B: AsRef<[u8]>,
@@ -189,7 +189,7 @@ impl Verifier {
         ))
     }
 
-    /// Verify a generated proof
+
     pub fn verify(
         &self,
         proof: &Proof,

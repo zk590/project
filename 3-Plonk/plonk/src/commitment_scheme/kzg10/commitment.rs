@@ -1,10 +1,10 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Module containing the representation of a Commitment to a Polynomial.
+
+
+//
+
+
+
 use coset_bls12_381::{G1Affine, G1Projective};
 use coset_bytes::{DeserializableSlice, Serializable};
 
@@ -16,8 +16,8 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-/// Holds a commitment to a polynomial in a form of a [`G1Affine`]-bls12_381
-/// point.
+
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -26,7 +26,7 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct Commitment(
-    /// The commitment is a group element.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) G1Affine,
 );
@@ -57,8 +57,8 @@ impl Serializable<{ G1Affine::SIZE }> for Commitment {
 }
 
 impl Commitment {
-    /// Builds an identity [`Commitment`] which is equivalent to the
-    /// [`G1Affine`] identity point in bls12_381.
+
+
     fn identity() -> Commitment {
         Commitment(G1Affine::identity())
     }

@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use coset_jubjub::*;
 
-// Non-Niels
+
 
 fn bench_point_doubling(c: &mut Criterion) {
     let a = ExtendedPoint::identity();
@@ -26,7 +26,7 @@ fn bench_point_subtraction(c: &mut Criterion) {
     });
 }
 
-// Niels
+
 
 fn bench_cached_point_addition(c: &mut Criterion) {
     let a = ExtendedPoint::identity();

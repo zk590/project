@@ -1,7 +1,7 @@
 use super::Fp;
 
 impl Fp {
-    /// Internal representation of `Fp`
+
     pub const fn internal_repr(&self) -> &[u64; 6] {
         &self.0
     }

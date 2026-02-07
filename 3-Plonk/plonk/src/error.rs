@@ -1,99 +1,99 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! A collection of all possible errors encountered in PLONK.
+
+
+//
+
+
+
 
 use coset_bytes::Error as DuskBytesError;
 
-/// Defines all possible errors that can be encountered in PLONK.
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
-    // FFT errors
-    /// This error occurs when an error triggers on any of the fft module
-    /// functions.
+
+
+
     InvalidEvalDomainSize {
-        /// Log size of the group
+
         log_size_of_group: u32,
-        /// Two adacity generated
+
         adacity: u32,
     },
 
-    // Prover/Verifier errors
-    /// This error occurs when a proof verification fails.
+
+
     ProofVerificationError,
-    /// This error occurs when the circuit is not provided with all of the
-    /// required inputs.
+
+
     CircuitInputsNotFound,
-    /// This error occurs when we want to verify a Proof but the pi_constructor
-    /// attribute is uninitialized.
+
+
     UninitializedPIGenerator,
-    /// PublicInput serialization error
+
     InvalidPublicInputBytes,
-    /// This error occurs when the Prover structure already contains a
-    /// preprocessed circuit inside, but you call preprocess again.
+
+
     CircuitAlreadyPreprocessed,
-    /// This error occurs when the circuit description has a different amount
-    /// of gates than the circuit for the proof creation.
-    /// The order: (description_size, circuit_size)
+
+
+
     InvalidCircuitSize(usize, usize),
 
-    // Preprocessing errors
-    /// This error occurs when an error triggers during the preprocessing
-    /// stage.
+
+
+
     MismatchedPolyLen,
 
-    // KZG10 errors
-    /// This error occurs when the user tries to create PublicParameters
-    /// and supplies the max degree as zero.
+
+
+
     DegreeIsZero,
-    /// This error occurs when the user tries to trim PublicParameters
-    /// to a degree that is larger than the maximum degree.
+
+
     TruncatedDegreeTooLarge,
-    /// This error occurs when the user tries to trim PublicParameters
-    /// down to a degree that is zero.
+
+
     TruncatedDegreeIsZero,
-    /// This error occurs when the user tries to commit to a polynomial whose
-    /// degree is larger than the supported degree for that proving key.
+
+
     PolynomialDegreeTooLarge,
-    /// This error occurs when the user tries to commit to a polynomial whose
-    /// degree is zero.
+
+
     PolynomialDegreeIsZero,
-    /// This error occurs when the pairing check fails at being equal to the
-    /// Identity point.
+
+
     PairingCheckFailure,
 
-    // Serialization errors
-    /// Dusk-bytes serialization error
+
+
     BytesError(DuskBytesError),
-    /// This error occurs when there are not enough bytes to read out of a
-    /// slice during deserialization.
+
+
     NotEnoughBytes,
-    /// This error occurs when a malformed point is decoded from a byte array.
+
     PointMalformed,
-    /// This error occurs when a malformed BLS scalar is decoded from a byte
-    /// array.
+
+
     BlsScalarMalformed,
-    /// This error occurs when a malformed JubJub scalar is decoded from a byte
-    /// array.
+
+
     JubJubScalarMalformed,
-    /// WNAF2k should be in `[-1, 0, 1]`
+
     UnsupportedWNAF2k,
-    /// The provided public inputs doesn't match the circuit definition
+
     PublicInputNotFound {
-        /// Expected public input wasn't found
+
         index: usize,
     },
-    /// The provided public inputs length doesn't match the processed verifier
+
     InconsistentPublicInputsLen {
-        /// Expected value
+
         expected: usize,
-        /// Provided value
+
         provided: usize,
     },
-    /// The provided compressed circuit bytes representation is invalid.
+
     InvalidCompressedCircuit,
 }
 

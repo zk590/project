@@ -1,25 +1,25 @@
-//! # `bls12_381`
+
 //!
-//! This crate provides an implementation of the BLS12-381 pairing-friendly elliptic
-//! curve construction.
+
+
 //!
-//! * **This implementation has not been reviewed or audited. Use at your own risk.**
-//! * This implementation targets Rust `1.36` or later.
-//! * This implementation does not require the Rust standard library.
-//! * All operations are constant time unless explicitly noted.
+
+
+
+
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-// Catch documentation errors caused by code changes.
+
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::many_single_char_names)]
-// This lint is described at
-// https://rust-lang.github.io/rust-clippy/master/index.html#suspicious_arithmetic_impl
-// In our library, some of the arithmetic involving extension fields will necessarily
-// involve various binary operators, and so this lint is triggered unnecessarily.
+
+
+
+
 #![allow(clippy::suspicious_arithmetic_impl)]
 
 #[cfg(feature = "alloc")]
@@ -36,8 +36,8 @@ mod tests;
 #[macro_use]
 mod util;
 
-/// Notes about how the BLS12-381 elliptic curve is designed, specified
-/// and implemented by this library.
+
+
 pub mod notes {
     pub mod design;
     pub mod serialization;
@@ -79,7 +79,7 @@ mod fp12;
 #[cfg(feature = "groups")]
 mod fp6;
 
-// The BLS parameter x for BLS12-381 is -0xd201000000010000
+
 #[cfg(feature = "groups")]
 const BLS_X: u64 = 0xd201_0000_0001_0000;
 #[cfg(feature = "groups")]
@@ -100,7 +100,7 @@ pub use pairings::{
     MillerLoopResultResolver,
 };
 
-/// Use the generic_array re-exported by digest to avoid a version mismatch
+
 #[cfg(feature = "experimental")]
 pub(crate) use digest::generic_array;
 

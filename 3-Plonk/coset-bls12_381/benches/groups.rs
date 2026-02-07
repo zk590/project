@@ -8,7 +8,7 @@ use coset_bytes::Serializable;
 use criterion::{black_box, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
-    // Pairings
+
     {
         let g = G1Affine::generator();
         let h = G2Affine::generator();
@@ -28,7 +28,7 @@ fn criterion_benchmark(c: &mut Criterion) {
             b.iter(|| r.final_exponentiation())
         });
     }
-    // G1Affine
+
     {
         let name = "G1Affine";
         let a = G1Affine::generator();
@@ -52,7 +52,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         );
     }
 
-    // G1Projective
+
     {
         let name = "G1Projective";
         let a = G1Projective::generator();
@@ -92,7 +92,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         });
     }
 
-    // G2Affine
+
     {
         let name = "G2Affine";
         let a = G2Affine::generator();
@@ -116,7 +116,7 @@ fn criterion_benchmark(c: &mut Criterion) {
         );
     }
 
-    // G2Projective
+
     {
         let name = "G2Projective";
         let a = G2Projective::generator();

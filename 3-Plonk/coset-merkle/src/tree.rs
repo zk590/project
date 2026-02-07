@@ -4,7 +4,7 @@ use core::cell::Ref;
 
 use crate::{capacity, Aggregate, Node, Opening, Walk};
 
-/// A sparse Merkle tree.
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -29,7 +29,7 @@ impl<T, const H: usize, const A: usize> Tree<T, H, A>
 where
     T: Aggregate<A>,
 {
-    /// Create a new merkle tree with the given initial `root`.
+
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -38,10 +38,10 @@ where
         }
     }
 
-    /// Insert an `item` at the given `position` in the tree.
+
     ///
-    /// # Panics
-    /// If `index >= capacity`.
+
+
     pub fn insert(&mut self, index: u64, item: impl Into<T>) {
         let capacity = self.capacity();
 
@@ -55,8 +55,8 @@ where
         self.positions.insert(index);
     }
 
-    /// Remove and return the item at the given `position` in the tree if it
-    /// exists.
+
+
     pub fn remove(&mut self, position: u64) -> Option<T> {
         if !self.positions.contains(&position) {
             return None;
@@ -68,7 +68,7 @@ where
         Some(item)
     }
 
-    /// Returns the [`Opening`] for the given `position` if it exists.
+
     pub fn opening(&self, position: u64) -> Option<Opening<T, H, A>>
     where
         T: Clone,
@@ -79,13 +79,13 @@ where
         Some(Opening::new(self, position))
     }
 
-    /// Returns a [`Walk`] through the tree, proceeding according to the
-    /// `walker` function.
+
+
     ///
-    /// A walk starts from the root of the tree, and "drills down" according to
-    /// the output of the walker function. The function should return `true` or
-    /// `false`, indicating whether the iterator should continue along the
-    /// tree's path.
+
+
+
+
     pub fn walk<W>(&self, walker: W) -> Walk<'_, T, W, H, A>
     where
         W: Fn(&T) -> bool,
@@ -93,12 +93,12 @@ where
         Walk::new(self, walker)
     }
 
-    /// Get the root of the merkle tree.
+
     pub fn root(&self) -> Ref<'_, T> {
         self.root.item()
     }
 
-    /// Returns the root of the smallest sub-tree that holds all the leaves.
+
     pub fn smallest_subtree(&self) -> (Ref<'_, T>, usize) {
         let mut current_node = &self.root;
         let mut current_height = H;
@@ -106,21 +106,21 @@ where
             let mut non_empty_children =
                 current_node.children.iter().flatten();
             match non_empty_children.next() {
-                // when the root has no children, the tree is empty and we
-                // return its root. This is only possible because the empty
-                // subtrees are the same for each level.
+
+
+
                 None => return (self.root(), 0),
                 Some(child) => {
-                    // if there is no more than one child and we are not at the
-                    // end of the tree, we need to continue to traverse
+
+
                     if non_empty_children.next().is_none()
                         && current_height > 1
                     {
                         current_node = child;
                     }
-                    // otherwise we return the item of the current node and the
-                    // current height as the root and height of the smallest
-                    // subtree
+
+
+
                     else {
                         return (current_node.item(), current_height);
                     }
@@ -130,24 +130,24 @@ where
         }
     }
 
-    /// Returns true if the tree contains a leaf at the given `position`.
+
     pub fn contains(&self, position: u64) -> bool {
         self.positions.contains(&position)
     }
 
-    /// Returns the number of elements that have been inserted into the tree.
+
     #[must_use]
     pub fn len(&self) -> u64 {
         self.positions.len() as u64
     }
 
-    /// Returns `true` if the tree is empty.
+
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
-    /// The maximum number of leaves in the tree, i.e. its capacity.
+
     #[must_use]
     pub const fn capacity(&self) -> u64 {
         capacity(A as u64, H)
@@ -223,11 +223,11 @@ mod tests {
         tree.insert(tree.capacity(), 42);
     }
 
-    // create test tree for shrunken root:
+
 
     type RangeTree = Tree<Option<Range>, H, A>;
 
-    // min and max are either
+
     #[derive(Debug, Clone, Copy, PartialEq)]
     struct Range {
         min: u64,

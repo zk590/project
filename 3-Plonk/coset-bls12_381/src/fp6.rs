@@ -16,7 +16,7 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-/// This represents an element $c_0 + c_1 v + c_2 v^2$ of $\mathbb{F}_{p^6} = \mathbb{F}_{p^2} / v^3 - u - 1$.
+
 #[cfg_attr(
     feature = "rkyv-impl",
     derive(Archive, RkyvSerialize, RkyvDeserialize),
@@ -148,12 +148,12 @@ impl Fp6 {
         }
     }
 
-    /// Multiply by quadratic nonresidue v.
+
     pub fn mul_by_nonresidue(&self) -> Self {
-        // Given a + bv + cv^2, this produces
-        //     av + bv^2 + cv^3
-        // but because v^3 = u + 1, we have
-        //     c(u + 1) + av + v^2
+
+
+
+
 
         Fp6 {
             c0: self.c2.mul_by_nonresidue(),
@@ -162,14 +162,14 @@ impl Fp6 {
         }
     }
 
-    /// Raises this element to p.
+
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
         let c1 = self.c1.frobenius_map();
         let c2 = self.c2.frobenius_map();
 
-        // c1 = c1 * (u + 1)^((p - 1) / 3)
+
         let c1 = c1
             * Fp2 {
                 c0: Fp::zero(),
@@ -183,7 +183,7 @@ impl Fp6 {
                 ]),
             };
 
-        // c2 = c2 * (u + 1)^((2p - 2) / 3)
+
         let c2 = c2
             * Fp2 {
                 c0: Fp::from_raw_unchecked([
@@ -205,46 +205,46 @@ impl Fp6 {
         self.c0.is_zero() & self.c1.is_zero() & self.c2.is_zero()
     }
 
-    /// Returns `c = self * b`.
+
     ///
-    /// Implements the full-tower interleaving strategy from
-    /// [ePrint 2022-376](https://eprint.iacr.org/2022/367).
+
+
     #[inline]
     fn mul_interleaved(&self, b: &Self) -> Self {
-        // The intuition for this algorithm is that we can look at F_p^6 as a direct
-        // extension of F_p^2, and express the overall operations down to the base field
-        // F_p instead of only over F_p^2. This enables us to interleave multiplications
-        // and reductions, ensuring that we don't require double-width intermediate
-        // representations (with around twice as many limbs as F_p elements).
 
-        // We want to express the multiplication c = a x b, where a = (a_0, a_1, a_2) is
-        // an element of F_p^6, and a_i = (a_i,0, a_i,1) is an element of F_p^2. The fully
-        // expanded multiplication is given by (2022-376 §5):
+
+
+
+
+
+
+
+
         //
-        //   c_0,0 = a_0,0 b_0,0 - a_0,1 b_0,1 + a_1,0 b_2,0 - a_1,1 b_2,1 + a_2,0 b_1,0 - a_2,1 b_1,1
-        //                                     - a_1,0 b_2,1 - a_1,1 b_2,0 - a_2,0 b_1,1 - a_2,1 b_1,0.
-        //         = a_0,0 b_0,0 - a_0,1 b_0,1 + a_1,0 (b_2,0 - b_2,1) - a_1,1 (b_2,0 + b_2,1)
-        //                                     + a_2,0 (b_1,0 - b_1,1) - a_2,1 (b_1,0 + b_1,1).
+
+
+
+
         //
-        //   c_0,1 = a_0,0 b_0,1 + a_0,1 b_0,0 + a_1,0 b_2,1 + a_1,1 b_2,0 + a_2,0 b_1,1 + a_2,1 b_1,0
-        //                                     + a_1,0 b_2,0 - a_1,1 b_2,1 + a_2,0 b_1,0 - a_2,1 b_1,1.
-        //         = a_0,0 b_0,1 + a_0,1 b_0,0 + a_1,0(b_2,0 + b_2,1) + a_1,1(b_2,0 - b_2,1)
-        //                                     + a_2,0(b_1,0 + b_1,1) + a_2,1(b_1,0 - b_1,1).
+
+
+
+
         //
-        //   c_1,0 = a_0,0 b_1,0 - a_0,1 b_1,1 + a_1,0 b_0,0 - a_1,1 b_0,1 + a_2,0 b_2,0 - a_2,1 b_2,1
-        //                                                                 - a_2,0 b_2,1 - a_2,1 b_2,0.
-        //         = a_0,0 b_1,0 - a_0,1 b_1,1 + a_1,0 b_0,0 - a_1,1 b_0,1 + a_2,0(b_2,0 - b_2,1)
-        //                                                                 - a_2,1(b_2,0 + b_2,1).
+
+
+
+
         //
-        //   c_1,1 = a_0,0 b_1,1 + a_0,1 b_1,0 + a_1,0 b_0,1 + a_1,1 b_0,0 + a_2,0 b_2,1 + a_2,1 b_2,0
-        //                                                                 + a_2,0 b_2,0 - a_2,1 b_2,1
-        //         = a_0,0 b_1,1 + a_0,1 b_1,0 + a_1,0 b_0,1 + a_1,1 b_0,0 + a_2,0(b_2,0 + b_2,1)
-        //                                                                 + a_2,1(b_2,0 - b_2,1).
+
+
+
+
         //
-        //   c_2,0 = a_0,0 b_2,0 - a_0,1 b_2,1 + a_1,0 b_1,0 - a_1,1 b_1,1 + a_2,0 b_0,0 - a_2,1 b_0,1.
-        //   c_2,1 = a_0,0 b_2,1 + a_0,1 b_2,0 + a_1,0 b_1,1 + a_1,1 b_1,0 + a_2,0 b_0,1 + a_2,1 b_0,0.
+
+
         //
-        // Each of these is a "sum of products", which we can compute efficiently.
+
 
         let a = self;
         let b10_p_b11 = b.c1.c0 + b.c1.c1;

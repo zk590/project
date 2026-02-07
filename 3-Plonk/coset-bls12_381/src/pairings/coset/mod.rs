@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::fp::Fp;
 use crate::fp2::Fp2;
@@ -12,12 +12,12 @@ use super::G2Prepared;
 use alloc::vec::Vec;
 
 impl G2Prepared {
-    /// Raw bytes representation
+
     ///
-    /// The intended usage of this function is for trusted sets of data
-    /// where performance is critical. This way, the `infinity` internal
-    /// attribute will not be stored and the coefficients will be stored
-    /// without any check.
+
+
+
+
     pub fn to_raw_bytes(&self) -> Vec<u8> {
         let mut bytes = alloc::vec![0u8; 288 * self.coeffs.len()];
         let mut chunks = bytes.chunks_exact_mut(8);
@@ -40,13 +40,13 @@ impl G2Prepared {
         bytes
     }
 
-    /// Create a `G2Prepared` from a set of bytes created by
-    /// `G2Prepared::to_raw_bytes`.
+
+
     ///
-    /// # Safety
-    /// No check is performed and no constant time is granted. The
-    /// `infinity` attribute is also lost. The expected usage of this
-    /// function is for trusted bytes where performance is critical.
+
+
+
+
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let coeffs = bytes
             .chunks_exact(288)

@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::commitment_scheme::Commitment;
 use coset_bytes::{DeserializableSlice, Serializable};
@@ -23,10 +23,10 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-/// PLONK circuit Verification Key.
+
 ///
-/// This structure is used by the Verifier in order to verify a
-/// [`Proof`](super::Proof).
+
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -34,25 +34,25 @@ use rkyv::{
     archive(bound(serialize = "__S: Serializer + ScratchSpace"))
 )]
 pub struct VerifierKey {
-    /// Circuit size (not padded to a power of two).
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) n: usize,
-    /// VerifierKey for arithmetic gates
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) arithmetic: arithmetic::VerifierKey,
-    /// VerifierKey for logic gates
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) logic: logic::VerifierKey,
-    /// VerifierKey for range gates
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) range: range::VerifierKey,
-    /// VerifierKey for fixed base curve addition gates
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) fixed_base: ecc::scalar_mul::fixed_base::VerifierKey,
-    /// VerifierKey for variable base curve addition gates
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) variable_base: ecc::curve_addition::VerifierKey,
-    /// VerifierKey for permutation checks
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) permutation: permutation::VerifierKey,
 }
@@ -131,9 +131,9 @@ impl Serializable<{ 20 * Commitment::SIZE + u64::SIZE }> for VerifierKey {
 }
 
 impl VerifierKey {
-    /// Constructs a [`VerifierKey`] from the widget VerifierKey's that are
-    /// constructed based on the selector polynomial commitments and the
-    /// sigma polynomial commitments.
+
+
+
     pub(crate) fn from_polynomial_commitments(
         n: usize,
         q_m: Commitment,
@@ -206,7 +206,7 @@ pub(crate) mod alloc {
     use merlin::Transcript;
 
     impl VerifierKey {
-        /// Adds the circuit description to the transcript
+
         pub(crate) fn seed_transcript(&self, transcript: &mut Transcript) {
             transcript.append_commitment(b"q_m", &self.arithmetic.q_m);
             transcript.append_commitment(b"q_l", &self.arithmetic.q_l);
@@ -235,15 +235,15 @@ pub(crate) mod alloc {
             transcript
                 .append_commitment(b"s_sigma_4", &self.permutation.s_sigma_1);
 
-            // Append circuit size to transcript
+
             transcript.circuit_domain_sep(self.n as u64);
         }
     }
 
-    /// PLONK circuit Proving Key.
+
     ///
-    /// This structure is used by the Prover in order to construct a
-    /// [`Proof`](crate::proof_system::Proof).
+
+
     #[derive(Debug, PartialEq, Eq, Clone)]
     #[cfg_attr(
         feature = "rkyv-impl",
@@ -252,67 +252,67 @@ pub(crate) mod alloc {
         archive_attr(derive(CheckBytes))
     )]
     pub struct ProverKey {
-        /// Circuit size
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) n: usize,
-        /// ProverKey for arithmetic gate
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) arithmetic: arithmetic::ProverKey,
-        /// ProverKey for logic gate
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) logic: logic::ProverKey,
-        /// ProverKey for range gate
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) range: range::ProverKey,
-        /// ProverKey for fixed base curve addition gates
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) fixed_base: ecc::scalar_mul::fixed_base::ProverKey,
-        /// ProverKey for variable base curve addition gates
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) variable_base: ecc::curve_addition::ProverKey,
-        /// ProverKey for permutation checks
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) permutation: permutation::ProverKey,
-        // Pre-processes the 8n Evaluations for the vanishing polynomial, so
-        // they do not need to be computed at the proving stage.
-        // Note: With this, we can combine all parts of the quotient polynomial
-        // in their evaluation phase and divide by the quotient
-        // polynomial without having to perform IFFT
+
+
+
+
+
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) v_h_coset_8n: Evaluations,
     }
 
     impl ProverKey {
-        /// Returns the size of the ProverKey for serialization.
+
         ///
-        /// Note:
-        /// Duplicate polynomials of the ProverKey (e.g. `q_L`, `q_R` and `q_C`)
-        /// are only counted once.
+
+
+
         fn serialization_size(&self) -> usize {
-            // Fetch size in bytes of each Polynomial
+
             let poly_size = self.arithmetic.q_m.0.len() * BlsScalar::SIZE;
-            // Fetch size in bytes of each Evaluations
+
             let eval_size = self.arithmetic.q_m.1.evals.len() * BlsScalar::SIZE
                 + EvaluationDomain::SIZE;
 
-            // The amount of distinct polynomials in `ProverKey`
-            // 7 (arithmetic) + 1 (logic) + 1 (range) + 1 (fixed_base)
-            // + 1 (variable_base) + 4 (permutation)
+
+
+
             let poly_num = 15;
 
-            // The amount of distinct evaluations in `ProverKey`
-            // poly_num + 1 (permutation) + 1 (v_h_coset_4n)
+
+
             let eval_num = poly_num + 2;
 
-            // The amount of i64 in `ProverKey`
-            //  poly_num + 1 (self.n) + 1 (eval_size)
+
+
             let i64_num = poly_num + 2;
 
-            // Calculate the amount of bytes needed to serialize `ProverKey`
+
             poly_size * poly_num + eval_size * eval_num + u64::SIZE * i64_num
         }
 
-        /// Serializes a [`ProverKey`] struct into a Vec of bytes.
+
         #[allow(unused_must_use)]
         pub fn to_var_bytes(&self) -> Vec<u8> {
             use coset_bytes::Write;
@@ -324,10 +324,10 @@ pub(crate) mod alloc {
 
             let mut writer = &mut bytes[..];
             writer.write(&(self.n as u64).to_bytes());
-            // Write Evaluation len in bytes.
+
             writer.write(&(eval_size as u64).to_bytes());
 
-            // Arithmetic
+
             writer.write(&(self.arithmetic.q_m.0.len() as u64).to_bytes());
             writer.write(&self.arithmetic.q_m.0.to_var_bytes());
             writer.write(&self.arithmetic.q_m.1.to_var_bytes());
@@ -356,24 +356,24 @@ pub(crate) mod alloc {
             writer.write(&self.arithmetic.q_arith.0.to_var_bytes());
             writer.write(&self.arithmetic.q_arith.1.to_var_bytes());
 
-            // Logic
+
             writer.write(&(self.logic.q_logic.0.len() as u64).to_bytes());
             writer.write(&self.logic.q_logic.0.to_var_bytes());
             writer.write(&self.logic.q_logic.1.to_var_bytes());
 
-            // Range
+
             writer.write(&(self.range.q_range.0.len() as u64).to_bytes());
             writer.write(&self.range.q_range.0.to_var_bytes());
             writer.write(&self.range.q_range.1.to_var_bytes());
 
-            // Fixed base multiplication
+
             writer.write(
                 &(self.fixed_base.q_fixed_group_add.0.len() as u64).to_bytes(),
             );
             writer.write(&self.fixed_base.q_fixed_group_add.0.to_var_bytes());
             writer.write(&self.fixed_base.q_fixed_group_add.1.to_var_bytes());
 
-            // Witness base addition
+
             writer.write(
                 &(self.variable_base.q_variable_group_add.0.len() as u64)
                     .to_bytes(),
@@ -385,7 +385,7 @@ pub(crate) mod alloc {
                 &self.variable_base.q_variable_group_add.1.to_var_bytes(),
             );
 
-            // Permutation
+
             writer
                 .write(&(self.permutation.s_sigma_1.0.len() as u64).to_bytes());
             writer.write(&self.permutation.s_sigma_1.0.to_var_bytes());
@@ -413,22 +413,22 @@ pub(crate) mod alloc {
             bytes
         }
 
-        /// Deserializes a slice of bytes into a [`ProverKey`].
+
         pub fn from_slice(bytes: &[u8]) -> Result<ProverKey, Error> {
             let mut buffer = bytes;
             let circuit_size = u64::from_reader(&mut buffer)? as usize;
             let evaluations_size = u64::from_reader(&mut buffer)? as usize;
-            // let domain = crate::fft::EvaluationDomain::new(4 * size)?;
-            // TODO: By creating this we can avoid including the
-            // EvaluationDomain inside Evaluations. See:
-            // dusk-network/plonk#436
+
+
+
+
 
             let poly_from_reader =
                 |reader: &mut &[u8]| -> Result<Polynomial, Error> {
                     let serialized_poly_len =
                         u64::from_reader(reader)? as usize * BlsScalar::SIZE;
-                    // If the announced len is zero, simply return an empty poly
-                    // and leave the buffer intact.
+
+
                     if serialized_poly_len == 0 {
                         return Ok(Polynomial::zero());
                     }

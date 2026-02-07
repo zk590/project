@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use core::cmp::{Ord, Ordering, PartialOrd};
 use core::convert::TryFrom;
@@ -11,7 +11,7 @@ use core::ops::{BitAnd, BitXor};
 use coset_bytes::{Error as BytesError, Serializable};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
-use super::{Scalar, R2};
+use super::Scalar;
 
 impl PartialOrd for Scalar {
     fn partial_cmp(&self, other: &Scalar) -> Option<Ordering> {
@@ -36,14 +36,14 @@ impl Ord for Scalar {
 impl Serializable<32> for Scalar {
     type Error = BytesError;
 
-    /// Converts an element of `Scalar` into a byte representation in
-    /// little-endian byte order.
+
+
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         self.to_bytes()
     }
 
-    /// Attempts to convert a little-endian byte representation of
-    /// a scalar into a `Scalar`, failing if the input is not canonical.
+
+
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         Self::from_bytes(buf)
             .into_option()
@@ -201,23 +201,23 @@ impl Hash for Scalar {
 }
 
 impl Scalar {
-    /// Checks in ct_time whether a Scalar is equal to zero.
+
     pub fn is_zero(&self) -> Choice {
         self.ct_eq(&Scalar::zero())
     }
 
-    /// Checks in ct_time whether a Scalar is equal to one.   
+
     pub fn is_one(&self) -> Choice {
         self.ct_eq(&Scalar::one())
     }
 
-    /// Returns the internal representation of the Scalar.
+
     pub const fn internal_repr(&self) -> &[u64; 4] {
         &self.0
     }
 
-    /// Returns the bit representation of the given `Scalar` as
-    /// an array of 256 bits represented as `u8`.
+
+
     pub fn to_bits(&self) -> [u8; 256] {
         let mut res = [0u8; 256];
         let bytes = self.to_bytes();
@@ -229,11 +229,11 @@ impl Scalar {
         res
     }
 
-    /// Converts an element of `Scalar` into a byte representation in
-    /// big-endian byte order.
+
+
     pub fn to_be_bytes(&self) -> [u8; Self::SIZE] {
-        // Turn into canonical form by computing
-        // (a.R) / R = a
+
+
         let tmp = self.reduce();
 
         let mut res = [0; Self::SIZE];
@@ -245,14 +245,14 @@ impl Scalar {
         res
     }
 
-    /// Reduces the scalar and returns it multiplied by the montgomery
-    /// radix.
+
+
     pub fn reduce(&self) -> Scalar {
         Scalar::montgomery_reduce(self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0)
     }
 
-    /// Computes `2^X` where X is a `u64` without the need to generate
-    /// an array in the stack as `pow` & `pow_vartime` require.
+
+
     pub fn pow_of_2(by: u64) -> Self {
         let two = Scalar::from(2u64);
         let mut res = Self::one();
@@ -265,23 +265,23 @@ impl Scalar {
         res
     }
 
-    /// Creates a `Scalar` from arbitrary bytes by hashing the input with
-    /// BLAKE2b into a 512-bits number, and then converting the number into its
-    /// `Scalar` representation by reducing it by the modulo.
+
+
+
     ///
-    /// By treating the output of the BLAKE2b hash as a random oracle, this
-    /// implementation follows the first conversion of
-    /// https://hackmd.io/zV6qe1_oSU-kYU6Tt7pO7Q with concrete numbers:
-    /// ```text
-    /// p = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001
-    /// p = 52435875175126190479447740508185965837690552500527637822603658699938581184513
+
+
+
+
+
+
     ///
-    /// s = 2^512
-    /// s = 13407807929942597099574024998205846127479365820592393377723561443721764030073546976801874298166903427690031858186486050853753882811946569946433649006084096
+
+
     ///
-    /// r = 255699135089535202043525422716183576215815630510683217819334674386498370757523
+
     ///
-    /// m = 3294906474794265442129797520630710739278575682199800681788903916070560242797
+
     /// ```
     pub fn hash_to_scalar(input: &[u8]) -> Scalar {
         let state = blake2b_simd::Params::new()
@@ -304,7 +304,7 @@ impl Scalar {
         ])
     }
 
-    /// SHR impl
+
     #[inline]
     pub fn divn(&mut self, mut n: u32) {
         if n >= 256 {
@@ -425,7 +425,7 @@ fn test_scalar_eq_and_hash() {
     ]);
     let r2 = Scalar::from(7);
 
-    // Check PartialEq
+
     assert!(r0 == r1);
     assert!(r0 != r2);
 
@@ -433,7 +433,7 @@ fn test_scalar_eq_and_hash() {
     let hash_r1 = Keccak256::digest(&r1.to_bytes());
     let hash_r2 = Keccak256::digest(&r2.to_bytes());
 
-    // Check if hash results are consistent with PartialEq results
+
     assert_eq!(hash_r0, hash_r1);
     assert_ne!(hash_r0, hash_r2);
 }
@@ -481,7 +481,7 @@ mod fuzz {
     use crate::util::sbb;
 
     fn is_scalar_in_range(scalar: &Scalar) -> bool {
-        // subtraction against modulus must underflow
+
         let borrow = scalar
             .0
             .iter()

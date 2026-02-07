@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::composer::{WireData, Witness};
 use crate::fft::{EvaluationDomain, Polynomial};
@@ -14,56 +14,56 @@ use itertools::izip;
 
 pub(crate) mod constants;
 
-/// Permutation provides the necessary state information and functions
-/// to create the permutation polynomial. In the literature, Z(X) is the
-/// "accumulator", this is what this codebase calls the permutation polynomial.
+
+
+
 #[derive(Debug, Clone)]
 pub(crate) struct Permutation {
-    // Maps a witness to the wires that it is associated to.
+
     pub(crate) witness_map: HashMap<Witness, Vec<WireData>>,
 }
 
 impl Permutation {
-    /// Creates a Permutation struct with an expected capacity of zero.
+
     pub(crate) fn new() -> Permutation {
         Permutation::with_capacity(0)
     }
 
-    /// Creates a Permutation struct with an expected capacity of `n`.
+
     pub(crate) fn with_capacity(size: usize) -> Permutation {
         Permutation {
             witness_map: HashMap::with_capacity(size),
         }
     }
 
-    /// Creates a new [`Witness`] by incrementing the index of the
-    /// `witness_map`.
+
+
     ///
-    /// This is correct as whenever we add a new [`Witness`] into the system It
-    /// is always allocated in the `witness_map`.
+
+
     pub(crate) fn new_witness(&mut self) -> Witness {
-        // Generate the Witness
+
         let witness = Witness::new(self.witness_map.keys().len());
 
-        // Allocate space for the Witness on the witness_map
-        // Each vector is initialized with a capacity of 16.
-        // This number is a best guess estimate.
+
+
+
         self.witness_map
             .insert(witness, Vec::with_capacity(16usize));
 
         witness
     }
 
-    /// Checks that the [`Witness`]s are valid by determining if they have been
-    /// added to the system
+
+
     fn valid_witnesses(&self, witnesses: &[Witness]) -> bool {
         witnesses
             .iter()
             .all(|witness| self.witness_map.contains_key(witness))
     }
 
-    /// Maps a set of [`Witness`]s (a,b,c,d) to a set of [`Wire`](WireData)s
-    /// (left, right, out, fourth) with the corresponding gate index
+
+
     pub fn add_witnesses_to_map<T: Into<Witness>>(
         &mut self,
         a: T,
@@ -77,8 +77,8 @@ impl Permutation {
         let output: WireData = WireData::Output(gate_index);
         let fourth: WireData = WireData::Fourth(gate_index);
 
-        // Map each witness to the wire it is associated with
-        // This essentially tells us that:
+
+
         self.add_witness_to_map(a.into(), left);
         self.add_witness_to_map(b.into(), right);
         self.add_witness_to_map(c.into(), output);
@@ -92,14 +92,14 @@ impl Permutation {
     ) {
         assert!(self.valid_witnesses(&[witness.into()]));
 
-        // Since we always allocate space for the Vec of WireData when a
-        // Witness is added to the witness_map, this should never fail
+
+
         let mapped_wires = self.witness_map.get_mut(&witness.into()).unwrap();
         mapped_wires.push(wire_data);
     }
 
-    // Performs shift by one permutation and computes sigma_1, sigma_2 and
-    // sigma_3, sigma_4 permutations from the witness maps
+
+
     pub(super) fn compute_sigma_permutations(
         &mut self,
         n: usize,
@@ -112,22 +112,22 @@ impl Permutation {
         let mut sigmas = [sigma_1, sigma_2, sigma_3, sigma_4];
 
         for (_, wire_data_entries) in self.witness_map.iter() {
-            // Gets the data for each wire associated with this witness
+
             for (wire_index, current_wire) in
                 wire_data_entries.iter().enumerate()
             {
-                // Fetch index of the next wire, if it is the last element
-                // We loop back around to the beginning
+
+
                 let next_index =
                     match wire_index == wire_data_entries.len() - 1 {
                     true => 0,
                     false => wire_index + 1,
                 };
 
-                // Fetch the next wire
+
                 let next_wire = &wire_data_entries[next_index];
 
-                // Map current wire to next wire
+
                 match current_wire {
                     WireData::Left(index) => sigmas[0][*index] = *next_wire,
                     WireData::Right(index) => sigmas[1][*index] = *next_wire,
@@ -172,14 +172,14 @@ impl Permutation {
         lagrange_poly
     }
 
-    /// Computes the sigma polynomials which are used to build the permutation
-    /// polynomial
+
+
     pub(crate) fn compute_sigma_polynomials(
         &mut self,
         n: usize,
         domain: &EvaluationDomain,
     ) -> [Polynomial; 4] {
-        // Compute sigma mappings
+
         let sigmas = self.compute_sigma_permutations(n);
 
         assert_eq!(sigmas[0].len(), n);
@@ -187,7 +187,7 @@ impl Permutation {
         assert_eq!(sigmas[2].len(), n);
         assert_eq!(sigmas[3].len(), n);
 
-        // define the sigma permutations using two non quadratic residues
+
         let s_sigma_1 = self.compute_permutation_lagrange(&sigmas[0], domain);
         let s_sigma_2 = self.compute_permutation_lagrange(&sigmas[1], domain);
         let s_sigma_3 = self.compute_permutation_lagrange(&sigmas[2], domain);
@@ -210,9 +210,9 @@ impl Permutation {
         ]
     }
 
-    // Uses a rayon multizip to allow more code flexibility while remaining
-    // parallelizable. This can be adapted into a general product argument
-    // for any number of wires.
+
+
+
     pub(crate) fn compute_permutation_vec(
         &self,
         domain: &EvaluationDomain,
@@ -223,12 +223,12 @@ impl Permutation {
     ) -> Vec<BlsScalar> {
         let domain_size = domain.size();
 
-        // Constants defining cosets H, k1H, k2H, etc
+
         let coset_scalars = vec![BlsScalar::one(), K1, K2, K3];
 
-        // Transpose wires and sigma values to get "rows" in the form [a_i,
-        // b_i, c_i, d_i] where each row contains the wire and sigma
-        // values for a single gate
+
+
+
         let gatewise_wires = izip!(wires[0], wires[1], wires[2], wires[3])
             .map(|(w0, w1, w2, w3)| vec![w0, w1, w2, w3]);
 
@@ -242,25 +242,25 @@ impl Permutation {
         )
         .map(|(s0, s1, s2, s3)| vec![s0, s1, s2, s3]);
 
-        // Compute all roots
-        // Non-parallelizable?
+
+
         let roots: Vec<BlsScalar> = domain.elements().collect();
 
         let product_argument = izip!(roots, gatewise_sigmas, gatewise_wires)
-            // Associate each wire value in a gate with the k defining its coset
+
             .map(|(gate_root, gate_sigmas, gate_wires)| {
                 (gate_root, izip!(gate_sigmas, gate_wires, &coset_scalars))
             })
-            // Now the ith element represents gate i and will have the form:
-            //   (root_i, ((w0_i, s0_i, k0), (w1_i, s1_i, k1), ..., (wm_i, sm_i,
-            // km)))   for m different wires, which is all the
-            // information   needed for a single product coefficient
-            // for a single gate Multiply up the numerator and
-            // denominator irreducibles for each gate   and pair the
-            // results
+
+
+
+
+
+
+
             .map(|(gate_root, wire_params)| {
                 (
-                    // Numerator product
+
                     wire_params
                         .clone()
                     .map(|(_sigma, wire_value, coset_scalar)| {
@@ -269,7 +269,7 @@ impl Permutation {
                                 + gamma
                         })
                         .product::<BlsScalar>(),
-                    // Denominator product
+
                     wire_params
                         .map(|(sigma, wire_value, _coset_scalar)| {
                             wire_value + beta * sigma + gamma
@@ -277,26 +277,26 @@ impl Permutation {
                         .product::<BlsScalar>(),
                 )
             })
-            // Divide each pair to get the single scalar representing each gate
+
             .map(|(n, d)| n * d.invert().unwrap())
-            // Collect into vector intermediary since rayon does not support
-            // `scan`
+
+
             .collect::<Vec<BlsScalar>>();
 
         let mut permutation_accumulator = Vec::with_capacity(domain_size);
 
-        // First element is one
+
         let mut state = BlsScalar::one();
         permutation_accumulator.push(state);
 
-        // Accumulate by successively multiplying the scalars
-        // Non-parallelizable?
+
+
         for product_term in product_argument {
             state *= product_term;
             permutation_accumulator.push(state);
         }
 
-        // Remove the last(n+1'th) element
+
         permutation_accumulator.remove(domain_size);
 
         assert_eq!(domain_size, permutation_accumulator.len());
@@ -332,7 +332,7 @@ mod test {
     ) -> Vec<BlsScalar> {
         let domain_size = domain.size();
 
-        // Compute beta * roots
+
         let common_roots: Vec<BlsScalar> =
             domain.elements().map(|root| root * beta).collect();
 
@@ -341,7 +341,7 @@ mod test {
         let s_sigma_3_mapping = domain.fft(s_sigma_3_poly);
         let s_sigma_4_mapping = domain.fft(s_sigma_4_poly);
 
-        // Compute beta * sigma polynomials
+
         let beta_s_sigma_1: Vec<_> =
             s_sigma_1_mapping.iter().map(|sigma| sigma * beta).collect();
         let beta_s_sigma_2: Vec<_> =
@@ -351,42 +351,42 @@ mod test {
         let beta_s_sigma_4: Vec<_> =
             s_sigma_4_mapping.iter().map(|sigma| sigma * beta).collect();
 
-        // Compute beta * roots * K1
+
         let beta_roots_k1: Vec<_> =
             common_roots.iter().map(|root_value| root_value * K1).collect();
 
-        // Compute beta * roots * K2
+
         let beta_roots_k2: Vec<_> =
             common_roots.iter().map(|root_value| root_value * K2).collect();
 
-        // Compute beta * roots * K3
+
         let beta_roots_k3: Vec<_> =
             common_roots.iter().map(|root_value| root_value * K3).collect();
 
-        // Compute left_wire + gamma
+
         let left_wire_with_gamma: Vec<_> =
             left_wire_values.iter().map(|wire_value| wire_value + gamma).collect();
 
-        // Compute right_wire + gamma
+
         let right_wire_with_gamma: Vec<_> = right_wire_values
             .iter()
             .map(|wire_value| wire_value + gamma)
             .collect();
 
-        // Compute out_wire + gamma
+
         let output_wire_with_gamma: Vec<_> = output_wire_values
             .iter()
             .map(|wire_value| wire_value + gamma)
             .collect();
 
-        // Compute fourth_wire + gamma
+
         let fourth_wire_with_gamma: Vec<_> = fourth_wire_values
             .iter()
             .map(|wire_value| wire_value + gamma)
             .collect();
 
-        // Compute 6 accumulator components
-        // Parallelizable
+
+
         let accumulator_components_without_l1: Vec<_> = izip!(
             left_wire_with_gamma,
             right_wire_with_gamma,
@@ -416,34 +416,34 @@ mod test {
                 beta_s_sigma_3,
                 beta_s_sigma_4,
             )| {
-                // w_j + beta * root^j-1 + gamma
+
                 let left_numerator_component = left_wire_with_gamma + beta_root;
 
-                // w_{n+j} + beta * K1 * root^j-1 + gamma
+
                 let right_numerator_component =
                     right_wire_with_gamma + beta_root_k1;
 
-                // w_{2n+j} + beta * K2 * root^j-1 + gamma
+
                 let output_numerator_component =
                     output_wire_with_gamma + beta_root_k2;
 
-                // w_{3n+j} + beta * K3 * root^j-1 + gamma
+
                 let fourth_numerator_component =
                     fourth_wire_with_gamma + beta_root_k3;
 
-                // 1 / w_j + beta * sigma(j) + gamma
+
                 let left_denominator_component =
                     (left_wire_with_gamma + beta_s_sigma_1).invert().unwrap();
 
-                // 1 / w_{n+j} + beta * sigma(n+j) + gamma
+
                 let right_denominator_component =
                     (right_wire_with_gamma + beta_s_sigma_2).invert().unwrap();
 
-                // 1 / w_{2n+j} + beta * sigma(2n+j) + gamma
+
                 let output_denominator_component =
                     (output_wire_with_gamma + beta_s_sigma_3).invert().unwrap();
 
-                // 1 / w_{3n+j} + beta * sigma(3n+j) + gamma
+
                 let fourth_denominator_component =
                     (fourth_wire_with_gamma + beta_s_sigma_4).invert().unwrap();
 
@@ -461,15 +461,15 @@ mod test {
         )
         .collect();
 
-        // Prepend ones to the beginning of each accumulator to signify L_1(x)
+
         let accumulator_components = core::iter::once([BlsScalar::one(); 8])
             .chain(accumulator_components_without_l1);
 
-        // Multiply each component of the accumulators
-        // A simplified example is the following:
-        // A1 = [1,2,3,4]
-        // result = [1, 1*2, 1*2*3, 1*2*3*4]
-        // Non Parallelizable
+
+
+
+
+
         let mut prev = [BlsScalar::one(); 8];
 
         let product_accumulated_components: Vec<_> = accumulator_components
@@ -482,19 +482,19 @@ mod test {
             })
             .collect();
 
-        // Right now we basically have 6 accumulators of the form:
-        // A1 = [a1, a1 * a2, a1*a2*a3,...]
-        // A2 = [b1, b1 * b2, b1*b2*b3,...]
-        // A3 = [c1, c1 * c2, c1*c2*c3,...]
-        // ... and so on
-        // We want:
-        // [a1*b1*c1, a1 * a2 *b1 * b2 * c1 * c2,...]
-        // Parallelizable
+
+
+
+
+
+
+
+
         let mut permutation_accumulator: Vec<_> = product_accumulated_components
             .iter()
             .map(move |current_component| current_component.iter().product())
             .collect();
-        // Remove the last(n+1'th) element
+
         permutation_accumulator.remove(domain_size);
 
         assert_eq!(domain_size, permutation_accumulator.len());
@@ -527,7 +527,7 @@ mod test {
         let s_sigma_3_mapping = domain.fft(s_sigma_3_poly);
         let s_sigma_4_mapping = domain.fft(s_sigma_4_poly);
 
-        // Compute beta * sigma polynomials
+
         let beta_s_sigma_1_iter =
             s_sigma_1_mapping.iter().map(|sigma| *sigma * beta);
         let beta_s_sigma_2_iter =
@@ -537,31 +537,31 @@ mod test {
         let beta_s_sigma_4_iter =
             s_sigma_4_mapping.iter().map(|sigma| *sigma * beta);
 
-        // Compute beta * roots
+
         let beta_roots_iter = domain.elements().map(|root| root * beta);
 
-        // Compute beta * roots * K1
+
         let beta_roots_k1_iter = domain.elements().map(|root| K1 * beta * root);
 
-        // Compute beta * roots * K2
+
         let beta_roots_k2_iter = domain.elements().map(|root| K2 * beta * root);
 
-        // Compute beta * roots * K3
+
         let beta_roots_k3_iter = domain.elements().map(|root| K3 * beta * root);
 
-        // Compute left_wire + gamma
+
         let left_wire_with_gamma: Vec<_> =
             left_wire_values.map(|wire_value| wire_value + gamma).collect();
 
-        // Compute right_wire + gamma
+
         let right_wire_with_gamma: Vec<_> =
             right_wire_values.map(|wire_value| wire_value + gamma).collect();
 
-        // Compute out_wire + gamma
+
         let output_wire_with_gamma: Vec<_> =
             output_wire_values.map(|wire_value| wire_value + gamma).collect();
 
-        // Compute fourth_wire + gamma
+
         let fourth_wire_with_gamma: Vec<_> =
             fourth_wire_values.map(|wire_value| wire_value + gamma).collect();
 
@@ -575,11 +575,11 @@ mod test {
         let mut denominator_coefficients: Vec<BlsScalar> =
             Vec::with_capacity(domain_size);
 
-        // First element in both of them is one
+
         numerator_coefficients.push(BlsScalar::one());
         denominator_coefficients.push(BlsScalar::one());
 
-        // Compute numerator coefficients
+
         for (
             a_gamma,
             b_gamma,
@@ -599,16 +599,16 @@ mod test {
             beta_roots_k2_iter,
             beta_roots_k3_iter,
         ) {
-            // (a + beta * root + gamma)
+
             let prod_a = beta_root + a_gamma;
 
-            // (b + beta * root * k_1 + gamma)
+
             let prod_b = beta_root_k1 + b_gamma;
 
-            // (c + beta * root * k_2 + gamma)
+
             let prod_c = beta_root_k2 + c_gamma;
 
-            // (d + beta * root * k_3 + gamma)
+
             let prod_d = beta_root_k3 + d_gamma;
 
             let mut numerator_term = prod_a * prod_b * prod_c * prod_d;
@@ -620,7 +620,7 @@ mod test {
             numerator_coefficients.push(numerator_term);
         }
 
-        // Compute denominator coefficients
+
         for (
             a_gamma,
             b_gamma,
@@ -640,16 +640,16 @@ mod test {
             beta_s_sigma_3_iter,
             beta_s_sigma_4_iter,
         ) {
-            // (a + beta * s_sigma_1 + gamma)
+
             let prod_a = beta_s_sigma_1 + a_gamma;
 
-            // (b + beta * s_sigma_2 + gamma)
+
             let prod_b = beta_s_sigma_2 + b_gamma;
 
-            // (c + beta * s_sigma_3 + gamma)
+
             let prod_c = beta_s_sigma_3 + c_gamma;
 
-            // (d + beta * s_sigma_4 + gamma)
+
             let prod_d = beta_s_sigma_4 + d_gamma;
 
             let mut denominator_term = prod_a * prod_b * prod_c * prod_d;
@@ -666,7 +666,7 @@ mod test {
         assert_eq!(denominator_coefficients.len(), domain_size + 1);
         assert_eq!(numerator_coefficients.len(), domain_size + 1);
 
-        // Check that n+1'th elements are equal (taken from proof)
+
         let numerator_last = numerator_coefficients.pop().unwrap();
         assert_ne!(numerator_last, BlsScalar::zero());
         let denominator_last = denominator_coefficients.pop().unwrap();
@@ -676,7 +676,7 @@ mod test {
             BlsScalar::one()
         );
 
-        // Combine numerator and denominator
+
 
         let mut z_coefficients: Vec<BlsScalar> =
             Vec::with_capacity(domain_size);
@@ -715,7 +715,7 @@ mod test {
             perm.add_witnesses_to_map(var_one, var_one, var_two, var_three, i);
         }
 
-        // Check all gate_indices are valid
+
         for (_, wire_data) in perm.witness_map.iter() {
             for wire in wire_data.iter() {
                 match wire {
@@ -744,52 +744,38 @@ mod test {
 
         let num_wire_mappings = 4;
 
-        // Add four wire mappings
+
         perm.add_witnesses_to_map(var_zero, var_zero, var_five, var_nine, 0);
         perm.add_witnesses_to_map(var_zero, var_two, var_six, var_nine, 1);
         perm.add_witnesses_to_map(var_zero, var_three, var_seven, var_nine, 2);
         perm.add_witnesses_to_map(var_zero, var_four, var_eight, var_nine, 3);
 
-        /*
-        var_zero = {L0, R0, L1, L2, L3}
-        var_two = {R1}
-        var_three = {R2}
-        var_four = {R3}
-        var_five = {O0}
-        var_six = {O1}
-        var_seven = {O2}
-        var_eight = {O3}
-        var_nine = {F0, F1, F2, F3}
-        s_sigma_1 = {R0, L2, L3, L0}
-        s_sigma_2 = {L1, R1, R2, R3}
-        s_sigma_3 = {O0, O1, O2, O3}
-        s_sigma_4 = {F1, F2, F3, F0}
-        */
+        
         let sigmas = perm.compute_sigma_permutations(num_wire_mappings);
         let s_sigma_1 = &sigmas[0];
         let s_sigma_2 = &sigmas[1];
         let s_sigma_3 = &sigmas[2];
         let s_sigma_4 = &sigmas[3];
 
-        // Check the left sigma polynomial
+
         assert_eq!(s_sigma_1[0], WireData::Right(0));
         assert_eq!(s_sigma_1[1], WireData::Left(2));
         assert_eq!(s_sigma_1[2], WireData::Left(3));
         assert_eq!(s_sigma_1[3], WireData::Left(0));
 
-        // Check the right sigma polynomial
+
         assert_eq!(s_sigma_2[0], WireData::Left(1));
         assert_eq!(s_sigma_2[1], WireData::Right(1));
         assert_eq!(s_sigma_2[2], WireData::Right(2));
         assert_eq!(s_sigma_2[3], WireData::Right(3));
 
-        // Check the output sigma polynomial
+
         assert_eq!(s_sigma_3[0], WireData::Output(0));
         assert_eq!(s_sigma_3[1], WireData::Output(1));
         assert_eq!(s_sigma_3[2], WireData::Output(2));
         assert_eq!(s_sigma_3[3], WireData::Output(3));
 
-        // Check the output sigma polynomial
+
         assert_eq!(s_sigma_4[0], WireData::Fourth(1));
         assert_eq!(s_sigma_4[1], WireData::Fourth(2));
         assert_eq!(s_sigma_4[2], WireData::Fourth(3));
@@ -800,9 +786,9 @@ mod test {
         let domain_generator_squared = domain_generator.pow(&[2, 0, 0, 0]);
         let domain_generator_cubed = domain_generator.pow(&[3, 0, 0, 0]);
 
-        // Check the left sigmas have been encoded properly
-        // s_sigma_1 = {R0, L2, L3, L0}
-        // Should turn into {1 * K1, w^2, w^3, 1}
+
+
+
         let encoded_s_sigma_1 =
             perm.compute_permutation_lagrange(s_sigma_1, &domain);
         assert_eq!(encoded_s_sigma_1[0], BlsScalar::one() * K1);
@@ -810,9 +796,9 @@ mod test {
         assert_eq!(encoded_s_sigma_1[2], domain_generator_cubed);
         assert_eq!(encoded_s_sigma_1[3], BlsScalar::one());
 
-        // Check the right sigmas have been encoded properly
-        // s_sigma_2 = {L1, R1, R2, R3}
-        // Should turn into {w, w * K1, w^2 * K1, w^3 * K1}
+
+
+
         let encoded_s_sigma_2 =
             perm.compute_permutation_lagrange(s_sigma_2, &domain);
         assert_eq!(encoded_s_sigma_2[0], domain_generator);
@@ -820,9 +806,9 @@ mod test {
         assert_eq!(encoded_s_sigma_2[2], domain_generator_squared * K1);
         assert_eq!(encoded_s_sigma_2[3], domain_generator_cubed * K1);
 
-        // Check the output sigmas have been encoded properly
-        // s_sigma_3 = {O0, O1, O2, O3}
-        // Should turn into {1 * K2, w * K2, w^2 * K2, w^3 * K2}
+
+
+
         let encoded_s_sigma_3 =
             perm.compute_permutation_lagrange(s_sigma_3, &domain);
         assert_eq!(encoded_s_sigma_3[0], BlsScalar::one() * K2);
@@ -830,9 +816,9 @@ mod test {
         assert_eq!(encoded_s_sigma_3[2], domain_generator_squared * K2);
         assert_eq!(encoded_s_sigma_3[3], domain_generator_cubed * K2);
 
-        // Check the fourth sigmas have been encoded properly
-        // s_sigma_4 = {F1, F2, F3, F0}
-        // Should turn into {w * K3, w^2 * K3, w^3 * K3, 1 * K3}
+
+
+
         let encoded_s_sigma_4 =
             perm.compute_permutation_lagrange(s_sigma_4, &domain);
         assert_eq!(encoded_s_sigma_4[0], domain_generator * K3);
@@ -887,69 +873,49 @@ mod test {
 
         let num_wire_mappings = 4;
 
-        // Add four wire mappings
+
         perm.add_witnesses_to_map(var_one, var_one, var_two, var_four, 0);
         perm.add_witnesses_to_map(var_two, var_one, var_two, var_four, 1);
         perm.add_witnesses_to_map(var_three, var_three, var_one, var_four, 2);
         perm.add_witnesses_to_map(var_two, var_one, var_three, var_four, 3);
 
-        /*
-        Below is a sketch of the map created by adding the specific witnesses into the map
-        var_one : {L0,R0, R1, O2, R3 }
-        var_two : {O0, L1, O1, L3}
-        var_three : {L2, R2, O3}
-        var_four : {F0, F1, F2, F3}
-        s_sigma_1 : {0,1,2,3} -> {R0,O1,R2,O0}
-        s_sigma_2 : {0,1,2,3} -> {R1, O2, O3, L0}
-        s_sigma_3 : {0,1,2,3} -> {L1, L3, R3, L2}
-        s_sigma_4 : {0,1,2,3} -> {F1, F2, F3, F0}
-        */
+        
         let sigmas = perm.compute_sigma_permutations(num_wire_mappings);
         let s_sigma_1 = &sigmas[0];
         let s_sigma_2 = &sigmas[1];
         let s_sigma_3 = &sigmas[2];
         let s_sigma_4 = &sigmas[3];
 
-        // Check the left sigma polynomial
+
         assert_eq!(s_sigma_1[0], WireData::Right(0));
         assert_eq!(s_sigma_1[1], WireData::Output(1));
         assert_eq!(s_sigma_1[2], WireData::Right(2));
         assert_eq!(s_sigma_1[3], WireData::Output(0));
 
-        // Check the right sigma polynomial
+
         assert_eq!(s_sigma_2[0], WireData::Right(1));
         assert_eq!(s_sigma_2[1], WireData::Output(2));
         assert_eq!(s_sigma_2[2], WireData::Output(3));
         assert_eq!(s_sigma_2[3], WireData::Left(0));
 
-        // Check the output sigma polynomial
+
         assert_eq!(s_sigma_3[0], WireData::Left(1));
         assert_eq!(s_sigma_3[1], WireData::Left(3));
         assert_eq!(s_sigma_3[2], WireData::Right(3));
         assert_eq!(s_sigma_3[3], WireData::Left(2));
 
-        // Check the fourth sigma polynomial
+
         assert_eq!(s_sigma_4[0], WireData::Fourth(1));
         assert_eq!(s_sigma_4[1], WireData::Fourth(2));
         assert_eq!(s_sigma_4[2], WireData::Fourth(3));
         assert_eq!(s_sigma_4[3], WireData::Fourth(0));
 
-        /*
-        Check that the unique encodings of the sigma polynomials have been computed properly
-        s_sigma_1 : {R0,O1,R2,O0}
-            When encoded using w, K1,K2,K3 we have {1 * K1, w * K2, w^2 * K1, 1 * K2}
-        s_sigma_2 : {R1, O2, O3, L0}
-            When encoded using w, K1,K2,K3 we have {w * K1, w^2 * K2, w^3 * K2, 1}
-        s_sigma_3 : {L1, L3, R3, L2}
-            When encoded using w, K1, K2,K3 we have {w, w^3 , w^3 * K1, w^2}
-        s_sigma_4 : {0,1,2,3} -> {F1, F2, F3, F0}
-            When encoded using w, K1, K2,K3 we have {w * K3, w^2 * K3, w^3 * K3, 1 * K3}
-        */
+        
         let domain = EvaluationDomain::new(num_wire_mappings).unwrap();
         let domain_generator = domain.group_gen;
         let domain_generator_squared = domain_generator.pow(&[2, 0, 0, 0]);
         let domain_generator_cubed = domain_generator.pow(&[3, 0, 0, 0]);
-        // check the left sigmas have been encoded properly
+
         let encoded_s_sigma_1 =
             perm.compute_permutation_lagrange(s_sigma_1, &domain);
         assert_eq!(encoded_s_sigma_1[0], K1);
@@ -957,7 +923,7 @@ mod test {
         assert_eq!(encoded_s_sigma_1[2], domain_generator_squared * K1);
         assert_eq!(encoded_s_sigma_1[3], BlsScalar::one() * K2);
 
-        // check the right sigmas have been encoded properly
+
         let encoded_s_sigma_2 =
             perm.compute_permutation_lagrange(s_sigma_2, &domain);
         assert_eq!(encoded_s_sigma_2[0], domain_generator * K1);
@@ -965,7 +931,7 @@ mod test {
         assert_eq!(encoded_s_sigma_2[2], domain_generator_cubed * K2);
         assert_eq!(encoded_s_sigma_2[3], BlsScalar::one());
 
-        // check the output sigmas have been encoded properly
+
         let encoded_s_sigma_3 =
             perm.compute_permutation_lagrange(s_sigma_3, &domain);
         assert_eq!(encoded_s_sigma_3[0], domain_generator);
@@ -973,7 +939,7 @@ mod test {
         assert_eq!(encoded_s_sigma_3[2], domain_generator_cubed * K1);
         assert_eq!(encoded_s_sigma_3[3], domain_generator_squared);
 
-        // check the fourth sigmas have been encoded properly
+
         let encoded_s_sigma_4 =
             perm.compute_permutation_lagrange(s_sigma_4, &domain);
         assert_eq!(encoded_s_sigma_4[0], domain_generator * K3);
@@ -1016,7 +982,7 @@ mod test {
         );
     }
 
-    // shifts the polynomials by one root of unity
+
     fn shift_poly_by_one(z_coefficients: Vec<BlsScalar>) -> Vec<BlsScalar> {
         let mut shifted_z_coefficients = z_coefficients;
         shifted_z_coefficients.push(shifted_z_coefficients[0]);
@@ -1033,13 +999,13 @@ mod test {
         c: Vec<BlsScalar>,
         d: Vec<BlsScalar>,
     ) {
-        // 0. Generate beta and gamma challenges
+
         //
         let beta = BlsScalar::random(&mut OsRng);
         let gamma = BlsScalar::random(&mut OsRng);
         assert_ne!(gamma, beta);
 
-        // 1. Compute the permutation polynomial using both methods
+
         let [s_sigma_1_poly, s_sigma_2_poly, s_sigma_3_poly, s_sigma_4_poly] =
             perm.compute_sigma_polynomials(n, domain);
         let (z_vec, numerator_components, denominator_components) =
@@ -1076,16 +1042,16 @@ mod test {
         );
         assert_eq!(fast_z_vec, z_vec);
 
-        // 2. First we perform basic tests on the permutation vector
+
         //
-        // Check that the vector has length `n` and that the first element is
+
         // `1`
         assert_eq!(z_vec.len(), n);
         assert_eq!(&z_vec[0], &BlsScalar::one());
         //
-        // Check that the \prod{f_i} / \prod{g_i} = 1
-        // Where f_i and g_i are the numerator and denominator components in the
-        // permutation polynomial
+
+
+
         let (mut a_0, mut b_0) = (BlsScalar::one(), BlsScalar::one());
         for n in numerator_components.iter() {
             a_0 *= n;
@@ -1095,21 +1061,21 @@ mod test {
         }
         assert_eq!(a_0 * b_0.invert().unwrap(), BlsScalar::one());
 
-        // 3. Now we perform the two checks that need to be done on the
-        // permutation polynomial (z)
+
+
         let z_poly = Polynomial::from_coefficients_vec(domain.ifft(&z_vec));
         //
-        // Check that z(w^{n+1}) == z(1) == 1
-        // This is the first check in the protocol
+
+
         assert_eq!(z_poly.evaluate(&BlsScalar::one()), BlsScalar::one());
         let n_plus_one = domain.elements().last().unwrap() * domain.group_gen;
         assert_eq!(z_poly.evaluate(&n_plus_one), BlsScalar::one());
         //
-        // Check that when z is unblinded, it has the correct degree
+
         assert_eq!(z_poly.degree(), n - 1);
         //
-        // Check relationship between z(X) and z(Xw)
-        // This is the second check in the protocol
+
+
         let roots: Vec<_> = domain.elements().collect();
 
         for i in 1..roots.len() {
@@ -1133,9 +1099,9 @@ mod test {
             let z_eval_shifted = z_poly.evaluate(&next_root);
             assert_ne!(z_eval_shifted, BlsScalar::zero());
 
-            // Z(Xw) * copy_perm
+
             let lhs = z_eval_shifted * current_copy_perm_product;
-            // Z(X) * iden_perm
+
             let rhs = z_eval * current_identity_perm_product;
             assert_eq!(
                 lhs, rhs,
@@ -1144,7 +1110,7 @@ mod test {
             );
         }
 
-        // Test that the shifted polynomial is correct
+
         let shifted_z = shift_poly_by_one(fast_z_vec);
         let shifted_z_poly =
             Polynomial::from_coefficients_vec(domain.ifft(&shifted_z));

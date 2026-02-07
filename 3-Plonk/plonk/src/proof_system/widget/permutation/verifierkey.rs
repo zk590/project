@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::commitment_scheme::Commitment;
 
@@ -55,10 +55,10 @@ mod alloc {
         ) {
             let alpha_sq = alpha.square();
 
-            // (a_eval + beta * z + gamma)
-            // * (b_eval + beta * z * k1 + gamma)
-            // * (c_eval + beta * k2 * z + gamma)
-            // * (d_eval + beta * k3 * z + gamma) * alpha
+
+
+
+
             let identity_permutation_term = {
                 let beta_z = beta * z_challenge;
                 let a_contribution = evaluations.a_eval + beta_z + gamma;
@@ -76,7 +76,7 @@ mod alloc {
                 a_contribution * b_contribution * c_contribution * d_contribution
             };
 
-            // l1(z) * alpha^2
+
             let lagrange_first_term = l1_eval * alpha_sq;
 
             scalars.push(
@@ -84,10 +84,10 @@ mod alloc {
             );
             points.push(z_comm);
 
-            // -1 * (a_eval + beta * sigma_1_eval + gamma)
-            // * (b_eval + beta * sigma_2_eval + gamma)
-            // * (c_eval + beta * sigma_3_eval + gamma)
-            // * alpha^2
+
+
+
+
             let copy_permutation_term = {
                 let beta_sigma_1 = beta * evaluations.s_sigma_1_eval;
                 let a_contribution = evaluations.a_eval + beta_sigma_1 + gamma;

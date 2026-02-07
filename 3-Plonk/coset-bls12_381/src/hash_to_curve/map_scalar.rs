@@ -1,17 +1,17 @@
-//! Implementation of hash-to-field for Scalar values
+
 
 use super::HashToField;
 use crate::generic_array::{typenum::U48, GenericArray};
 use crate::scalar::Scalar;
 
 impl HashToField for Scalar {
-    // ceil(log2(p)) = 255, m = 1, k = 128.
+
     type InputLength = U48;
 
     fn from_okm(okm: &GenericArray<u8, U48>) -> Scalar {
         let mut bs = [0u8; 64];
         bs[16..].copy_from_slice(okm);
-        bs.reverse(); // into little endian
+        bs.reverse();
         Scalar::from_bytes_wide(&bs)
     }
 }

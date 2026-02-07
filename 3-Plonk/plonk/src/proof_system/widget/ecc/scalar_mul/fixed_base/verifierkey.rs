@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::commitment_scheme::Commitment;
 
@@ -68,7 +68,7 @@ mod alloc {
             let accumulated_bit_w = evaluations.d_w_eval;
             let bit = extract_bit(&accumulated_bit, &accumulated_bit_w);
 
-            // Check bit consistency
+
             let bit_consistency = check_bit_consistency(bit);
 
             let y_alpha = (bit.square() * (y_beta_eval - BlsScalar::one()))
@@ -76,17 +76,17 @@ mod alloc {
 
             let x_alpha = x_beta_poly * bit;
 
-            // xy_alpha consistency check
+
             let xy_consistency =
                 ((bit * evaluations.q_c_eval) - xy_alpha) * kappa;
 
-            // x accumulator consistency check
+
             let shifted_acc_x = acc_x_w;
             let x_consistency_lhs = shifted_acc_x + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
             let x_consistency_rhs = (x_alpha * acc_y) + (y_alpha * acc_x);
             let x_acc_consistency = (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
 
-            // y accumulator consistency check
+
             let shifted_acc_y = acc_y_w;
             let y_consistency_lhs = shifted_acc_y - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
             let y_consistency_rhs = (x_alpha * acc_x) + (y_alpha * acc_y);

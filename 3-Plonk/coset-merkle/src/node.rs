@@ -28,9 +28,9 @@ where
     }
 
     pub(crate) fn item(&self) -> Ref<'_, T> {
-        // a leaf will always have a computed item, so we never go into it
+
         if self.item.borrow().is_none() {
-            // compute our item, recursing into the children.
+
             let empty_subtree = &T::EMPTY_SUBTREE;
             let mut item_refs = [empty_subtree; A];
 
@@ -59,15 +59,15 @@ where
             }
         }
 
-        // unwrapping is ok since we ensure it exists
+
         Ref::map(self.item.borrow(), |item| item.as_ref().unwrap())
     }
 
     pub(crate) fn child_location(height: usize, position: u64) -> (usize, u64) {
         let child_cap = capacity(A as u64, H - height - 1);
 
-        // Casting to a `usize` should be fine, since the index should be within
-        // the `[0, A[` bound anyway.
+
+
         #[allow(clippy::cast_possible_truncation)]
         let child_index = (position / child_cap) as usize;
         let child_pos = position % child_cap;
@@ -94,19 +94,19 @@ where
             *selected_child = Some(Box::new(Node::new()));
         }
 
-        // We just inserted a child at the given index.
+
         let selected_child = self.children[child_index].as_mut().unwrap();
         Self::insert(selected_child, height + 1, child_pos, item);
     }
 
-    /// Returns the removed element, together with if there are any siblings
-    /// left in the branch.
+
+
     ///
-    /// # Panics
-    /// If an element does not exist at the given position.
+
+
     pub(crate) fn remove(&mut self, height: usize, position: u64) -> (T, bool) {
         if height == H {
-            // unwrapping is ok since leaves are always filled
+
             let item = self.item.take().unwrap();
             return (item, false);
         }

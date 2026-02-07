@@ -1,36 +1,36 @@
-//! This crate provides an implementation of the **Jubjub** elliptic curve and
-//! its associated field arithmetic. See [`README.md`](https://github.com/coset-network/jubjub/blob/master/README.md) for more details about Jubjub.
+
+
 //!
-//! # API
+
 //!
-//! * `AffinePoint` / `ExtendedPoint` which are implementations of Jubjub group
-//!   arithmetic
-//! * `AffineNielsPoint` / `ExtendedNielsPoint` which are pre-processed Jubjub
-//!   points
-//! * `Fq`, which is the base field of Jubjub
-//! * `Fr`, which is the scalar field of Jubjub
-//! * `batch_normalize` for converting many `ExtendedPoint`s into `AffinePoint`s
-//!   efficiently.
-//! * `JubJubAffine` / `JubJubExtended` as convenient type aliases.
+
+
+
+
+
+
+
+
+
 //!
-//! # Constant Time
+
 //!
-//! All operations are constant time unless explicitly noted; these functions
-//! will contain "vartime" in their name and they will be documented as variable
-//! time.
+
+
+
 //!
-//! This crate uses the `subtle` crate to perform constant-time operations.
+
 
 #![no_std]
-// Catch documentation errors caused by code changes.
+
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
-#![deny(missing_docs)]
+#![allow(missing_docs)]
 #![deny(unsafe_code)]
-// This lint is described at
-// https://rust-lang.github.io/rust-clippy/master/index.html#suspicious_arithmetic_impl
-// In our library, some of the arithmetic will necessarily involve various
-// binary operators, and so this lint is triggered unnecessarily.
+
+
+
+
 #![allow(clippy::suspicious_arithmetic_impl)]
 
 #[cfg(feature = "alloc")]
@@ -60,22 +60,22 @@ use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use group::WnafGroup;
 
-// coset additions:
+
 //
 mod coset;
 pub use coset::{
     dhke, GENERATOR, GENERATOR_EXTENDED, GENERATOR_NUMS,
     GENERATOR_NUMS_EXTENDED,
 };
-/// An alias for [`AffinePoint`]
+
 pub type JubJubAffine = AffinePoint;
-/// An alias for [`ExtendedPoint`]
+
 pub type JubJubExtended = ExtendedPoint;
-/// An alias for [`Fr`].
+
 pub type JubJubScalar = Fr;
 pub use coset_bls12_381::BlsScalar;
 pub use coset_bls12_381::BlsScalar as Fq;
-// end
+
 
 #[macro_use]
 mod util;
@@ -83,12 +83,12 @@ mod util;
 mod fr;
 pub use fr::Fr;
 
-/// Represents an element of the base field $\mathbb{F}_q$ of the Jubjub
-/// elliptic curve construction.
+
+
 pub type Base = Fq;
 
-/// Represents an element of the scalar field $\mathbb{F}_r$ of the Jubjub
-/// elliptic curve construction.
+
+
 pub type Scalar = Fr;
 
 const FR_MODULUS_BYTES: [u8; 32] = [
@@ -96,8 +96,8 @@ const FR_MODULUS_BYTES: [u8; 32] = [
     0, 59, 52, 1, 1, 59, 103, 6, 169, 175, 51, 101, 234, 180, 125, 14,
 ];
 
-/// This represents a Jubjub point in the affine `(u, v)`
-/// coordinates.
+
+
 #[derive(Clone, Copy, Debug, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -118,8 +118,8 @@ impl fmt::Display for AffinePoint {
 impl Neg for AffinePoint {
     type Output = AffinePoint;
 
-    /// This computes the negation of a point `P = (u, v)`
-    /// as `-P = (-u, v)`.
+
+
     #[inline]
     fn neg(self) -> AffinePoint {
         AffinePoint {
@@ -150,17 +150,17 @@ impl ConditionallySelectable for AffinePoint {
     }
 }
 
-/// This represents an extended point `(U, V, Z, T1, T2)`
-/// with `Z` nonzero, corresponding to the affine point
-/// `(U/Z, V/Z)`. We always have `T1 * T2 = UV/Z`.
+
+
+
 ///
-/// You can do the following things with a point in this
-/// form:
+
+
 ///
-/// * Convert it into a point in the affine form.
-/// * Add it to an `ExtendedPoint`, `AffineNielsPoint` or `ExtendedNielsPoint`.
-/// * Double it using `double()`.
-/// * Compare it with another extended point using `PartialEq` or `ct_eq()`.
+
+
+
+
 #[derive(Clone, Copy, Debug, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -183,10 +183,10 @@ impl fmt::Display for ExtendedPoint {
 
 impl ConstantTimeEq for ExtendedPoint {
     fn ct_eq(&self, other: &Self) -> Choice {
-        // (u/z, v/z) = (u'/z', v'/z') is implied by
-        //      (uz'z = u'z'z) and
-        //      (vz'z = v'z'z)
-        // as z and z' are always nonzero.
+
+
+
+
 
         (self.u * other.z).ct_eq(&(other.u * self.z))
             & (self.v * other.z).ct_eq(&(other.v * self.z))
@@ -226,9 +226,9 @@ where
 impl Neg for ExtendedPoint {
     type Output = ExtendedPoint;
 
-    /// Computes the negation of a point `P = (U, V, Z, T)`
-    /// as `-P = (-U, V, Z, -T1, T2)`. The choice of `T1`
-    /// is made without loss of generality.
+
+
+
     #[inline]
     fn neg(self) -> ExtendedPoint {
         ExtendedPoint {
@@ -242,8 +242,8 @@ impl Neg for ExtendedPoint {
 }
 
 impl From<AffinePoint> for ExtendedPoint {
-    /// Constructs an extended point (with `Z = 1`) from
-    /// an affine point using the map `(u, v) => (u, v, 1, u, v)`.
+
+
     fn from(affine: AffinePoint) -> ExtendedPoint {
         ExtendedPoint {
             u: affine.u,
@@ -256,14 +256,14 @@ impl From<AffinePoint> for ExtendedPoint {
 }
 
 impl<'a> From<&'a ExtendedPoint> for AffinePoint {
-    /// Constructs an affine point from an extended point
-    /// using the map `(U, V, Z, T1, T2) => (U/Z, V/Z)`
-    /// as Z is always nonzero. **This requires a field inversion
-    /// and so it is recommended to perform these in a batch
-    /// using [`batch_normalize`](crate::batch_normalize) instead.**
+
+
+
+
+
     fn from(extended: &'a ExtendedPoint) -> AffinePoint {
-        // Z coordinate is always nonzero, so this is
-        // its inverse.
+
+
         let zinv = extended.z.invert().unwrap();
 
         AffinePoint {
@@ -279,9 +279,9 @@ impl From<ExtendedPoint> for AffinePoint {
     }
 }
 
-/// This is a pre-processed version of an affine point `(u, v)`
-/// in the form `(v + u, v - u, u * v * 2d)`. This can be added to an
-/// [`ExtendedPoint`](crate::ExtendedPoint).
+
+
+
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -295,7 +295,7 @@ pub struct AffineNielsPoint {
 }
 
 impl AffineNielsPoint {
-    /// Constructs this point from the neutral element `(0, 1)`.
+
     pub const fn identity() -> Self {
         AffineNielsPoint {
             v_plus_u: Fq::one(),
@@ -310,12 +310,12 @@ impl AffineNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-        // This is a simple double-and-add implementation of point
-        // multiplication, moving from most significant to least
-        // significant bit of the scalar.
+
+
+
         //
-        // We skip the leading four bits because they're always
-        // unset for Fr.
+
+
         for bit in by
             .as_bits::<Lsb0>()
             .iter()
@@ -331,8 +331,8 @@ impl AffineNielsPoint {
         accumulated_point
     }
 
-    /// Multiplies this point by the specific little-endian bit pattern in the
-    /// given byte array, ignoring the highest four bits.
+
+
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
     }
@@ -362,8 +362,8 @@ impl ConditionallySelectable for AffineNielsPoint {
     }
 }
 
-/// This is a pre-processed version of an extended point `(U, V, Z, T1, T2)`
-/// in the form `(V + U, V - U, Z, T1 * T2 * 2d)`.
+
+
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -393,7 +393,7 @@ impl ConditionallySelectable for ExtendedNielsPoint {
 }
 
 impl ExtendedNielsPoint {
-    /// Constructs this point from the neutral element `(0, 1)`.
+
     pub const fn identity() -> Self {
         ExtendedNielsPoint {
             v_plus_u: Fq::one(),
@@ -409,12 +409,12 @@ impl ExtendedNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-        // This is a simple double-and-add implementation of point
-        // multiplication, moving from most significant to least
-        // significant bit of the scalar.
+
+
+
         //
-        // We skip the leading four bits because they're always
-        // unset for Fr.
+
+
         for bit in by
             .iter()
             .rev()
@@ -431,8 +431,8 @@ impl ExtendedNielsPoint {
         accumulated_point
     }
 
-    /// Multiplies this point by the specific little-endian bit pattern in the
-    /// given byte array, ignoring the highest four bits.
+
+
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
     }
@@ -448,7 +448,7 @@ impl<'a, 'b> Mul<&'b Fr> for &'a ExtendedNielsPoint {
 
 impl_binops_multiplicative_mixed!(ExtendedNielsPoint, Fr, ExtendedPoint);
 
-/// `d = -(10240/10241)`
+
 pub const EDWARDS_D: Fq = Fq::from_raw([
     0x0106_5fd6_d634_3eb1,
     0x292d_7f6d_3757_9d26,
@@ -456,7 +456,7 @@ pub const EDWARDS_D: Fq = Fq::from_raw([
     0x2a93_18e7_4bfa_2b48,
 ]);
 
-// `2*d`
+
 const EDWARDS_D2: Fq = Fq::from_raw([
     0x020c_bfad_ac68_7d62,
     0x525a_feda_6eaf_3a4c,
@@ -465,7 +465,7 @@ const EDWARDS_D2: Fq = Fq::from_raw([
 ]);
 
 impl AffinePoint {
-    /// Constructs the neutral element `(0, 1)`.
+
     pub const fn identity() -> Self {
         AffinePoint {
             u: Fq::zero(),
@@ -473,72 +473,72 @@ impl AffinePoint {
         }
     }
 
-    /// Determines if this point is the identity.
+
     pub fn is_identity(&self) -> Choice {
         ExtendedPoint::from(*self).is_identity()
     }
 
-    /// Multiplies this point by the cofactor, producing an
-    /// `ExtendedPoint`
+
+
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         ExtendedPoint::from(*self).mul_by_cofactor()
     }
 
-    /// Determines if this point is of small order.
+
     pub fn is_small_order(&self) -> Choice {
         ExtendedPoint::from(*self).is_small_order()
     }
 
-    /// Determines if this point is torsion free and so is
-    /// in the prime order subgroup.
+
+
     pub fn is_torsion_free(&self) -> Choice {
         ExtendedPoint::from(*self).is_torsion_free()
     }
 
-    /// Determines if this point is prime order, or in other words that
-    /// the smallest scalar multiplied by this point that produces the
-    /// identity is `r`. This is equivalent to checking that the point
-    /// is both torsion free and not the identity.
+
+
+
+
     pub fn is_prime_order(&self) -> Choice {
         let extended = ExtendedPoint::from(*self);
         extended.is_torsion_free() & (!extended.is_identity())
     }
 
-    /// Converts this element into its byte representation.
+
     pub fn to_bytes(&self) -> [u8; 32] {
         let mut encoded_bytes = self.v.to_bytes();
         let u_bytes = self.u.to_bytes();
 
-        // Encode the sign of the u-coordinate in the most
-        // significant bit.
+
+
         encoded_bytes[31] |= u_bytes[0] << 7;
 
         encoded_bytes
     }
 
-    /// Attempts to interpret a byte representation of an
-    /// affine point, failing if the element is not on
-    /// the curve or non-canonical.
+
+
+
     pub fn from_bytes(b: [u8; 32]) -> CtOption<Self> {
         Self::from_bytes_inner(b, 1.into())
     }
 
-    /// Attempts to interpret a byte representation of an affine point, failing
-    /// if the element is not on the curve.
+
+
     ///
-    /// Most non-canonical encodings will also cause a failure. However, this
-    /// API preserves (for use in consensus-critical protocols) a bug in the
-    /// parsing code that caused two non-canonical encodings to be
-    /// **silently** accepted:
+
+
+
+
     ///
-    /// - (0, 1), which is the identity;
-    /// - (0, -1), which is a point of order two.
+
+
     ///
-    /// Each of these has a single non-canonical encoding in which the value of
-    /// the sign bit is 1.
+
+
     ///
-    /// See [ZIP 216](https://zips.z.cash/zip-0216) for a more detailed description of the
-    /// bug, as well as its fix.
+
+
     pub fn from_bytes_pre_zip216_compatibility(b: [u8; 32]) -> CtOption<Self> {
         Self::from_bytes_inner(b, 0.into())
     }
@@ -547,24 +547,24 @@ impl AffinePoint {
         mut b: [u8; 32],
         zip_216_enabled: Choice,
     ) -> CtOption<Self> {
-        // Grab the sign bit from the representation
+
         let sign = b[31] >> 7;
 
-        // Mask away the sign bit
+
         b[31] &= 0b0111_1111;
 
-        // Interpret what remains as the v-coordinate
+
         Fq::from_bytes(&b).and_then(|v| {
-            // -u^2 + v^2 = 1 + d.u^2.v^2
-            // -u^2 = 1 + d.u^2.v^2 - v^2    (rearrange)
-            // -u^2 - d.u^2.v^2 = 1 - v^2    (rearrange)
-            // u^2 + d.u^2.v^2 = v^2 - 1     (flip signs)
-            // u^2 (1 + d.v^2) = v^2 - 1     (factor)
-            // u^2 = (v^2 - 1) / (1 + d.v^2) (isolate u^2)
-            // We know that (1 + d.v^2) is nonzero for all v:
-            //   (1 + d.v^2) = 0
-            //   d.v^2 = -1
-            //   v^2 = -(1 / d)   No solutions, as -(1 / d) is not a square
+
+
+
+
+
+
+
+
+
+
 
             let v2 = v.square();
 
@@ -572,17 +572,17 @@ impl AffinePoint {
                 * ((Fq::one() + EDWARDS_D * v2).invert().unwrap_or(Fq::zero())))
             .sqrt()
             .and_then(|u| {
-                // Fix the sign of `u` if necessary
+
                 let flip_sign = Choice::from((u.to_bytes()[0] ^ sign) & 1);
                 let u_negated = -u;
                 let final_u = Fq::conditional_select(&u, &u_negated, flip_sign);
 
-                // If u == 0, flip_sign == sign_bit. We therefore want to reject
-                // the encoding as non-canonical if all of the
-                // following occur:
-                // - ZIP 216 is enabled
-                // - u == 0
-                // - flip_sign == true
+
+
+
+
+
+
                 let u_is_zero = u.ct_eq(&Fq::zero());
                 CtOption::new(
                     AffinePoint { u: final_u, v },
@@ -592,10 +592,10 @@ impl AffinePoint {
         })
     }
 
-    /// Attempts to interpret a batch of byte representations of affine points.
+
     ///
-    /// Returns None for each element if it is not on the curve, or is
-    /// non-canonical according to ZIP 216.
+
+
     #[cfg(feature = "alloc")]
     pub fn batch_from_bytes(
         items: impl Iterator<Item = [u8; 32]>,
@@ -631,25 +631,25 @@ impl AffinePoint {
 
         let items: Vec<_> = items
             .map(|mut b| {
-                // Grab the sign bit from the representation
+
                 let sign = b[31] >> 7;
 
-                // Mask away the sign bit
+
                 b[31] &= 0b0111_1111;
 
-                // Interpret what remains as the v-coordinate
+
                 Fq::from_bytes(&b).map(|v| {
-                    // -u^2 + v^2 = 1 + d.u^2.v^2
-                    // -u^2 = 1 + d.u^2.v^2 - v^2    (rearrange)
-                    // -u^2 - d.u^2.v^2 = 1 - v^2    (rearrange)
-                    // u^2 + d.u^2.v^2 = v^2 - 1     (flip signs)
-                    // u^2 (1 + d.v^2) = v^2 - 1     (factor)
-                    // u^2 = (v^2 - 1) / (1 + d.v^2) (isolate u^2)
-                    // We know that (1 + d.v^2) is nonzero for all v:
-                    //   (1 + d.v^2) = 0
-                    //   d.v^2 = -1
-                    //   v^2 = -(1 / d)   No solutions, as -(1 / d) is not a
-                    // square
+
+
+
+
+
+
+
+
+
+
+
 
                     let v2 = v.square();
 
@@ -678,7 +678,7 @@ impl AffinePoint {
                          v, sign, numerator, ..
                      }| {
                         (numerator * inv_denominator).sqrt().and_then(|u| {
-                            // Fix the sign of `u` if necessary
+
                             let flip_sign =
                                 Choice::from((u.to_bytes()[0] ^ sign) & 1);
                             let u_negated = -u;
@@ -686,12 +686,12 @@ impl AffinePoint {
                                 &u, &u_negated, flip_sign,
                             );
 
-                            // If u == 0, flip_sign == sign_bit. We therefore
-                            // want to reject the
-                            // encoding as non-canonical if all of the following
-                            // occur:
-                            // - u == 0
-                            // - flip_sign == true
+
+
+
+
+
+
                             let u_is_zero = u.ct_eq(&Fq::zero());
                             CtOption::new(
                                 AffinePoint { u: final_u, v },
@@ -704,17 +704,17 @@ impl AffinePoint {
             .collect()
     }
 
-    /// Returns the `u`-coordinate of this point.
+
     pub fn get_u(&self) -> Fq {
         self.u
     }
 
-    /// Returns the `v`-coordinate of this point.
+
     pub fn get_v(&self) -> Fq {
         self.v
     }
 
-    /// Returns an `ExtendedPoint` for use in arithmetic operations.
+
     pub const fn to_extended(&self) -> ExtendedPoint {
         ExtendedPoint {
             u: self.u,
@@ -725,8 +725,8 @@ impl AffinePoint {
         }
     }
 
-    /// Performs a pre-processing step that produces an `AffineNielsPoint`
-    /// for use in multiple additions.
+
+
     pub const fn to_niels(&self) -> AffineNielsPoint {
         AffineNielsPoint {
             v_plus_u: Fq::add(&self.v, &self.u),
@@ -735,15 +735,15 @@ impl AffinePoint {
         }
     }
 
-    /// Constructs an AffinePoint given `u` and `v` without checking
-    /// that the point is on the curve.
+
+
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> AffinePoint {
         AffinePoint { u, v }
     }
 
-    /// This is only for debugging purposes and not
-    /// exposed in the public API. Checks that this
-    /// point is on the curve.
+
+
+
     #[cfg(test)]
     fn is_on_curve_vartime(&self) -> bool {
         let u2 = self.u.square();
@@ -754,7 +754,7 @@ impl AffinePoint {
 }
 
 impl ExtendedPoint {
-    /// Constructs an extended point from the neutral element `(0, 1)`.
+
     pub const fn identity() -> Self {
         ExtendedPoint {
             u: Fq::zero(),
@@ -765,44 +765,44 @@ impl ExtendedPoint {
         }
     }
 
-    /// Determines if this point is the identity.
+
     pub fn is_identity(&self) -> Choice {
-        // If this point is the identity, then
-        //     u = 0 * z = 0
-        // and v = 1 * z = z
+
+
+
         self.u.ct_eq(&Fq::zero()) & self.v.ct_eq(&self.z)
     }
 
-    /// Determines if this point is of small order.
+
     pub fn is_small_order(&self) -> Choice {
-        // We only need to perform two doublings, since the 2-torsion
-        // points are (0, 1) and (0, -1), and so we only need to check
-        // that the u-coordinate of the result is zero to see if the
-        // point is small order.
+
+
+
+
         self.double().double().u.ct_eq(&Fq::zero())
     }
 
-    /// Determines if this point is torsion free and so is contained
-    /// in the prime order subgroup.
+
+
     pub fn is_torsion_free(&self) -> Choice {
         self.multiply(&FR_MODULUS_BYTES).is_identity()
     }
 
-    /// Determines if this point is prime order, or in other words that
-    /// the smallest scalar multiplied by this point that produces the
-    /// identity is `r`. This is equivalent to checking that the point
-    /// is both torsion free and not the identity.
+
+
+
+
     pub fn is_prime_order(&self) -> Choice {
         self.is_torsion_free() & (!self.is_identity())
     }
 
-    /// Multiplies this element by the cofactor `8`.
+
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         self.double().double().double()
     }
 
-    /// Performs a pre-processing step that produces an `ExtendedNielsPoint`
-    /// for use in multiple additions.
+
+
     pub fn to_niels(&self) -> ExtendedNielsPoint {
         ExtendedNielsPoint {
             v_plus_u: self.v + self.u,
@@ -812,80 +812,80 @@ impl ExtendedPoint {
         }
     }
 
-    /// Computes the doubling of a point more efficiently than a point can
-    /// be added to itself.
+
+
     pub fn double(&self) -> ExtendedPoint {
-        // Doubling is more efficient (three multiplications, four squarings)
-        // when we work within the projective coordinate space (U:Z, V:Z). We
-        // rely on the most efficient formula, "dbl-2008-bbjlp", as described
-        // in Section 6 of "Twisted Edwards Curves" by Bernstein et al.
+
+
+
+
         //
-        // See <https://hyperelliptic.org/EFD/g1p/auto-twisted-projective.html#doubling-dbl-2008-bbjlp>
-        // for more information.
+
+
         //
-        // We differ from the literature in that we use (u, v) rather than
-        // (x, y) coordinates. We also have the constant `a = -1` implied. Let
-        // us rewrite the procedure of doubling (u, v, z) to produce (U, V, Z)
-        // as follows:
+
+
+
+
         //
-        // B = (u + v)^2
-        // C = u^2
-        // D = v^2
-        // F = D - C
-        // H = 2 * z^2
-        // J = F - H
-        // U = (B - C - D) * J
-        // V = F * (- C - D)
-        // Z = F * J
+
+
+
+
+
+
+
+
+
         //
-        // If we compute K = D + C, we can rewrite this:
+
         //
-        // B = (u + v)^2
-        // C = u^2
-        // D = v^2
-        // F = D - C
-        // K = D + C
-        // H = 2 * z^2
-        // J = F - H
-        // U = (B - K) * J
-        // V = F * (-K)
-        // Z = F * J
+
+
+
+
+
+
+
+
+
+
         //
-        // In order to avoid the unnecessary negation of K,
-        // we will negate J, transforming the result into
-        // an equivalent point with a negated z-coordinate.
+
+
+
         //
-        // B = (u + v)^2
-        // C = u^2
-        // D = v^2
-        // F = D - C
-        // K = D + C
-        // H = 2 * z^2
-        // J = H - F
-        // U = (B - K) * J
-        // V = F * K
-        // Z = F * J
+
+
+
+
+
+
+
+
+
+
         //
-        // Let us rename some variables to simplify:
+
         //
-        // UV2 = (u + v)^2
-        // UU = u^2
-        // VV = v^2
-        // VVmUU = VV - UU
-        // VVpUU = VV + UU
-        // ZZ2 = 2 * z^2
-        // J = ZZ2 - VVmUU
-        // U = (UV2 - VVpUU) * J
-        // V = VVmUU * VVpUU
-        // Z = VVmUU * J
+
+
+
+
+
+
+
+
+
+
         //
-        // We wish to obtain two factors of T = UV/Z.
+
         //
-        // UV/Z = (UV2 - VVpUU) * (ZZ2 - VVmUU) * VVmUU * VVpUU / VVmUU / (ZZ2 -
-        // VVmUU)      = (UV2 - VVpUU) * VVmUU * VVpUU / VVmUU
-        //      = (UV2 - VVpUU) * VVpUU
+
+
+
         //
-        // and so we have that T1 = (UV2 - VVpUU) and T2 = VVpUU.
+
 
         let u_squared = self.u.square();
         let v_squared = self.v.square();
@@ -894,8 +894,8 @@ impl ExtendedPoint {
         let v_plus_u_squared = v_squared + u_squared;
         let v_minus_u_squared = v_squared - u_squared;
 
-        // The remaining arithmetic is exactly the process of converting
-        // from a completed point to an extended point.
+
+
         CompletedPoint {
             u: uv2 - v_plus_u_squared,
             v: v_plus_u_squared,
@@ -910,19 +910,19 @@ impl ExtendedPoint {
         self.to_niels().multiply(by)
     }
 
-    /// Converts a batch of projective elements into affine elements.
+
     ///
-    /// This function will panic if `p.len() != q.len()`.
+
     ///
-    /// This costs 5 multiplications per element, and a field inversion.
+
     fn batch_normalize(projective_points: &[Self], affine_points: &mut [AffinePoint]) {
         assert_eq!(projective_points.len(), affine_points.len());
 
         for (projective_point, affine_point) in
             projective_points.iter().zip(affine_points.iter_mut())
         {
-            // We use the `u` field of `AffinePoint` to store the z-coordinate
-            // being inverted, and the `v` field for scratch space.
+
+
             affine_point.u = projective_point.z;
         }
 
@@ -939,15 +939,15 @@ impl ExtendedPoint {
         {
             let z_inverse = affine_point.u;
 
-            // Set the coordinates to the correct value
-            affine_point.u = projective_point.u * z_inverse; // Multiply by 1/z
-            affine_point.v = projective_point.v * z_inverse; // Multiply by 1/z
+
+            affine_point.u = projective_point.u * z_inverse;
+            affine_point.v = projective_point.v * z_inverse;
         }
     }
 
-    /// This is only for debugging purposes and not
-    /// exposed in the public API. Checks that this
-    /// point is on the curve.
+
+
+
     #[cfg(test)]
     fn is_on_curve_vartime(&self) -> bool {
         let affine = AffinePoint::from(*self);
@@ -973,30 +973,30 @@ impl<'a, 'b> Add<&'b ExtendedNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b ExtendedNielsPoint) -> ExtendedPoint {
-        // We perform addition in the extended coordinates. Here we use
-        // a formula presented by Hisil, Wong, Carter and Dawson in
-        // "Twisted Edward Curves Revisited" which only requires 8M.
+
+
+
         //
-        // A = (V1 - U1) * (V2 - U2)
-        // B = (V1 + U1) * (V2 + U2)
-        // C = 2d * T1 * T2
-        // D = 2 * Z1 * Z2
-        // E = B - A
-        // F = D - C
-        // G = D + C
-        // H = B + A
-        // U3 = E * F
-        // Y3 = G * H
-        // Z3 = F * G
-        // T3 = E * H
+
+
+
+
+
+
+
+
+
+
+
+
 
         let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
         let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
         let t_term = self.t1 * self.t2 * other.t2d;
         let z_term = (self.z * other.z).double();
 
-        // The remaining arithmetic is exactly the process of converting
-        // from a completed point to an extended point.
+
+
         CompletedPoint {
             u: v_plus_u_term - v_minus_u_term,
             v: v_plus_u_term + v_minus_u_term,
@@ -1034,17 +1034,17 @@ impl<'a, 'b> Add<&'b AffineNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b AffineNielsPoint) -> ExtendedPoint {
-        // This is identical to the addition formula for `ExtendedNielsPoint`,
-        // except we can assume that `other.z` is one, so that we perform
-        // 7 multiplications.
+
+
+
 
         let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
         let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
         let t_term = self.t1 * self.t2 * other.t2d;
         let z_term = self.z.double();
 
-        // The remaining arithmetic is exactly the process of converting
-        // from a completed point to an extended point.
+
+
         CompletedPoint {
             u: v_plus_u_term - v_minus_u_term,
             v: v_plus_u_term + v_minus_u_term,
@@ -1117,10 +1117,10 @@ impl<'a, 'b> Sub<&'b AffinePoint> for &'a ExtendedPoint {
 
 impl_binops_additive!(ExtendedPoint, AffinePoint);
 
-/// This is a "completed" point produced during a point doubling or
-/// addition routine. These points exist in the `(U:Z, V:T)` model
-/// of the curve. This is not exposed in the API because it is
-/// an implementation detail.
+
+
+
+
 struct CompletedPoint {
     u: Fq,
     v: Fq,
@@ -1129,13 +1129,13 @@ struct CompletedPoint {
 }
 
 impl CompletedPoint {
-    /// This converts a completed point into an extended point by
-    /// homogenizing:
+
+
     ///
-    /// (u/z, v/t) = (u/z * t/t, v/t * z/z) = (ut/zt, vz/zt)
+
     ///
-    /// The resulting T coordinate is utvz/zt = uv, and so
-    /// T1 = u, T2 = v, without loss of generality.
+
+
     #[inline]
     fn into_extended(self) -> ExtendedPoint {
         ExtendedPoint {
@@ -1149,30 +1149,30 @@ impl CompletedPoint {
 }
 
 impl Default for AffinePoint {
-    /// Returns the identity.
+
     fn default() -> AffinePoint {
         AffinePoint::identity()
     }
 }
 
 impl Default for ExtendedPoint {
-    /// Returns the identity.
+
     fn default() -> ExtendedPoint {
         ExtendedPoint::identity()
     }
 }
 
-/// This takes a mutable slice of `ExtendedPoint`s and "normalizes" them using
-/// only a single inversion for the entire batch. This normalization results in
-/// all of the points having a Z-coordinate of one. Further, an iterator is
-/// returned which can be used to obtain `AffinePoint`s for each element in the
-/// slice.
+
+
+
+
+
 ///
-/// This costs 5 multiplications per element, and a field inversion.
+
 pub fn batch_normalize(
     points: &mut [ExtendedPoint],
 ) -> impl Iterator<Item = AffinePoint> + '_ {
-    // We use the `t1` field of `ExtendedPoint` for scratch space.
+
     BatchInverter::invert_with_internal_scratch(
         points,
         |point| &mut point.z,
@@ -1183,19 +1183,19 @@ pub fn batch_normalize(
         let mut normalized_point = *point;
         let z_inverse = normalized_point.z;
 
-        // Set the coordinates to the correct value
-        normalized_point.u *= &z_inverse; // Multiply by 1/z
-        normalized_point.v *= &z_inverse; // Multiply by 1/z
-        normalized_point.z = Fq::one(); // z-coordinate is now one
+
+        normalized_point.u *= &z_inverse;
+        normalized_point.v *= &z_inverse;
+        normalized_point.z = Fq::one();
         normalized_point.t1 = normalized_point.u;
         normalized_point.t2 = normalized_point.v;
 
         *point = normalized_point;
     }
 
-    // All extended points are now normalized, but the type
-    // doesn't encode this fact. Let us offer affine points
-    // to the caller.
+
+
+
 
     points
         .iter()
@@ -1215,8 +1215,8 @@ impl<'a, 'b> Mul<&'b Fr> for &'a AffinePoint {
 
 impl_binops_multiplicative_mixed!(AffinePoint, Fr, ExtendedPoint);
 
-/// This represents a point in the prime-order subgroup of Jubjub, in extended
-/// coordinates.
+
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -1250,14 +1250,14 @@ impl ConditionallySelectable for SubgroupPoint {
 }
 
 impl SubgroupPoint {
-    /// Constructs an AffinePoint given `u` and `v` without checking that the
-    /// point is on the curve or in the prime-order subgroup.
+
+
     ///
-    /// This should only be used for hard-coding constants (e.g. fixed
-    /// generators); in all other cases, use [`SubgroupPoint::from_bytes`]
-    /// instead.
+
+
+
     ///
-    /// [`SubgroupPoint::from_bytes`]: SubgroupPoint#impl-GroupEncoding
+
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> Self {
         SubgroupPoint(AffinePoint::from_raw_unchecked(u, v).to_extended())
     }
@@ -1351,7 +1351,7 @@ impl Group for ExtendedPoint {
             let random_v = Fq::random(&mut rng);
             let flip_sign = rng.next_u32() % 2 != 0;
 
-            // See AffinePoint::from_bytes for details.
+
             let v_squared = random_v.square();
             let candidate_point = ((v_squared - Fq::one())
                 * ((Fq::one() + EDWARDS_D * v_squared)
@@ -1385,7 +1385,6 @@ impl Group for ExtendedPoint {
         self.is_identity()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }
@@ -1417,7 +1416,6 @@ impl Group for SubgroupPoint {
         self.0.is_identity()
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         SubgroupPoint(self.0.double())
     }
@@ -1426,7 +1424,7 @@ impl Group for SubgroupPoint {
 #[cfg(feature = "alloc")]
 impl WnafGroup for ExtendedPoint {
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize {
-        // Copied from bls12_381::g1, should be updated.
+
         const RECOMMENDATIONS: [usize; 12] =
             [1, 3, 7, 20, 43, 120, 273, 563, 1630, 3128, 7933, 62569];
 
@@ -1486,8 +1484,8 @@ impl CofactorCurveAffine for AffinePoint {
     }
 
     fn generator() -> Self {
-        // The point with the lowest positive v-coordinate and positive
-        // u-coordinate.
+
+
         AffinePoint {
             u: Fq::from_raw([
                 0xe4b3_d35d_f1a7_adfe,
@@ -1521,7 +1519,7 @@ impl GroupEncoding for ExtendedPoint {
     }
 
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
-        // We can't avoid curve checks when parsing a compressed encoding.
+
         AffinePoint::from_bytes(*bytes).map(Self::from)
     }
 
@@ -1908,7 +1906,7 @@ fn test_mul_consistency() {
         (point * left_scalar) * right_scalar
     );
 
-    // Test Mul implemented on ExtendedNielsPoint
+
     assert_eq!(
         point * product_scalar,
         (point.to_niels() * left_scalar) * right_scalar
@@ -1922,7 +1920,7 @@ fn test_mul_consistency() {
         (point.to_niels() * left_scalar) * right_scalar
     );
 
-    // Test Mul implemented on AffineNielsPoint
+
     let point_affine_niels = AffinePoint::from(point).to_niels();
     assert_eq!(
         point * product_scalar,
@@ -2048,13 +2046,13 @@ fn test_serialization_consistency() {
 #[test]
 fn test_zip_216() {
     const NON_CANONICAL_ENCODINGS: [[u8; 32]; 2] = [
-        // (0, 1) with sign bit set to 1.
+
         [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
         ],
-        // (0, -1) with sign bit set to 1.
+
         [
             0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe,
             0xff, 0x02, 0xa4, 0xbd, 0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8,
@@ -2066,13 +2064,13 @@ fn test_zip_216() {
         {
             let mut canonicalized_encoding = *non_canonical_encoding;
 
-            // The normal API should reject the non-canonical encoding.
+
             assert!(bool::from(
                 AffinePoint::from_bytes(canonicalized_encoding).is_none()
             ));
 
-            // If we clear the sign bit of the non-canonical encoding, it should
-            // be accepted by the normal API.
+
+
             canonicalized_encoding[31] &= 0b0111_1111;
             assert!(bool::from(
                 AffinePoint::from_bytes(canonicalized_encoding).is_some()
@@ -2080,9 +2078,9 @@ fn test_zip_216() {
         }
 
         {
-            // The bug-preserving API should accept the non-canonical encoding,
-            // and the resulting point should serialize to a
-            // different (canonical) encoding.
+
+
+
             let parsed =
                 AffinePoint::from_bytes_pre_zip216_compatibility(
                     *non_canonical_encoding,
@@ -2091,8 +2089,8 @@ fn test_zip_216() {
             let mut encoded = parsed.to_bytes();
             assert_ne!(non_canonical_encoding, &encoded);
 
-            // If we set the sign bit of the serialized encoding, it should
-            // match the non-canonical encoding.
+
+
             encoded[31] |= 0b1000_0000;
             assert_eq!(non_canonical_encoding, &encoded);
         }

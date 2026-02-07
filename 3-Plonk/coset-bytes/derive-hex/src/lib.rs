@@ -58,7 +58,7 @@ pub fn derive_hex_debug(item: TokenStream) -> TokenStream {
             #[allow(deprecated)]
             if f.flags() & (1 << debug_upper_hex_flag_index) !=0 {
                 core::fmt::UpperHex::fmt(self, f)
-            } else { // LowerHex is always the default for debug
+            } else {
                 core::fmt::LowerHex::fmt(self, f)
             }
         }

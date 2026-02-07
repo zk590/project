@@ -8,67 +8,67 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize, Serialize};
 
-/// Tuple for assymetric encryption using ElGamal algorithm.
+
 ///
-/// ## Example
+
 ///
-/// ```ignore
-/// use coset_jubjub::elgamal::ElgamalCipher;
-/// use coset_jubjub::{JubJubScalar, GENERATOR_EXTENDED};
+
+
+
 ///
-/// fn main() {
-///     // Bob's (sender) secret and message
-///     let bob_secret = JubJubScalar::random(&mut rand::thread_rng());
-///     let message = JubJubScalar::random(&mut rand::thread_rng());
-///     let message = GENERATOR_EXTENDED * message;
+
+
+
+
+
 ///
-///     // Alice's (receiver) secret and public
-///     let alice_secret = JubJubScalar::random(&mut rand::thread_rng());
-///     let alice_public = GENERATOR_EXTENDED * alice_secret;
+
+
+
 ///
-///     let cipher = ElgamalCipher::encrypt(
-///         &bob_secret,
-///         &alice_public,
-///         &GENERATOR_EXTENDED,
-///         &message,
+
+
+
+
+
 ///     );
-///     let decrypt = cipher.decrypt(&alice_secret);
+
 ///
-///     assert_eq!(message, decrypt);
+
 /// }
 /// ```
 ///
-/// 1. Let `p` and `G = α` be defined by the parameters of JubJub.
-/// 2. Let `a` be Alice's secret, and `A = G · a`
-/// 3. Let `b` be Bob's secret, and `B = G · b`
+
+
+
 ///
-/// #### Encryption
-/// Bob should do the following:
+
+
 ///
-/// 1. Obtain Alice’s authentic public key `A`.
-/// 2. Represent the message `M` as a point of JubJub defined such as `M = G ·m`
-/// where `m` is a scalar in `JubJubScalar`.
-/// 3. Compute `γ = G · b` and `δ = M + (A ·b)`.
-/// 4. Send the ciphertext `c = (γ; δ)` to Alice.
+
+
+
+
+
 ///
-/// #### Decryption
-/// To recover plaintext `M` from `c`, Alice should do the following:
+
+
 ///
-/// 1. Recover `M` by computing `δ - γ · a`.
+
 ///
-/// #### Homomorphism
-/// A function `f` is homomorphic when `f(a · b) = f(a) · f(b)`.
+
+
 ///
-/// This implementation extends the homomorphic property of ElGamal to addition,
-/// subtraction and multiplication.
+
+
 ///
-/// The addition and subtraction are homomorphic with other [`ElgamalCipher`]
-/// structures.
+
+
 ///
-/// The multiplication is homomorphic with [`JubJubScalar`] scalars.
+
 ///
-/// Being `E` the encrypt and `D` the decrypt functions, here follows an
-/// example: `D{E[x * (a + b)]} == D{x * [E(a) + E(b)]}`
+
+
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "rkyv-impl", derive(Archive, Serialize, Deserialize))]
 #[cfg_attr(feature = "rkyv-impl", archive_attr(derive(CheckBytes)))]
@@ -80,7 +80,7 @@ pub struct ElgamalCipher {
 impl Serializable<64> for ElgamalCipher {
     type Error = BytesError;
 
-    /// Serialize the cipher into bytes
+
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         let gamma: JubJubAffine = self.gamma.into();
         let gamma = gamma.to_bytes();
@@ -96,7 +96,7 @@ impl Serializable<64> for ElgamalCipher {
         bytes
     }
 
-    /// Deserialize from a [`ElgamalCipher::to_bytes`] construction
+
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let gamma = JubJubAffine::from_slice(&bytes[..32])?;
         let delta = JubJubAffine::from_slice(&bytes[32..])?;
@@ -106,24 +106,24 @@ impl Serializable<64> for ElgamalCipher {
 }
 
 impl ElgamalCipher {
-    /// [`ElgamalCipher`] constructor
+
     pub fn new(gamma: JubJubExtended, delta: JubJubExtended) -> Self {
         Self { gamma, delta }
     }
 
-    /// Getter for the gamma public key
+
     pub fn gamma(&self) -> &JubJubExtended {
         &self.gamma
     }
 
-    /// Getter for the delta ciphertext
+
     pub fn delta(&self) -> &JubJubExtended {
         &self.delta
     }
 
-    /// Uses assymetric encryption to return a cipher construction.
+
     ///
-    /// The decryption will expect the secret of `public`.
+
     pub fn encrypt(
         secret: &JubJubScalar,
         public: &JubJubExtended,
@@ -136,7 +136,7 @@ impl ElgamalCipher {
         Self::new(gamma, delta)
     }
 
-    /// Perform the decryption with the provided secret.
+
     pub fn decrypt(&self, secret: &JubJubScalar) -> JubJubExtended {
         self.delta - self.gamma * secret
     }

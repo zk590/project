@@ -17,19 +17,19 @@ pub use opening::*; //将 opening 模块中的所有公共项（pub）导出，�
 pub use tree::*; //将 tree 模块中的所有公共项（pub）导出，允许外部代码使用
 pub use walk::*; //将 walk 模块中的所有公共项（pub）导出，允许外部代码使用
 
-/// A type that can be produced by aggregating `A` instances of itself.
+
 /// 定义 Aggregate  trait，用于聚合 A 个 Self 类型的实例
 pub trait Aggregate<const A: usize> { 
-    /// The value used in place of an empty subtree.
+
     /// 定义 trait 关联常量 EMPTY_SUBTREE，用于表示空子树的默认值
     const EMPTY_SUBTREE: Self; 
 
-    /// Aggregate the given array of item references to return a single item.
+
     /// 定义 trait 方法 aggregate，用于聚合 A 个 Self 类型的实例
     fn aggregate(items: [&Self; A]) -> Self; 
 }
 
-// Implement aggregate for an item with empty data
+
 /// 实现 Aggregate  trait 为 () 类型，用于聚合 0 个实例
 impl<const A: usize> Aggregate<A> for () {
     const EMPTY_SUBTREE: Self = ();
@@ -59,12 +59,12 @@ where //开始定义泛型约束
     //获取数组的原始指针
     let array_ptr = array.as_ptr();
 
-    // SAFETY: this is safe since we initialized all the array elements prior to
-    // the read operation.
+
+
     unsafe { ptr::read(array_ptr.cast()) }
 }
 
-/// Returns the capacity of a node at a given depth in the tree.
+
 /// 说明返回树中给定深度的节点容量
 /// 输入参数：
 /// arity：树的基数，即每个节点的子节点数量，也就是分叉度
@@ -72,8 +72,8 @@ where //开始定义泛型约束
 /// 返回值：
 /// 返回树中给定深度的节点容量，即 arity 的 depth 次幂
 const fn capacity(arity: u64, depth: usize) -> u64 {
-    // (Down)casting to a `u32` should be ok, since height shouldn't ever become
-    // that large.
+
+
     #[allow(clippy::cast_possible_truncation)]
     u64::pow(arity, depth as u32)
 }

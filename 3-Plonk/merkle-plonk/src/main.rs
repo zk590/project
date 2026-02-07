@@ -43,7 +43,7 @@ impl Default for OpeningCircuit {
 }
 
 impl OpeningCircuit {
-    /// Create a new OpeningCircuit
+
     pub fn new(opening: Opening<(), { TREE_HEIGHT }>, leaf: Item<()>) -> Self {
         Self { opening, leaf }
     }
@@ -51,12 +51,12 @@ impl OpeningCircuit {
 
 impl Circuit for OpeningCircuit {
     fn circuit(&self, composer: &mut Composer) -> Result<(), Error> {
-        // append the leaf and opening gadget to the circuit
+
         let leaf = composer.append_witness(self.leaf.hash);
         let computed_root = opening_gadget(composer, &self.opening, leaf);
 
-        // append the public root as public input to the circuit
-        // and ensure it is equal to the computed root
+
+
         let constraint = Constraint::new()
             .left(-BlsScalar::one())
             .a(computed_root)

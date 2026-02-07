@@ -1,10 +1,10 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Debugger module
+
+
+//
+
+
+
 
 use std::env;
 use std::path::PathBuf;
@@ -18,7 +18,7 @@ use dusk_cdf::{
 use crate::composer::{Constraint, Selector, WiredWitness, Witness};
 use crate::runtime::RuntimeEvent;
 
-/// PLONK debugger
+
 #[derive(Debug, Clone)]
 pub(crate) struct Debugger {
     witnesses: Vec<(EncodableSource, Witness, BlsScalar)>,
@@ -26,12 +26,12 @@ pub(crate) struct Debugger {
 }
 
 impl Debugger {
-    /// Resolver the caller function
+
     fn resolve_caller() -> EncodableSource {
         let mut source = None;
 
         backtrace::trace(|frame| {
-            // Resolve this instruction pointer to a symbol name
+
             backtrace::resolve_frame(frame, |symbol| {
                 if symbol
                     .name()
@@ -101,7 +101,7 @@ impl Debugger {
                 let witnesses = WiredWitnesses {
                     a: constraint.witness(WiredWitness::A).index(),
                     b: constraint.witness(WiredWitness::B).index(),
-                    // TODO: change by 'c' in debugger crate
+
                     o: constraint.witness(WiredWitness::C).index(),
                     d: constraint.witness(WiredWitness::D).index(),
                 };
@@ -120,7 +120,7 @@ impl Debugger {
 
                 let wc = self
                     .witnesses
-                    // TODO: change by 'c' in debugger crate
+
                     .get(witnesses.o)
                     .map(|(_, _, v)| *v)
                     .unwrap_or_default();
@@ -131,7 +131,7 @@ impl Debugger {
                     .map(|(_, _, v)| *v)
                     .unwrap_or_default();
 
-                // TODO check arith, range, logic & ecc wires
+
                 let evaluation = qm * wa * wb
                     + ql * wa
                     + qr * wb
@@ -147,7 +147,7 @@ impl Debugger {
                     ql: ql.to_bytes().into(),
                     qr: qr.to_bytes().into(),
                     qo: qo.to_bytes().into(),
-                    // TODO: change by 'qf' in debugger crate
+
                     qd: qf.to_bytes().into(),
                     qc: qc.to_bytes().into(),
                     pi: pi.to_bytes().into(),

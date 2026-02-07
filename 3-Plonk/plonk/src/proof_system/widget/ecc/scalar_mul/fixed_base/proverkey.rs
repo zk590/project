@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -40,13 +40,13 @@ impl ProverKey {
         &self,
         index: usize,
         ecc_separation_challenge: &BlsScalar,
-        a_i: &BlsScalar,   // acc_x or curr_x
-        a_i_w: &BlsScalar, // shifted x
-        b_i: &BlsScalar,   // acc_y or curr_y
-        b_i_w: &BlsScalar, // shifted y
-        c_i: &BlsScalar,   // xy_alpha
-        d_i: &BlsScalar,   // accumulated_bit
-        d_i_w: &BlsScalar, // accumulated_bit_w
+        a_i: &BlsScalar,
+        a_i_w: &BlsScalar,
+        b_i: &BlsScalar,
+        b_i_w: &BlsScalar,
+        c_i: &BlsScalar,
+        d_i: &BlsScalar,
+        d_i_w: &BlsScalar,
     ) -> BlsScalar {
         let q_fixed_group_add_i = &self.q_fixed_group_add.1[index];
         let q_c_i = &self.q_c.1[index];
@@ -69,26 +69,26 @@ impl ProverKey {
         let accumulated_bit_w = d_i_w;
         let bit = extract_bit(accumulated_bit, accumulated_bit_w);
 
-        // Checks
+
         //
-        // Check bit consistency
+
         let bit_consistency = check_bit_consistency(bit);
 
-        // Derive y_alpha and x_alpha from bit
+
         let y_alpha =
             bit.square() * (y_beta - BlsScalar::one()) + BlsScalar::one();
         let x_alpha = bit * x_beta;
 
-        // xy_alpha consistency check
+
         let xy_consistency = ((bit * q_c_i) - xy_alpha) * kappa;
 
-        // x accumulator consistency check
+
         let shifted_acc_x = acc_x_w;
         let x_consistency_lhs = shifted_acc_x + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
         let x_consistency_rhs = (acc_x * y_alpha) + (acc_y * x_alpha);
         let x_acc_consistency = (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
 
-        // y accumulator consistency check
+
         let shifted_acc_y = acc_y_w;
         let y_consistency_lhs = shifted_acc_y - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
         let y_consistency_rhs = (acc_y * y_alpha) + (acc_x * x_alpha);
@@ -127,7 +127,7 @@ impl ProverKey {
         let accumulated_bit_w = evaluations.d_w_eval;
         let bit = extract_bit(&accumulated_bit, &accumulated_bit_w);
 
-        // Check bit consistency
+
         let bit_consistency = check_bit_consistency(bit);
 
         let y_alpha =
@@ -135,16 +135,16 @@ impl ProverKey {
 
         let x_alpha = x_beta_eval * bit;
 
-        // xy_alpha consistency check
+
         let xy_consistency = ((bit * evaluations.q_c_eval) - xy_alpha) * kappa;
 
-        // x accumulator consistency check
+
         let shifted_acc_x = acc_x_w;
         let x_consistency_lhs = shifted_acc_x + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
         let x_consistency_rhs = (x_alpha * acc_y) + (y_alpha * acc_x);
         let x_acc_consistency = (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
 
-        // y accumulator consistency check
+
         let shifted_acc_y = acc_y_w;
         let y_consistency_lhs = shifted_acc_y - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
         let y_consistency_rhs = (x_alpha * acc_x) + (y_alpha * acc_y);
@@ -160,11 +160,11 @@ impl ProverKey {
 }
 
 pub(crate) fn extract_bit(acc: &BlsScalar, acc_w: &BlsScalar) -> BlsScalar {
-    // acc_w - 2 * acc
+
     acc_w - acc - acc
 }
 
-// Ensures that the bit is either +1, -1 or 0
+
 pub(crate) fn check_bit_consistency(bit: BlsScalar) -> BlsScalar {
     let one = BlsScalar::one();
     bit * (bit - one) * (bit + one)

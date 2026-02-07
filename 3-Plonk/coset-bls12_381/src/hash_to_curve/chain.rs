@@ -1,6 +1,6 @@
-//! Addition chains for computing square roots.
-//! chain_pm3div4: input x, output x^((p-3)//4).
-//! chain_p2m9div16: input x, output x^((p**2 - 9) // 16).
+
+
+
 
 use core::ops::MulAssign;
 
@@ -15,44 +15,44 @@ macro_rules! square {
 }
 
 #[allow(clippy::cognitive_complexity)]
-/// addchain for 1000602388805416848354447456433976039139220704984751971333014534031007912622709466110671907282253916009473568139946
-/// Bos-Coster (win=4) : 458 links, 16 variables */
-/// Addition chain implementing exponentiation by (p - 3) // 4.
+
+
+
 pub fn chain_pm3div4(var0: &Fp) -> Fp {
     let mut var1 = var0.square();
-    //Self::sqr(var1, var0);                              /*    0 : 2 */
+
     let var9 = var1 * var0;
-    //Self::mul(&mut var9, var1, var0);                /*    1 : 3 */
+
     let var5 = var1.square();
-    //Self::sqr(&mut var5, var1);                         /*    2 : 4 */
+
     let var2 = var9 * var1;
-    //Self::mul(&mut var2, &var9, var1);               /*    3 : 5 */
+
     let var7 = var5 * var9;
-    //Self::mul(&mut var7, &var5, &var9);              /*    4 : 7 */
+
     let var10 = var2 * var5;
-    //Self::mul(&mut var10, &var2, &var5);             /*    5 : 9 */
+
     let var13 = var7 * var5;
-    //Self::mul(&mut var13, &var7, &var5);             /*    6 : 11 */
+
     let var4 = var10 * var5;
-    //Self::mul(&mut var4, &var10, &var5);             /*    7 : 13 */
+
     let var8 = var13 * var5;
-    //Self::mul(&mut var8, &var13, &var5);             /*    8 : 15 */
+
     let var15 = var4 * var5;
-    //Self::mul(&mut var15, &var4, &var5);             /*    9 : 17 */
+
     let var11 = var8 * var5;
-    //Self::mul(&mut var11, &var8, &var5);             /*   10 : 19 */
+
     let var3 = var15 * var5;
-    //Self::mul(&mut var3, &var15, &var5);             /*   11 : 21 */
+
     let var12 = var11 * var5;
-    //Self::mul(&mut var12, &var11, &var5);            /*   12 : 23 */
+
     var1 = var4.square();
-    //Self::sqr(var1, &var4);                             /*   13 : 26 */
+
     let var14 = var12 * var5;
-    //Self::mul(&mut var14, &var12, &var5);            /*   14 : 27 */
+
     let var6 = var1 * var9;
-    //Self::mul(&mut var6, var1, &var9);               /*   15 : 29 */
+
     let var5 = var1 * var2;
-    //Self::mul(&mut var5, var1, &var2);               /*   16 : 31 */
+
     //   17 : 106496
     square!(var1, 12);
     //   29 : 106513
@@ -322,44 +322,44 @@ pub fn chain_pm3div4(var0: &Fp) -> Fp {
 }
 
 #[allow(clippy::cognitive_complexity)]
-/// addchain for 1001205140483106588246484290269935788605945006208159541241399033561623546780709821462541004956387089373434649096260670658193992783731681621012512651314777238193313314641988297376025498093520728838658813979860931248214124593092835
-/// Bos-Coster (win=4) : 895 links, 17 variables
-/// Addition chain implementing exponentiation by (p**2 - 9) // 16.
+
+
+
 pub fn chain_p2m9div16(var0: &Fp2) -> Fp2 {
     let mut var1 = var0.square();
-    //Self::sqr(var1, var0);                              /*    0 : 2 */
+
     let var2 = var1 * var0;
-    //Self::mul(&mut var2, var1, var0);                /*    1 : 3 */
+
     let var15 = var2 * var1;
-    //Self::mul(&mut var15, &var2, var1);              /*    2 : 5 */
+
     let var3 = var15 * var1;
-    //Self::mul(&mut var3, &var15, var1);              /*    3 : 7 */
+
     let var14 = var3 * var1;
-    //Self::mul(&mut var14, &var3, var1);              /*    4 : 9 */
+
     let var13 = var14 * var1;
-    //Self::mul(&mut var13, &var14, var1);             /*    5 : 11 */
+
     let var5 = var13 * var1;
-    //Self::mul(&mut var5, &var13, var1);              /*    6 : 13 */
+
     let var10 = var5 * var1;
-    //Self::mul(&mut var10, &var5, var1);              /*    7 : 15 */
+
     let var9 = var10 * var1;
-    //Self::mul(&mut var9, &var10, var1);              /*    8 : 17 */
+
     let var16 = var9 * var1;
-    //Self::mul(&mut var16, &var9, var1);              /*    9 : 19 */
+
     let var4 = var16 * var1;
-    //Self::mul(&mut var4, &var16, var1);              /*   10 : 21 */
+
     let var7 = var4 * var1;
-    //Self::mul(&mut var7, &var4, var1);               /*   11 : 23 */
+
     let var6 = var7 * var1;
-    //Self::mul(&mut var6, &var7, var1);               /*   12 : 25 */
+
     let var12 = var6 * var1;
-    //Self::mul(&mut var12, &var6, var1);              /*   13 : 27 */
+
     let var8 = var12 * var1;
-    //Self::mul(&mut var8, &var12, var1);              /*   14 : 29 */
+
     let var11 = var8 * var1;
-    //Self::mul(&mut var11, &var8, var1);              /*   15 : 31 */
+
     var1 = var4.square();
-    //Self::sqr(var1, &var4);                             /*   16 : 42 */
+
     //   17 : 168
     square!(var1, 2);
     //   19 : 169
@@ -862,7 +862,7 @@ pub fn chain_p2m9div16(var0: &Fp2) -> Fp2 {
     var1 * var2
 }
 
-/// Tests for addition chains
+
 #[cfg(test)]
 mod tests {
     use super::*;

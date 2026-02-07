@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -119,7 +119,7 @@ impl ProverKey {
     }
 }
 
-// Computes f(f-1)(f-2)(f-3)
+
 pub(crate) fn delta(f: BlsScalar) -> BlsScalar {
     let f_1 = f - BlsScalar::one();
     let f_2 = f - BlsScalar::from(2);
@@ -127,11 +127,11 @@ pub(crate) fn delta(f: BlsScalar) -> BlsScalar {
     f * f_1 * f_2 * f_3
 }
 
-// The identity we want to check is q_logic * A = 0
-// A = B + E
-// B = q_c * [9c - 3(a+b)]
-// E = 3(a+b+c) - 2F
-// F = w[w(4w - 18(a+b) + 81) + 18(a^2 + b^2) - 81(a+b) + 83]
+
+
+
+
+
 #[allow(non_snake_case)]
 pub(crate) fn delta_xor_and(
     a: &BlsScalar,

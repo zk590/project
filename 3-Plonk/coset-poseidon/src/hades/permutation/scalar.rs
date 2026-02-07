@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use coset_bls12_381::BlsScalar;
 use dusk_safe::Safe;
@@ -10,12 +10,12 @@ use dusk_safe::Safe;
 use super::Hades;
 use crate::hades::{MDS_MATRIX, ROUND_CONSTANTS, WIDTH};
 
-/// An implementation of the [`Permutation`] for `BlsScalar` as input values.
+
 #[derive(Default)]
 pub(crate) struct ScalarPermutation();
 
 impl ScalarPermutation {
-    /// Constructs a new `ScalarPermutation`.
+
     pub fn new() -> Self {
         Self()
     }

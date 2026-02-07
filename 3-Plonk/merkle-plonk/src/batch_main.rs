@@ -77,7 +77,7 @@ impl Default for OpeningCircuit {
 }
 
 impl OpeningCircuit {
-    /// Create a new OpeningCircuit
+
     pub fn new(opening: Opening<(), { TREE_HEIGHT }>, leaf: Item<()>) -> Self {
         Self { opening, leaf }
     }

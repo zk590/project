@@ -1,15 +1,15 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! This module is designed to load the constants used as `ROUND_CONSTANTS`
-//! from `assets/arc.bin`.
+
+
+//
+
+
+
+
 //!
-//! The constants were originally computed using:
-//! https://extgit.iaik.tugraz.at/krypto/hadesmimc/blob/master/code/calc_round_numbers.py
-//! and then mapped onto `BlsScalar` in the Bls12_381 scalar field.
+
+
+
 
 use coset_bls12_381::BlsScalar;
 
@@ -17,17 +17,17 @@ use crate::hades::{FULL_ROUNDS, PARTIAL_ROUNDS, WIDTH};
 
 const ROUNDS: usize = FULL_ROUNDS + PARTIAL_ROUNDS;
 
-/// `ROUND_CONSTANTS` consists on a static reference that points to the
-/// pre-loaded 340 constant scalar of the bls12_381 curve.
+
+
 ///
-/// These 340 `BlsScalar` constants are loaded from `assets/arc.bin`.
+
 ///
-/// Check `assets/HOWTO.md` to see how we generated the constants.
+
 pub const ROUND_CONSTANTS: [[BlsScalar; WIDTH]; ROUNDS] = {
     let bytes = include_bytes!("../../assets/arc.bin");
 
-    // make sure that there are enough bytes for (WIDTH * ROUNDS) BlsScalar
-    // stored under 'assets/arc.bin'
+
+
     if bytes.len() < WIDTH * ROUNDS * 32 {
         panic!("There are not enough round constants stored in 'assets/arc.bin', have a look at the HOWTO to generate enough constants.");
     }
@@ -57,7 +57,7 @@ mod test {
 
     #[test]
     fn test_round_constants() {
-        // Check each element is non-zero
+
         let zero = BlsScalar::zero();
         let has_zero = ROUND_CONSTANTS.iter().flatten().any(|&x| x == zero);
         for ctant in ROUND_CONSTANTS.iter().flatten() {

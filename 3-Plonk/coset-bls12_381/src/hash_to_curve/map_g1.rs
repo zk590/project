@@ -1,4 +1,4 @@
-//! Implementation of hash-to-curve for the G1 group.
+
 
 use subtle::{Choice, ConditionallyNegatable, ConditionallySelectable, ConstantTimeEq};
 
@@ -8,7 +8,7 @@ use crate::fp::Fp;
 use crate::g1::G1Projective;
 use crate::generic_array::{typenum::U64, GenericArray};
 
-/// Coefficients of the 11-isogeny x map's numerator
+
 const ISO11_XNUM: [Fp; 12] = [
     Fp::from_raw_unchecked([
         0x4d18_b6f3_af00_131c,
@@ -108,7 +108,7 @@ const ISO11_XNUM: [Fp; 12] = [
     ]),
 ];
 
-/// Coefficients of the 11-isogeny x map's denominator
+
 const ISO11_XDEN: [Fp; 11] = [
     Fp::from_raw_unchecked([
         0xb962_a077_fdb0_f945,
@@ -200,7 +200,7 @@ const ISO11_XDEN: [Fp; 11] = [
     ]),
 ];
 
-/// Coefficients of the 11-isogeny y map's numerator
+
 const ISO11_YNUM: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0x2b56_7ff3_e283_7267,
@@ -332,7 +332,7 @@ const ISO11_YNUM: [Fp; 16] = [
     ]),
 ];
 
-/// Coefficients of the 11-isogeny y map's denominator
+
 const ISO11_YDEN: [Fp; 16] = [
     Fp::from_raw_unchecked([
         0xeb6c_359d_47e5_2b1c,
@@ -501,7 +501,7 @@ const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
 ]);
 
 impl HashToField for Fp {
-    // ceil(log2(p)) = 381, m = 1, k = 128.
+
     type InputLength = U64;
 
     fn from_okm(okm: &GenericArray<u8, U64>) -> Fp {
@@ -527,8 +527,8 @@ impl HashToField for Fp {
 
 impl Sgn0 for Fp {
     fn sgn0(&self) -> Choice {
-        // Turn into canonical form by computing
-        // (a.R) / R = a
+
+
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
         );
@@ -536,40 +536,40 @@ impl Sgn0 for Fp {
     }
 }
 
-/// Maps an element of [`Fp`] to a point on iso-G1.
+
 ///
-/// Implements [section 6.6.2 of `draft-irtf-cfrg-hash-to-curve-12`][sswu].
+
 ///
-/// [sswu]: https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-hash-to-curve-12#section-6.6.2
+
 fn map_to_curve_simple_swu(u: &Fp) -> G1Projective {
     let usq = u.square();
     let xi_usq = SSWU_XI * usq;
     let xisq_u4 = xi_usq.square();
-    let nd_common = xisq_u4 + xi_usq; // XI^2 * u^4 + XI * u^2
+    let nd_common = xisq_u4 + xi_usq;
     let x_den = SSWU_ELLP_A * Fp::conditional_select(&(-nd_common), &SSWU_XI, nd_common.is_zero());
-    let x0_num = SSWU_ELLP_B * (Fp::one() + nd_common); // B * (1 + (XI^2 * u^4 + XI * u^2))
+    let x0_num = SSWU_ELLP_B * (Fp::one() + nd_common);
 
-    // compute g(x0(u))
+
     let x_densq = x_den.square();
     let gx_den = x_densq * x_den;
-    // x0_num^3 + A * x0_num * x_den^2 + B * x_den^3
+
     let gx0_num = (x0_num.square() + SSWU_ELLP_A * x_densq) * x0_num + SSWU_ELLP_B * gx_den;
 
-    // compute g(X0(u)) ^ ((p - 3) // 4)
+
     let sqrt_candidate = {
-        let u_v = gx0_num * gx_den; // u*v
-        let vsq = gx_den.square(); // v^2
-        u_v * chain_pm3div4(&(u_v * vsq)) // u v (u v^3) ^ ((p - 3) // 4)
+        let u_v = gx0_num * gx_den;
+        let vsq = gx_den.square();
+        u_v * chain_pm3div4(&(u_v * vsq))
     };
 
-    let gx0_square = (sqrt_candidate.square() * gx_den).ct_eq(&gx0_num); // g(x0) is square
+    let gx0_square = (sqrt_candidate.square() * gx_den).ct_eq(&gx0_num);
     let x1_num = x0_num * xi_usq;
-    // sqrt(-XI**3) * u^3 g(x0) ^ ((p - 3) // 4)
+
     let y1 = SQRT_M_XI_CUBED * usq * u * sqrt_candidate;
 
     let x_num = Fp::conditional_select(&x1_num, &x0_num, gx0_square);
     let mut y = Fp::conditional_select(&y1, &sqrt_candidate, gx0_square);
-    // ensure sign of y and sign of u agree
+
     y.conditional_negate(y.sgn0() ^ u.sgn0());
 
     G1Projective {
@@ -579,17 +579,17 @@ fn map_to_curve_simple_swu(u: &Fp) -> G1Projective {
     }
 }
 
-/// Maps an iso-G1 point to a G1 point.
+
 fn iso_map(u: &G1Projective) -> G1Projective {
     const COEFFS: [&[Fp]; 4] = [&ISO11_XNUM, &ISO11_XDEN, &ISO11_YNUM, &ISO11_YDEN];
 
-    // unpack input point
+
     let G1Projective { x, y, z } = *u;
 
-    // xnum, xden, ynum, yden
+
     let mut mapvals = [Fp::zero(); 4];
 
-    // pre-compute powers of z
+
     let zpows = {
         let mut zpows = [Fp::zero(); 15];
         zpows[0] = z;
@@ -599,7 +599,7 @@ fn iso_map(u: &G1Projective) -> G1Projective {
         zpows
     };
 
-    // compute map value by Horner's rule
+
     for idx in 0..4 {
         let coeff = COEFFS[idx];
         let clast = coeff.len() - 1;
@@ -609,17 +609,17 @@ fn iso_map(u: &G1Projective) -> G1Projective {
         }
     }
 
-    // x denominator is order 1 less than x numerator, so we need an extra factor of z
+
     mapvals[1] *= z;
 
-    // multiply result of Y map by the y-coord, y / z
+
     mapvals[2] *= y;
     mapvals[3] *= z;
 
     G1Projective {
-        x: mapvals[0] * mapvals[3], // xnum * yden,
-        y: mapvals[2] * mapvals[1], // ynum * xden,
-        z: mapvals[1] * mapvals[3], // xden * yden
+        x: mapvals[0] * mapvals[3],
+        y: mapvals[2] * mapvals[1],
+        z: mapvals[1] * mapvals[3],
     }
 }
 
@@ -638,8 +638,8 @@ impl MapToCurve for G1Projective {
 
 #[cfg(test)]
 fn check_g1_prime(pt: &G1Projective) -> bool {
-    // (X : Y : Z)==(X/Z, Y/Z) is on E': y^2 = x^3 + A * x + B.
-    // y^2 z = (x^3) + A (x z^2) + B z^3
+
+
     let zsq = pt.z.square();
     (pt.y.square() * pt.z)
         == (pt.x.square() * pt.x + SSWU_ELLP_A * pt.x * zsq + SSWU_ELLP_B * zsq * pt.z)
@@ -647,7 +647,7 @@ fn check_g1_prime(pt: &G1Projective) -> bool {
 
 #[test]
 fn test_simple_swu_expected() {
-    // exceptional case: zero
+
     let p = map_to_curve_simple_swu(&Fp::zero());
     let G1Projective { x, y, z } = &p;
     let xo = Fp::from_raw_unchecked([
@@ -679,7 +679,7 @@ fn test_simple_swu_expected() {
     assert_eq!(z, &zo);
     assert!(check_g1_prime(&p));
 
-    // exceptional case: sqrt(-1/XI) (positive)
+
     let excp = Fp::from_raw_unchecked([
         0x00f3_d047_7e91_edbf,
         0x08d6_621e_4ca8_dc69,
@@ -695,7 +695,7 @@ fn test_simple_swu_expected() {
     assert_eq!(z, &zo);
     assert!(check_g1_prime(&p));
 
-    // exceptional case: sqrt(-1/XI) (negative)
+
     let excp = Fp::from_raw_unchecked([
         0xb90b_2fb8_816d_bcec,
         0x15d5_9de0_64ab_2396,
@@ -769,7 +769,7 @@ fn test_osswu_semirandom() {
     }
 }
 
-// test vectors from the draft 10 RFC
+
 #[test]
 fn test_encode_to_curve_10() {
     use crate::{
@@ -850,7 +850,7 @@ fn test_encode_to_curve_10() {
     }
 }
 
-// test vectors from the draft 10 RFC
+
 #[test]
 fn test_hash_to_curve_10() {
     use crate::{
@@ -931,7 +931,7 @@ fn test_hash_to_curve_10() {
 }
 
 #[cfg(test)]
-// p-1 / 2
+
 pub const P_M1_OVER2: Fp = Fp::from_raw_unchecked([
     0xa1fa_ffff_fffe_5557,
     0x995b_fff9_76a3_fffe,

@@ -9,7 +9,7 @@ use coset_bytes::{DeserializableSlice, Error as BytesError, Serializable};
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize, Serialize};
 
-/// An opening for a given position in a merkle tree.
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -26,8 +26,8 @@ impl<T, const H: usize, const A: usize> Opening<T, H, A>
 where
     T: Aggregate<A> + Clone,
 {
-    /// # Panics
-    /// If the given `position` is not in the `tree`.
+
+
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
         let opening_positions = [0; H];
         let opening_branch =
@@ -43,23 +43,23 @@ where
         opening
     }
 
-    /// Returns the root of the opening.
+
     pub fn root(&self) -> &T {
         &self.root
     }
 
-    /// Returns the branch of the opening.
+
     pub fn branch(&self) -> &[[T; A]; H] {
         &self.branch
     }
 
-    /// Returns the indices for the path in the opening.
+
     pub fn positions(&self) -> &[usize; H] {
         &self.positions
     }
 
-    /// Verify the given item is the leaf of the opening, and that the opening
-    /// is cryptographically correct.
+
+
     pub fn verify(&self, item: impl Into<T>) -> bool
     where
         T: PartialEq,
@@ -70,8 +70,8 @@ where
             let level_branch = &self.branch[level_index];
             let level_position = self.positions[level_index];
 
-            // if the computed item doesn't match the stored item at the given
-            // position, the opening is incorrect
+
+
             if item != level_branch[level_position] {
                 return false;
             }
@@ -91,10 +91,10 @@ where
         self.root == item
     }
 
-    /// Serialize an [`Opening`] to a vector of bytes.
-    // Once the new implementation of the `Serializable` trait becomes
-    // available, we will want that instead, but for the time being we use
-    // this implementation.
+
+
+
+
     pub fn to_var_bytes<const T_SIZE: usize>(&self) -> Vec<u8>
     where
         T: Serializable<T_SIZE>,
@@ -103,20 +103,20 @@ where
             (1 + H * A) * T_SIZE + H * (u32::BITS as usize / 8),
         );
 
-        // serialize root
+
         bytes.extend(&self.root.to_bytes());
 
-        // serialize branch
+
         for level in &self.branch {
             for item in level {
                 bytes.extend(&item.to_bytes());
             }
         }
 
-        // serialize positions
+
         for position_index in self.positions {
-            // the positions will be in the range [0..A[, so casting to u32
-            // is never going to be a problem
+
+
             #[allow(clippy::cast_possible_truncation)]
             bytes.extend(&(position_index as u32).to_bytes());
         }
@@ -124,14 +124,14 @@ where
         bytes
     }
 
-    /// Deserialize an [`Opening`] from a slice of bytes.
+
     ///
-    /// # Errors
+
     ///
-    /// Will return [`coset_bytes::Error`] in case of a deserialization error.
-    // Once the new implementation of the `Serializable` trait becomes
-    // available, we will want that instead, but for the time being we use
-    // this implementation.
+
+
+
+
     pub fn from_slice<const T_SIZE: usize>(
         bytes: &[u8],
     ) -> Result<Self, BytesError>
@@ -150,10 +150,10 @@ where
 
         let mut reader = bytes;
 
-        // deserialize root
+
         let root = T::from_reader(&mut reader)?;
 
-        // deserialize branch
+
         let mut branch: [[T; A]; H] =
             init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
         for level in &mut branch {
@@ -162,7 +162,7 @@ where
             }
         }
 
-        // deserialize positions
+
         let mut positions = [0usize; H];
         for position_slot in &mut positions {
             *position_slot = u32::from_reader(&mut reader)? as usize;
@@ -212,8 +212,8 @@ mod tests {
     const A: usize = 2;
     const TREE_CAP: usize = A.pow(H as u32);
 
-    /// A string type that is on the stack, and holds a string of a size as
-    /// large as the tree.
+
+
     #[derive(Clone, Copy, PartialEq)]
     struct String {
         chars: [char; TREE_CAP],
@@ -233,7 +233,7 @@ mod tests {
         len: 0,
     };
 
-    /// A simple aggregator that concatenates strings.
+
     impl Aggregate<A> for String {
         const EMPTY_SUBTREE: Self = EMPTY_ITEM;
 

@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use coset_bytes::Serializable;
 use hashbrown::HashMap;
@@ -51,7 +51,7 @@ fn scalar_map(hades_optimization: bool) -> HashMap<BlsScalar, usize> {
             .collect()
     };
     if hades_optimization {
-        // assert we don't override a previously inserted constant
+
         for constant in hades::constants() {
             let len = scalars.len();
             scalars.entry(constant).or_insert(len);
@@ -171,8 +171,8 @@ impl CompressedCircuit {
             .into_iter()
             .for_each(|(scalar, index)| scalars[index] = scalar.to_bytes());
 
-        // clear the scalars that can be determiniscally reconstructed from the
-        // scalar_map
+
+
         let scalars = scalars.split_off(base_scalars_len);
 
         let polynomials_map = polynomial_index_map;
@@ -230,8 +230,8 @@ impl CompressedCircuit {
         }
         let scalars = all_scalars;
 
-        // we use `uninitialized` because the decompressor will also contain the
-        // dummy constraints, if they were part of the prover when encoding.
+
+
         let mut composer = Composer::uninitialized();
 
         let mut public_input_cursor = 0;

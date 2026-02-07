@@ -28,9 +28,9 @@ use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
 
-/// Represents results of a Miller loop, one of the most expensive portions
-/// of the pairing function. `MillerLoopResult`s cannot be compared with each
-/// other until `.final_exponentiation()` is called, which is also expensive.
+
+
+
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(
@@ -56,10 +56,10 @@ impl ConditionallySelectable for MillerLoopResult {
 }
 
 impl MillerLoopResult {
-    /// This performs a "final exponentiation" routine to convert the result
-    /// of a Miller loop into an element of `Gt` with help of efficient squaring
-    /// operation in the so-called `cyclotomic subgroup` of `Fq6` so that
-    /// it can be compared with other elements of `Gt`.
+
+
+
+
     pub fn final_exponentiation(&self) -> Gt {
         #[must_use]
         fn fp4_square(a: Fp2, b: Fp2) -> (Fp2, Fp2) {
@@ -74,9 +74,9 @@ impl MillerLoopResult {
 
             (c0, c1)
         }
-        // Adaptation of Algorithm 5.5.4, Guide to Pairing-Based Cryptography
-        // Faster Squaring in the Cyclotomic Subgroup of Sixth Degree Extensions
-        // https://eprint.iacr.org/2009/565.pdf
+
+
+
         #[must_use]
         fn cyclotomic_square(f: Fp12) -> Fp12 {
             let mut z0 = f.c0.c0;
@@ -88,7 +88,7 @@ impl MillerLoopResult {
 
             let (t0, t1) = fp4_square(z0, z1);
 
-            // For A
+
             z0 = t0 - z0;
             z0 = z0 + z0 + t0;
 
@@ -98,14 +98,14 @@ impl MillerLoopResult {
             let (mut t0, t1) = fp4_square(z2, z3);
             let (t2, t3) = fp4_square(z4, z5);
 
-            // For C
+
             z4 = t0 - z4;
             z4 = z4 + z4 + t0;
 
             z5 = t1 + z5;
             z5 = z5 + z5 + t1;
 
-            // For B
+
             t0 = t3.mul_by_nonresidue();
             z2 = t0 + z2;
             z2 = z2 + z2 + t0;
@@ -184,9 +184,9 @@ impl MillerLoopResult {
 
                 final_exponentiation_value
             })
-            // We unwrap() because `MillerLoopResult` can only be constructed
-            // by a function within this crate, and we uphold the invariant
-            // that the enclosed value is nonzero.
+
+
+
             .unwrap())
     }
 }
@@ -216,11 +216,11 @@ impl<'b> AddAssign<&'b MillerLoopResult> for MillerLoopResult {
     }
 }
 
-/// This is an element of $\mathbb{G}_T$, the target group of the pairing function. As with
-/// $\mathbb{G}_1$ and $\mathbb{G}_2$ this group has order $q$.
+
+
 ///
-/// Typically, $\mathbb{G}_T$ is written multiplicatively but we will write it additively to
-/// keep code and abstractions consistent.
+
+
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(feature = "rkyv-impl", derive(Archive, RkyvDeserialize, RkyvSerialize))]
@@ -263,12 +263,12 @@ impl PartialEq for Gt {
 }
 
 impl Gt {
-    /// Returns the group identity, which is $1$.
+
     pub fn identity() -> Gt {
         Gt(Fp12::one())
     }
 
-    /// Doubles this group element.
+
     pub fn double(&self) -> Gt {
         Gt(self.0.square())
     }
@@ -279,7 +279,7 @@ impl<'a> Neg for &'a Gt {
 
     #[inline]
     fn neg(self) -> Gt {
-        // The element is unitary, so we just conjugate.
+
         Gt(self.0.conjugate())
     }
 }
@@ -317,12 +317,12 @@ impl<'a, 'b> Mul<&'b BlsScalar> for &'a Gt {
     fn mul(self, other: &'b BlsScalar) -> Self::Output {
         let mut accumulated_gt = Gt::identity();
 
-        // This is a simple double-and-add implementation of group element
-        // multiplication, moving from most significant to least
-        // significant bit of the scalar.
+
+
+
         //
-        // We skip the leading bit because it's always unset for Fq
-        // elements.
+
+
         for bit in other
             .to_bytes()
             .iter()
@@ -364,9 +364,9 @@ impl Group for Gt {
         loop {
             let inner = Fp12::random(&mut rng);
 
-            // Not all elements of Fp12 are elements of the prime-order multiplicative
-            // subgroup. We run the random element through final_exponentiation to obtain
-            // a valid element, which requires that it is non-zero.
+
+
+
             if !bool::from(inner.is_zero()) {
                 return MillerLoopResult(inner).final_exponentiation();
             }
@@ -378,7 +378,7 @@ impl Group for Gt {
     }
 
     fn generator() -> Self {
-        // pairing(&G1Affine::generator(), &G2Affine::generator())
+
         Gt(Fp12 {
             c0: Fp6 {
                 c0: Fp2 {
@@ -499,20 +499,19 @@ impl Group for Gt {
         self.ct_eq(&Self::identity())
     }
 
-    #[must_use]
     fn double(&self) -> Self {
         self.double()
     }
 }
 
-/// This structure contains cached computations pertaining to a $\mathbb{G}_2$
-/// element as part of the pairing function (specifically, the Miller loop) and
-/// so should be computed whenever a $\mathbb{G}_2$ element is being used in
-/// multiple pairings or is otherwise known in advance. This should be used in
-/// conjunction with the [`multi_miller_loop`](crate::multi_miller_loop)
-/// function provided by this crate.
+
+
+
+
+
+
 ///
-/// Requires the `alloc` and `pairing` crate features to be enabled.
+
 #[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "pairings", feature = "alloc"))))]
 #[derive(Clone, Debug)]
@@ -574,10 +573,10 @@ impl From<G2Affine> for G2Prepared {
 
 #[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "pairings", feature = "alloc"))))]
-/// Computes $$\sum_{i=1}^n \textbf{ML}(a_i, b_i)$$ given a series of terms
-/// $$(a_1, b_1), (a_2, b_2), ..., (a_n, b_n).$$
+
+
 ///
-/// Requires the `alloc` and `pairing` crate features to be enabled.
+
 pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult {
     struct Adder<'a, 'b, 'c> {
         terms: &'c [(&'a G1Affine, &'b G2Prepared)],
@@ -629,7 +628,7 @@ pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult
     MillerLoopResult(miller_value)
 }
 
-/// Invoke the pairing function without the use of precomputation and other optimizations.
+
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 pub fn pairing(p: &G1Affine, q: &G2Affine) -> Gt {
     struct Adder {
@@ -689,9 +688,9 @@ trait MillerLoopDriver {
     fn one() -> Self::Output;
 }
 
-/// This is a "generic" implementation of the Miller loop to avoid duplicating code
-/// structure elsewhere; instead, we'll write concrete instantiations of
-/// `MillerLoopDriver` for whatever purposes we need (such as caching modes).
+
+
+
 fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
     let mut miller_value = D::one();
 
@@ -737,7 +736,7 @@ fn ell(f: Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
 }
 
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 26, https://eprint.iacr.org/2010/354.pdf
+
     let tmp0 = r.x.square();
     let tmp1 = r.y.square();
     let tmp2 = tmp1.square();
@@ -768,7 +767,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
 }
 
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
-    // Adaptation of Algorithm 27, https://eprint.iacr.org/2010/354.pdf
+
     let zsquared = r.z.square();
     let ysquared = q.y.square();
     let t0 = zsquared * q.x;
@@ -817,7 +816,7 @@ impl PairingCurveAffine for G2Affine {
     }
 }
 
-/// A [`pairing::Engine`] for BLS12-381 pairing operations.
+
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Clone, Debug)]
 pub struct Bls12;

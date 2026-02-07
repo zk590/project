@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 #[cfg(feature = "alloc")]
 use crate::{
@@ -21,8 +21,8 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-/// Subset of all of the evaluations. These evaluations
-/// are added to the [`Proof`](super::Proof).
+
+
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -31,16 +31,16 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct ProofEvaluations {
-    // Evaluation of the witness polynomial for the left wire at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) a_eval: BlsScalar,
-    // Evaluation of the witness polynomial for the right wire at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) b_eval: BlsScalar,
-    // Evaluation of the witness polynomial for the output wire at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) c_eval: BlsScalar,
-    // Evaluation of the witness polynomial for the fourth wire at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) d_eval: BlsScalar,
     //
@@ -49,11 +49,11 @@ pub(crate) struct ProofEvaluations {
     //
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) b_w_eval: BlsScalar,
-    // Evaluation of the witness polynomial for the fourth wire at `z * root of
-    // unity`
+
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) d_w_eval: BlsScalar,
-    // Evaluation of the arithmetic selector polynomial at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_arith_eval: BlsScalar,
     //
@@ -66,23 +66,23 @@ pub(crate) struct ProofEvaluations {
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_r_eval: BlsScalar,
     //
-    // Evaluation of the left sigma polynomial at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_1_eval: BlsScalar,
-    // Evaluation of the right sigma polynomial at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_2_eval: BlsScalar,
-    // Evaluation of the out sigma polynomial at `z`
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_3_eval: BlsScalar,
 
-    // (Shifted) Evaluation of the permutation polynomial at `z * root of
-    // unity`
+
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) z_eval: BlsScalar,
 }
 
-// The struct ProofEvaluations has 15 BlsScalars
+
 impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
     type Error = coset_bytes::Error;
 
@@ -153,8 +153,8 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
 
 #[cfg(feature = "alloc")]
 
-/// Compute the linearization polynomial.
-// TODO: Improve the method signature
+
+
 #[allow(clippy::type_complexity)]
 pub(crate) fn compute(
     prover_key: &ProverKey,
@@ -242,7 +242,7 @@ pub(crate) fn compute(
     let linearized_identity =
         &circuit_linearization + &permutation_linearization;
 
-    // r_poly
+
     &linearized_identity + &quotient_polynomial
 }
 

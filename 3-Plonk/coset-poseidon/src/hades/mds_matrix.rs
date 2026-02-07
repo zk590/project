@@ -1,19 +1,19 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use coset_bls12_381::BlsScalar;
 
 use crate::hades::WIDTH;
 
-/// Represents a `static reference` to the
-/// `Maximum Distance Separable Matrix -> MDS_MATRIX`
-/// of `(WIDTH x WIDTH)`.
+
+
+
 ///
-/// This matrix is loaded from the `mds.bin` file where
-/// is pre-computed and represented in bytes.
+
+
 pub const MDS_MATRIX: [[BlsScalar; WIDTH]; WIDTH] = {
     let bytes = include_bytes!("../../assets/mds.bin");
     let mut mds = [[BlsScalar::zero(); WIDTH]; WIDTH];

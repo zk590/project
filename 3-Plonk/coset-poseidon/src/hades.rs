@@ -1,23 +1,23 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! Implementation of [Hades252](https://eprint.iacr.org/2019/458.pdf)
-//! permutation algorithm over the Bls12-381 Scalar field.
+
+
+//
+
+
+
+
 //!
-//! ## Parameters
+
 //!
-//! - `p = 0x73eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001`
-//! - Permutation container `WIDTH` is 5 field elements
-//! - 8 full rounds: 4 full rounds at the beginning and 4 full rounds at the
-//!   end, and each full round has `WIDTH` quintic S-Boxes.
-//! - 60 partial rounds: each partial round has `WIDTH - 1` identity function
-//!   and one quintic S-Box.
-//! - 340 round constants which are generated using [this algorithm](https://extgit.iaik.tugraz.at/krypto/hadesmimc/blob/master/code/calc_round_numbers.py)
-//! - The MDS matrix is a cauchy matrix, the method used to generate it, is
-//!   noted in section "Concrete Instantiations Poseidon and Starkad"
+
+
+
+
+
+
+
+
+
 
 mod mds_matrix;
 mod permutation;
@@ -30,7 +30,7 @@ const FULL_ROUNDS: usize = 8;
 
 const PARTIAL_ROUNDS: usize = 60;
 
-/// The amount of field elements that fit into the hades permutation container
+
 pub const WIDTH: usize = 5;
 
 #[cfg(feature = "zk")]
@@ -50,9 +50,9 @@ const fn u64_from_buffer<const N: usize>(buf: &[u8; N], i: usize) -> u64 {
     ])
 }
 
-// Test the sponge with an internal hades permutation against some predefined
-// input and output values. The sponge is initialized with the capacity element
-// being zero and the padding is one `BlsScalar::one()`.
+
+
+
 #[cfg(test)]
 mod tests {
     extern crate std;
@@ -69,13 +69,13 @@ mod tests {
     struct Test();
 
     impl Safe<BlsScalar, WIDTH> for Test {
-        // apply hades permutation
+
         fn permute(&mut self, state: &mut [BlsScalar; WIDTH]) {
             ScalarPermutation::new().permute(state);
         }
 
-        // the test in- and outputs have been created with the capacity element
-        // (tag) being zero
+
+
         fn tag(&mut self, input: &[u8]) -> BlsScalar {
             let _ = input;
             BlsScalar::zero()
@@ -112,11 +112,11 @@ mod tests {
         let domain_sep = 0;
         let mut sponge = Sponge::start(Test::new(), iopattern, domain_sep)
             .expect("IO pattern should be valid");
-        // absorb given input
+
         sponge
             .absorb(input.len(), input)
             .expect("Absorption of the input should work fine");
-        // absorb padding of one BlsScalar::one()
+
         sponge
             .absorb(1, &[BlsScalar::one()])
             .expect("Absorption of padding should work fine");

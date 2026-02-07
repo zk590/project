@@ -1,8 +1,8 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+
+
 //
-// Copyright (c) DUSK NETWORK. All rights reserved.
+
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -46,8 +46,8 @@ impl ProverKey {
         let kappa_sq = kappa.square();
         let kappa_cu = kappa_sq * kappa;
 
-        // Delta([o(X) - 4 * d(X)]) + Delta([b(X) - 4 * o(X)]) + Delta([a(X) - 4
-        // * b(X)]) + Delta([d(Xg) - 4 * a(X)]) * Q_Range(X)
+
+
         //
         let c_minus_4d_delta = delta(c_i - four * d_i);
         let b_minus_4c_delta = delta(b_i - four * c_i) * kappa;
@@ -73,9 +73,9 @@ impl ProverKey {
         let kappa_sq = kappa.square();
         let kappa_cu = kappa_sq * kappa;
 
-        // Delta([c_eval - 4 * d_eval]) + Delta([b_eval - 4 * c_eval]) +
-        // Delta([a_eval - 4 * b_eval]) + Delta([d_w_eval - 4 * a_eval]) *
-        // Q_Range(X)
+
+
+
         let c_minus_4d_delta =
             delta(evaluations.c_eval - four * evaluations.d_eval);
         let b_minus_4c_delta =
@@ -95,7 +95,7 @@ impl ProverKey {
     }
 }
 
-// Computes f(f-1)(f-2)(f-3)
+
 pub(crate) fn delta(f: BlsScalar) -> BlsScalar {
     let f_1 = f - BlsScalar::one();
     let f_2 = f - BlsScalar::from(2);

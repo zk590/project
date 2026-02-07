@@ -1,16 +1,16 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// Copyright (c) DUSK NETWORK. All rights reserved.
 
-//! In pairing-based SNARKs like GM17, we need to calculate
-//! a quotient polynomial over a target polynomial with roots
-//! at distinct points associated with each constraint of the
-//! constraint system. In order to be efficient, we choose these
-//! roots to be the powers of a 2^n root of unity in the field.
-//! This allows us to perform polynomial operations in O(n)
-//! by performing an O(n log n) FFT over such a domain.
+
+
+//
+
+
+
+
+
+
+
+
+
 
 use coset_bls12_381::BlsScalar;
 use coset_bytes::{DeserializableSlice, Serializable};
@@ -23,9 +23,9 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-/// Defines a domain over which finite field (I)FFTs can be performed. Works
-/// only for fields that have a large multiplicative subgroup of size that is
-/// a power-of-2.
+
+
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -34,25 +34,25 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct EvaluationDomain {
-    /// The size of the domain.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) size: u64,
-    /// `log_2(self.size)`.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) log_size_of_group: u32,
-    /// Size of the domain as a field element.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) size_as_field_element: BlsScalar,
-    /// Inverse of the size in the field.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) size_inv: BlsScalar,
-    /// A generator of the subgroup.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) group_gen: BlsScalar,
-    /// Inverse of the generator of the subgroup.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) group_gen_inv: BlsScalar,
-    /// Multiplicative generator of the finite field.
+
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) generator_inv: BlsScalar,
 }
@@ -117,10 +117,10 @@ pub(crate) mod alloc {
     use rayon::prelude::*;
 
     impl EvaluationDomain {
-        /// Construct a domain that is large enough for evaluations of a
-        /// polynomial having `num_coeffs` coefficients.
+
+
         pub(crate) fn new(num_coeffs: usize) -> Result<Self, Error> {
-            // Compute the size of our evaluation domain
+
             let size = num_coeffs.next_power_of_two() as u64;
             let log_size_of_group = size.trailing_zeros();
 
@@ -131,8 +131,8 @@ pub(crate) mod alloc {
                 });
             }
 
-            // Compute the generator for the multiplicative subgroup.
-            // It should be 2^(log_size_of_group) root of unity.
+
+
 
             let mut group_gen = ROOT_OF_UNITY;
             for _ in log_size_of_group..TWO_ADACITY {
@@ -152,32 +152,32 @@ pub(crate) mod alloc {
             })
         }
 
-        /// Return the size of `self`.
+
         pub(crate) fn size(&self) -> usize {
             self.size as usize
         }
 
-        /// Compute a FFT.
+
         pub(crate) fn fft(&self, coeffs: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut coeffs = coeffs.to_vec();
             self.fft_in_place(&mut coeffs);
             coeffs
         }
 
-        /// Compute a FFT, modifying the vector in place.
+
         fn fft_in_place(&self, coeffs: &mut Vec<BlsScalar>) {
             coeffs.resize(self.size(), BlsScalar::zero());
             best_fft(coeffs, self.group_gen, self.log_size_of_group)
         }
 
-        /// Compute an IFFT.
+
         pub(crate) fn ifft(&self, evals: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut evals = evals.to_vec();
             self.ifft_in_place(&mut evals);
             evals
         }
 
-        /// Compute an IFFT, modifying the vector in place.
+
         #[inline]
         pub(crate) fn ifft_in_place(&self, evals: &mut Vec<BlsScalar>) {
             evals.resize(self.size(), BlsScalar::zero());
@@ -198,42 +198,42 @@ pub(crate) mod alloc {
             })
         }
 
-        /// Compute a FFT over a coset of the domain.
+
         pub(crate) fn coset_fft(&self, coeffs: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut coeffs = coeffs.to_vec();
             self.coset_fft_in_place(&mut coeffs);
             coeffs
         }
 
-        /// Compute a FFT over a coset of the domain, modifying the input vector
-        /// in place.
+
+
         fn coset_fft_in_place(&self, coeffs: &mut Vec<BlsScalar>) {
             Self::distribute_powers(coeffs, GENERATOR);
             self.fft_in_place(coeffs);
         }
 
-        /// Compute an IFFT over a coset of the domain.
+
         pub(crate) fn coset_ifft(&self, evals: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut evals = evals.to_vec();
             self.coset_ifft_in_place(&mut evals);
             evals
         }
 
-        /// Compute an IFFT over a coset of the domain, modifying the input
-        /// vector in place.
+
+
         fn coset_ifft_in_place(&self, evals: &mut Vec<BlsScalar>) {
             self.ifft_in_place(evals);
             Self::distribute_powers(evals, self.generator_inv);
         }
 
         #[allow(clippy::needless_range_loop)]
-        /// Evaluate all the lagrange polynomials defined by this domain at the
-        /// point `tau`.
+
+
         pub(crate) fn evaluate_all_lagrange_coefficients(
             &self,
             tau: BlsScalar,
         ) -> Vec<BlsScalar> {
-            // Evaluate all Lagrange polynomials
+
             let size = self.size as usize;
             let t_size = tau.pow(&[self.size, 0, 0, 0]);
             let one = BlsScalar::one();
@@ -278,8 +278,8 @@ pub(crate) mod alloc {
             }
         }
 
-        /// This evaluates the vanishing polynomial for this domain at tau.
-        /// For multiplicative subgroups, this polynomial is `z(X) = X^self.size
+
+
         /// - 1`.
         pub(crate) fn evaluate_vanishing_polynomial(
             &self,
@@ -288,12 +288,12 @@ pub(crate) mod alloc {
             tau.pow(&[self.size, 0, 0, 0]) - BlsScalar::one()
         }
 
-        /// Given that the domain size is `D`  
-        /// This function computes the `D` evaluation points for
-        /// the vanishing polynomial of degree `n` over a coset
+
+
+
         pub(crate) fn compute_vanishing_poly_over_coset(
-            &self,            // domain to evaluate over
-            poly_degree: u64, // degree of the vanishing polynomial
+            &self,
+            poly_degree: u64,
         ) -> Evaluations {
             assert!((self.size() as u64) > poly_degree);
             let coset_gen = GENERATOR.pow(&[poly_degree, 0, 0, 0]);
@@ -312,7 +312,7 @@ pub(crate) mod alloc {
             Evaluations::from_vec_and_domain(v_h, *self)
         }
 
-        /// Return an iterator over the elements of the domain.
+
         pub(crate) fn elements(&self) -> Elements {
             Elements {
                 cur_elem: BlsScalar::one(),
@@ -378,7 +378,7 @@ pub(crate) mod alloc {
         }
     }
 
-    /// An iterator over the elements of the domain.
+
     #[derive(Debug)]
     pub(crate) struct Elements {
         cur_elem: BlsScalar,

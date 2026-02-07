@@ -1,29 +1,29 @@
 
 use super::errors::{BadLength, Error};
 
-/// The core trait used to implement [`from_bytes`] and [`to_bytes`]
+
 pub trait Serializable<const N: usize> {
-    /// The size of
+
     const SIZE: usize = N;
-    /// The type returned in the event of a conversion error.
+
     type Error;
 
-    /// Deserialize a [`&[u8; N]`] into [`Self`], it might be fail.
+
     fn from_bytes(bytes: &[u8; N]) -> Result<Self, Self::Error>
     where
         Self: Sized;
 
-    /// Serialize [`Self`] into a [`[u8; N]`].
+
     fn to_bytes(&self) -> [u8; N];
 }
 
-/// An optional trait used to implement [`from_slice`] on top of types that
-/// uses [`Serializable`] trait.
-/// The default implementation makes use of [`Serializable`] trait to provide
-/// the necessary deserialization functionality without additional code from the
-/// consumer.
+
+
+
+
+
 pub trait DeserializableSlice<const N: usize>: Serializable<N> {
-    /// Deserialize a slice of [`u8`] into [`Self`]
+
     fn from_slice(bytes: &[u8]) -> Result<Self, Self::Error>
     where
         Self: Sized,
@@ -38,8 +38,8 @@ pub trait DeserializableSlice<const N: usize>: Serializable<N> {
         }
     }
 
-    /// Deserialize the type reading the bytes from a reader.
-    /// The bytes read are removed from the reader.
+
+
     fn from_reader<R>(reader: &mut R) -> Result<Self, Self::Error>
     where
         R: Read,
@@ -55,23 +55,23 @@ pub trait DeserializableSlice<const N: usize>: Serializable<N> {
     }
 }
 
-// Auto trait [`DeserializableSlice`] for any type that implements
-// [`Serializable`]
+
+
 impl<T, const N: usize> DeserializableSlice<N> for T where T: Serializable<N> {}
 
-// The `Read` trait allows for reading bytes from a source.
+
 ///
-/// Implementors of the `Read` trait are called 'readers'.
+
 ///
-/// Readers are defined by one required method, [`read()`]. Each call to
-/// [`read()`] will attempt to pull bytes from this source into a provided
-/// buffer.
+
+
+
 pub trait Read {
-    /// Returns the number of elements the Reader can hold.
+
     fn capacity(&self) -> usize;
 
-    /// Pull some bytes from this source into the specified buffer, returning
-    /// how many bytes were read.
+
+
     fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Error>;
 }
 
@@ -89,9 +89,9 @@ impl Read for &[u8] {
         let bytes_to_read = buffer.len();
         let (head, tail) = self.split_at(bytes_to_read);
 
-        // First check if the amount of bytes we want to read is small:
-        // `copy_from_slice` will generally expand to a call to `memcpy`, and
-        // for a single byte the overhead is significant.
+
+
+
         if bytes_to_read == 1 {
             buffer[0] = head[0];
         } else {
@@ -103,17 +103,17 @@ impl Read for &[u8] {
     }
 }
 
-// A trait for objects which are byte-oriented sinks.
+
 ///
-/// Implementors of the `Write` trait are sometimes called 'writers'.
+
 ///
-/// Writers are defined by one required method, [`write()`].
+
 pub trait Write {
-    /// Write a buffer into this writer, returning how many bytes were written.
+
     ///
-    /// This function will attempt to write the entire contents of `buf`, but
-    /// the entire write may not succeed, or the write may also generate an
-    /// error.
+
+
+
     fn write(&mut self, bytes: &[u8]) -> Result<usize, Error>;
 }
 
