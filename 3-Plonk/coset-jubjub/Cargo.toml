@@ -1,0 +1,101 @@
+[package]
+name = "coset-jubjub"
+version = "0.15.1"
+categories =["algorithms", "cryptography", "science", "no-std"]
+edition = "2021"
+
+[dependencies.bitvec]
+version = "1"
+default-features = false
+
+[dependencies.coset-bls12_381]
+path = "../coset-bls12_381"
+default-features = false
+
+[dependencies.ff]
+version = "0.13"
+default-features = false
+
+[dependencies.group]
+version = "0.13"
+default-features = false
+
+[dependencies.rand_core]
+version = "0.6"
+default-features = false
+
+[dependencies.subtle]
+version = "2"
+default-features = false
+
+# Begin Dusk dependencies
+[dependencies.blake2b_simd]
+version = "1.0"
+default-features = false
+
+[dependencies.bytecheck]
+version = "0.6"
+optional = true
+default-features = false
+
+[dependencies.coset-bytes]
+path = "../coset-bytes/bytes"
+
+[dependencies.rkyv]
+version = "0.7"
+optional = true
+default-features = false
+
+[dependencies.zeroize]
+version = "1"
+optional = true
+default-features = false
+
+[dependencies.serde]
+version = "1.0"
+default-features = false
+optional = true
+
+[dependencies.hex]
+version = "0.4"
+default-features = false
+optional = true
+# End Dusk dependendencies
+
+[dev-dependencies]
+criterion = "0.3"
+csv = ">= 1.0, < 1.2" # csv 1.2 has MSRV 1.60
+quickcheck = "1"
+
+[dev-dependencies.rand_xorshift]
+version = "0.3"
+default-features = false
+
+# Begin Dusk dev-dependencies
+[dev-dependencies.blake2]
+version = "0.9"
+
+[dev-dependencies.rand]
+version = "0.8"
+
+[dev-dependencies.serde_json]
+version = "1.0"
+
+[features]
+default = ["alloc", "bits"]
+alloc = ["ff/alloc", "group/alloc"]
+bits = ["ff/bits"]
+rkyv-impl = ["bytecheck", "coset-bls12_381/rkyv-impl", "rkyv"]
+serde = ["serde/alloc", "hex/alloc"]
+
+[[bench]]
+name = "fq_bench"
+harness = false
+
+[[bench]]
+name = "fr_bench"
+harness = false
+
+[[bench]]
+name = "point_bench"
+harness = false
