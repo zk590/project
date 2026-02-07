@@ -1,0 +1,7 @@
+[package]
+name = "coset-bytes"
+version = "0.1.7"
+edition = "2018"
+
+[dependencies]
+derive-hex = { path = "../derive-hex", version = "0.1" }
