@@ -59,29 +59,31 @@ impl From<Domain> for u64 {
 // always produce a valid io-pattern based on the input.
 // The function will return an error if a merkle domain is selected but the
 // given input elements don't add up to the specified arity.
-fn io_pattern<T>(
+fn build_io_pattern<T>(
     domain: Domain,
-    input: &[&[T]],
+    input_segments: &[&[T]],
     output_len: usize,
 ) -> Result<Vec<Call>, Error> {
-    let mut io_pattern = Vec::new();
+    let mut io_calls = Vec::new();
     // check total input length against domain
-    let input_len = input.iter().fold(0, |acc, input| acc + input.len());
+    let total_input_len = input_segments
+        .iter()
+        .fold(0, |accumulator, segment| accumulator + segment.len());
     match domain {
-        Domain::Merkle2 if input_len != 2 || output_len != 1 => {
+        Domain::Merkle2 if total_input_len != 2 || output_len != 1 => {
             return Err(Error::IOPatternViolation);
         }
-        Domain::Merkle4 if input_len != 4 || output_len != 1 => {
+        Domain::Merkle4 if total_input_len != 4 || output_len != 1 => {
             return Err(Error::IOPatternViolation);
         }
         _ => {}
     }
-    for input in input.iter() {
-        io_pattern.push(Call::Absorb(input.len()));
+    for segment in input_segments.iter() {
+        io_calls.push(Call::Absorb(segment.len()));
     }
-    io_pattern.push(Call::Squeeze(output_len));
+    io_calls.push(Call::Squeeze(output_len));
 
-    Ok(io_pattern)
+    Ok(io_calls)
 }
 
 /// Hash any given input into one or several scalar using the Hades
@@ -128,28 +130,28 @@ impl<'a> Hash<'a> {
     pub fn finalize(&self) -> Vec<BlsScalar> {
         // Generate the hash using the sponge framework:
         // initialize the sponge
-        let mut sponge = Sponge::start(
+        let mut poseidon_sponge = Sponge::start(
             ScalarPermutation::new(),
-            io_pattern(self.domain, &self.input, self.output_len)
+            build_io_pattern(self.domain, &self.input, self.output_len)
                 .expect("io-pattern should be valid"),
             self.domain.into(),
         )
         .expect("at this point the io-pattern is valid");
 
         // absorb the input
-        for input in self.input.iter() {
-            sponge
-                .absorb(input.len(), input)
+        for segment in self.input.iter() {
+            poseidon_sponge
+                .absorb(segment.len(), segment)
                 .expect("at this point the io-pattern is valid");
         }
 
         // squeeze output_len elements
-        sponge
+        poseidon_sponge
             .squeeze(self.output_len)
             .expect("at this point the io-pattern is valid");
 
         // return the result
-        sponge
+        poseidon_sponge
             .finish()
             .expect("at this point the io-pattern is valid")
     }
@@ -172,12 +174,14 @@ impl<'a> Hash<'a> {
         ]);
 
         // finalize the hash as bls-scalar
-        let bls_output = self.finalize();
+        let field_elements = self.finalize();
 
-        bls_output
+        field_elements
             .iter()
-            .map(|bls| {
-                JubJubScalar::from_raw((bls & &TRUNCATION_MASK).reduce().0)
+            .map(|field_element| {
+                JubJubScalar::from_raw(
+                    (field_element & &TRUNCATION_MASK).reduce().0,
+                )
             })
             .collect()
     }
@@ -189,9 +193,9 @@ impl<'a> Hash<'a> {
     /// given domain and input, e.g. using [`Domain::Merkle4`] with an input
     /// anything other than 4 Scalar.
     pub fn digest(domain: Domain, input: &'a [BlsScalar]) -> Vec<BlsScalar> {
-        let mut hash = Self::new(domain);
-        hash.update(input);
-        hash.finalize()
+        let mut poseidon_hash = Self::new(domain);
+        poseidon_hash.update(input);
+        poseidon_hash.finalize()
     }
 
     /// Digest an input and calculate the hash as jubjub-scalar immediately
@@ -204,8 +208,8 @@ impl<'a> Hash<'a> {
         domain: Domain,
         input: &'a [BlsScalar],
     ) -> Vec<JubJubScalar> {
-        let mut hash = Self::new(domain);
-        hash.update(input);
-        hash.finalize_truncated()
+        let mut poseidon_hash = Self::new(domain);
+        poseidon_hash.update(input);
+        poseidon_hash.finalize_truncated()
     }
 }

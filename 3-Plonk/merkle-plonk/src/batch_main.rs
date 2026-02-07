@@ -174,13 +174,13 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     let multiple_leaves_data = unsafe {
         rkyv::archived_root::<MultipleLeavesData>(&bytes)
     };
-    
+    println!("MultipleLeavesData 加载成功");
     // 解析根哈希
     let root_hash = match BlsScalar::from_bytes(&multiple_leaves_data.root_hash).into_option() {
         Some(hash) => hash,
         None => return Err(Box::new(IoError::new(ErrorKind::Other, "解析根哈希失败")))
     };
-    
+    println!("根哈希加载成功");
     let start_time = Instant::now();
     // 加载或编译电路
     let (prover, verifier) = load_or_build_circuit()?;

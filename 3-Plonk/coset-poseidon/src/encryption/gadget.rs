@@ -19,16 +19,17 @@ use crate::{Domain, Error};
 /// The cipher-text will always yield exactly one element more than the message.
 pub fn encrypt_gadget(
     composer: &mut Composer,
-    message: impl AsRef<[Witness]>,
+    plaintext_message: impl AsRef<[Witness]>,
     shared_secret: &WitnessPoint,
-    nonce: &Witness,
+    nonce_witness: &Witness,
 ) -> Result<Vec<Witness>, Error> {
+    let shared_secret_coordinates = [*shared_secret.x(), *shared_secret.y()];
     Ok(dusk_safe::encrypt(
         GadgetPermutation::new(composer),
         Domain::Encryption,
-        message,
-        &[*shared_secret.x(), *shared_secret.y()],
-        nonce,
+        plaintext_message,
+        &shared_secret_coordinates,
+        nonce_witness,
     )?)
 }
 
@@ -41,15 +42,16 @@ pub fn encrypt_gadget(
 /// The cipher-text will always yield exactly one element more than the message.
 pub fn decrypt_gadget(
     composer: &mut Composer,
-    cipher: impl AsRef<[Witness]>,
+    ciphertext: impl AsRef<[Witness]>,
     shared_secret: &WitnessPoint,
-    nonce: &Witness,
+    nonce_witness: &Witness,
 ) -> Result<Vec<Witness>, Error> {
+    let shared_secret_coordinates = [*shared_secret.x(), *shared_secret.y()];
     Ok(dusk_safe::decrypt(
         GadgetPermutation::new(composer),
         Domain::Encryption,
-        cipher,
-        &[*shared_secret.x(), *shared_secret.y()],
-        nonce,
+        ciphertext,
+        &shared_secret_coordinates,
+        nonce_witness,
     )?)
 }

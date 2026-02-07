@@ -60,16 +60,18 @@ use crate::{Domain, Error};
 ///
 /// The cipher-text will always yield exactly one element more than the message.
 pub fn encrypt(
-    message: impl AsRef<[BlsScalar]>,
+    plaintext_message: impl AsRef<[BlsScalar]>,
     shared_secret: &JubJubAffine,
-    nonce: &BlsScalar,
+    nonce_scalar: &BlsScalar,
 ) -> Result<Vec<BlsScalar>, Error> {
+    let shared_secret_coordinates =
+        [shared_secret.get_u(), shared_secret.get_v()];
     Ok(dusk_safe::encrypt(
         ScalarPermutation::new(),
         Domain::Encryption,
-        message,
-        &[shared_secret.get_u(), shared_secret.get_v()],
-        nonce,
+        plaintext_message,
+        &shared_secret_coordinates,
+        nonce_scalar,
     )?)
 }
 
@@ -81,15 +83,17 @@ pub fn encrypt(
 ///
 /// The cipher-text will always yield exactly one element more than the message.
 pub fn decrypt(
-    cipher: impl AsRef<[BlsScalar]>,
+    ciphertext: impl AsRef<[BlsScalar]>,
     shared_secret: &JubJubAffine,
-    nonce: &BlsScalar,
+    nonce_scalar: &BlsScalar,
 ) -> Result<Vec<BlsScalar>, Error> {
+    let shared_secret_coordinates =
+        [shared_secret.get_u(), shared_secret.get_v()];
     Ok(dusk_safe::decrypt(
         ScalarPermutation::new(),
         Domain::Encryption,
-        cipher,
-        &[shared_secret.get_u(), shared_secret.get_v()],
-        nonce,
+        ciphertext,
+        &shared_secret_coordinates,
+        nonce_scalar,
     )?)
 }

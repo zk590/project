@@ -12,7 +12,7 @@ use dusk_safe::Sponge;
 use crate::hades::GadgetPermutation;
 use crate::Domain;
 
-use super::io_pattern;
+use super::build_io_pattern;
 
 /// Hash struct.
 pub struct HashGadget<'a> {
@@ -54,28 +54,28 @@ impl<'a> HashGadget<'a> {
     pub fn finalize(&self, composer: &mut Composer) -> Vec<Witness> {
         // Generate the hash using the sponge framework:
         // initialize the sponge
-        let mut sponge = Sponge::start(
+        let mut poseidon_sponge = Sponge::start(
             GadgetPermutation::new(composer),
-            io_pattern(self.domain, &self.input, self.output_len)
+            build_io_pattern(self.domain, &self.input, self.output_len)
                 .expect("io-pattern should be valid"),
             self.domain.into(),
         )
         .expect("at this point the io-pattern is valid");
 
         // absorb the input
-        for input in self.input.iter() {
-            sponge
-                .absorb(input.len(), input)
+        for segment in self.input.iter() {
+            poseidon_sponge
+                .absorb(segment.len(), segment)
                 .expect("at this point the io-pattern is valid");
         }
 
         // squeeze output_len elements
-        sponge
+        poseidon_sponge
             .squeeze(self.output_len)
             .expect("at this point the io-pattern is valid");
 
         // return the result
-        sponge
+        poseidon_sponge
             .finish()
             .expect("at this point the io-pattern is valid")
     }
@@ -88,12 +88,14 @@ impl<'a> HashGadget<'a> {
     /// anything other than 4 Scalar.
     pub fn finalize_truncated(&self, composer: &mut Composer) -> Vec<Witness> {
         // finalize the hash as bls-scalar witnesses
-        let bls_output = self.finalize(composer);
+        let field_witnesses = self.finalize(composer);
 
         // truncate the bls witnesses to 250 bits
-        bls_output
+        field_witnesses
             .iter()
-            .map(|bls| composer.append_logic_xor::<125>(*bls, Composer::ZERO))
+            .map(|witness| {
+                composer.append_logic_xor::<125>(*witness, Composer::ZERO)
+            })
             .collect()
     }
 
@@ -108,9 +110,9 @@ impl<'a> HashGadget<'a> {
         domain: Domain,
         input: &'a [Witness],
     ) -> Vec<Witness> {
-        let mut hash = Self::new(domain);
-        hash.update(input);
-        hash.finalize(composer)
+        let mut poseidon_hash = Self::new(domain);
+        poseidon_hash.update(input);
+        poseidon_hash.finalize(composer)
     }
 
     /// Digest an input and calculate the hash as jubjub-scalar immediately
@@ -124,8 +126,8 @@ impl<'a> HashGadget<'a> {
         domain: Domain,
         input: &'a [Witness],
     ) -> Vec<Witness> {
-        let mut hash = Self::new(domain);
-        hash.update(input);
-        hash.finalize_truncated(composer)
+        let mut poseidon_hash = Self::new(domain);
+        poseidon_hash.update(input);
+        poseidon_hash.finalize_truncated(composer)
     }
 }

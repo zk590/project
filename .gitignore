@@ -49,3 +49,5 @@ core.*
 *.log
 *.tmp
 *.bak
+
+Poseidon252/*

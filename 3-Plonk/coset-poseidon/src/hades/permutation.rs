@@ -41,7 +41,11 @@ pub(crate) trait Hades<T> {
     ///
     /// Basically it allows to destroy any connection between the inputs and the
     /// outputs of the function.
-    fn add_round_constants(&mut self, round: usize, state: &mut [T; WIDTH]);
+    fn add_round_constants(
+        &mut self,
+        round_index: usize,
+        state: &mut [T; WIDTH],
+    );
 
     /// Computes `input ^ 5 (mod p)`
     ///
@@ -51,7 +55,7 @@ pub(crate) trait Hades<T> {
     fn quintic_s_box(&mut self, value: &mut T);
 
     /// Multiply the MDS matrix with the state.
-    fn mul_matrix(&mut self, round: usize, state: &mut [T; WIDTH]);
+    fn mul_matrix(&mut self, round_index: usize, state: &mut [T; WIDTH]);
 
     /// Applies a `Partial Round` also known as a `Partial S-Box layer` to a set
     /// of inputs.
@@ -62,15 +66,19 @@ pub(crate) trait Hades<T> {
     ///   state** generated from the first step.
     /// - Mix Layer: Multiplies the output state from the second step by the
     ///   `MDS_MATRIX`.
-    fn apply_partial_round(&mut self, round: usize, state: &mut [T; WIDTH]) {
+    fn apply_partial_round(
+        &mut self,
+        round_index: usize,
+        state: &mut [T; WIDTH],
+    ) {
         // Add round constants to each state element
-        self.add_round_constants(round, state);
+        self.add_round_constants(round_index, state);
 
         // Then apply quintic s-box to the last element of the state
         self.quintic_s_box(&mut state[WIDTH - 1]);
 
         // Multiply this result by the MDS matrix
-        self.mul_matrix(round, state);
+        self.mul_matrix(round_index, state);
     }
 
     /// Applies a `Full Round` also known as a `Full S-Box layer` to a set of
@@ -82,15 +90,19 @@ pub(crate) trait Hades<T> {
     ///   generated from the first step.
     /// - Mix Layer: Multiplies the output state from the second step by the
     ///   `MDS_MATRIX`.
-    fn apply_full_round(&mut self, round: usize, state: &mut [T; WIDTH]) {
+    fn apply_full_round(
+        &mut self,
+        round_index: usize,
+        state: &mut [T; WIDTH],
+    ) {
         // Add round constants to each state element
-        self.add_round_constants(round, state);
+        self.add_round_constants(round_index, state);
 
         // Then apply quintic s-box to each element of the state
         state.iter_mut().for_each(|w| self.quintic_s_box(w));
 
         // Multiply this result by the MDS matrix
-        self.mul_matrix(round, state);
+        self.mul_matrix(round_index, state);
     }
 
     /// Applies one Hades permutation.
@@ -106,19 +118,22 @@ pub(crate) trait Hades<T> {
     /// maintaining the security.
     fn perm(&mut self, state: &mut [T; WIDTH]) {
         // Apply R_f full rounds
-        for round in 0..FULL_ROUNDS / 2 {
-            self.apply_full_round(round, state);
+        for full_round_index in 0..FULL_ROUNDS / 2 {
+            self.apply_full_round(full_round_index, state);
         }
 
         // Apply R_P partial rounds
-        for round in 0..PARTIAL_ROUNDS {
-            self.apply_partial_round(round + FULL_ROUNDS / 2, state);
+        for partial_round_index in 0..PARTIAL_ROUNDS {
+            self.apply_partial_round(
+                partial_round_index + FULL_ROUNDS / 2,
+                state,
+            );
         }
 
         // Apply R_f full rounds
-        for round in 0..FULL_ROUNDS / 2 {
+        for full_round_index in 0..FULL_ROUNDS / 2 {
             self.apply_full_round(
-                round + FULL_ROUNDS / 2 + PARTIAL_ROUNDS,
+                full_round_index + FULL_ROUNDS / 2 + PARTIAL_ROUNDS,
                 state,
             );
         }

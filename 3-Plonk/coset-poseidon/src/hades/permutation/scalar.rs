@@ -38,29 +38,36 @@ impl Safe<BlsScalar, WIDTH> for ScalarPermutation {
 impl Hades<BlsScalar> for ScalarPermutation {
     fn add_round_constants(
         &mut self,
-        round: usize,
+        round_index: usize,
         state: &mut [BlsScalar; WIDTH],
     ) {
         state
             .iter_mut()
             .enumerate()
-            .for_each(|(i, s)| *s += ROUND_CONSTANTS[round][i]);
+            .for_each(|(state_index, state_value)| {
+                *state_value += ROUND_CONSTANTS[round_index][state_index]
+            });
     }
 
     fn quintic_s_box(&mut self, value: &mut BlsScalar) {
         *value = value.square().square() * *value;
     }
 
-    fn mul_matrix(&mut self, _round: usize, state: &mut [BlsScalar; WIDTH]) {
-        let mut result = [BlsScalar::zero(); WIDTH];
+    fn mul_matrix(
+        &mut self,
+        _round_index: usize,
+        state: &mut [BlsScalar; WIDTH],
+    ) {
+        let mut mixed_state = [BlsScalar::zero(); WIDTH];
 
-        for (j, value) in state.iter().enumerate() {
-            for k in 0..WIDTH {
-                result[k] += MDS_MATRIX[k][j] * value;
+        for (column_index, state_value) in state.iter().enumerate() {
+            for row_index in 0..WIDTH {
+                mixed_state[row_index] +=
+                    MDS_MATRIX[row_index][column_index] * state_value;
             }
         }
 
-        state.copy_from_slice(&result);
+        state.copy_from_slice(&mixed_state);
     }
 }
 

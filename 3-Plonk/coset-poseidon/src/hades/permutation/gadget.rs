@@ -164,82 +164,95 @@ mod tests {
 
     #[derive(Default)]
     struct TestCircuit {
-        i: [BlsScalar; WIDTH],
-        o: [BlsScalar; WIDTH],
+        input_state: [BlsScalar; WIDTH],
+        expected_state: [BlsScalar; WIDTH],
     }
 
     impl Circuit for TestCircuit {
         fn circuit(&self, composer: &mut Composer) -> Result<(), Error> {
-            let zero = Composer::ZERO;
+            let zero_witness = Composer::ZERO;
 
-            let mut perm: [Witness; WIDTH] = [zero; WIDTH];
+            let mut permuted_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
 
-            let mut i_wit: [Witness; WIDTH] = [zero; WIDTH];
-            self.i.iter().zip(i_wit.iter_mut()).for_each(|(i, w)| {
-                *w = composer.append_witness(*i);
-            });
+            let mut input_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
+            self.input_state
+                .iter()
+                .zip(input_witnesses.iter_mut())
+                .for_each(|(input_scalar, witness_slot)| {
+                    *witness_slot = composer.append_witness(*input_scalar);
+                });
 
-            let mut o_wit: [Witness; WIDTH] = [zero; WIDTH];
-            self.o.iter().zip(o_wit.iter_mut()).for_each(|(o, w)| {
-                *w = composer.append_witness(*o);
-            });
+            let mut expected_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
+            self.expected_state
+                .iter()
+                .zip(expected_witnesses.iter_mut())
+                .for_each(|(expected_scalar, witness_slot)| {
+                    *witness_slot = composer.append_witness(*expected_scalar);
+                });
 
             // Apply Hades gadget permutation.
-            GadgetPermutation::new(composer).permute(&mut i_wit);
+            GadgetPermutation::new(composer).permute(&mut input_witnesses);
 
-            // Copy the result of the permutation into the perm.
-            perm.copy_from_slice(&i_wit);
+            // Copy the result of the permutation into the local result buffer.
+            permuted_witnesses.copy_from_slice(&input_witnesses);
 
-            // Check that the Gadget perm results = BlsScalar perm results
-            i_wit.iter().zip(o_wit.iter()).for_each(|(p, o)| {
-                composer.assert_equal(*p, *o);
-            });
+            // Check that the Gadget permutation result equals scalar permutation result.
+            permuted_witnesses
+                .iter()
+                .zip(expected_witnesses.iter())
+                .for_each(|(permuted_witness, expected_witness)| {
+                    composer.assert_equal(*permuted_witness, *expected_witness);
+                });
 
             Ok(())
         }
     }
 
     /// Generate a random input and perform a permutation
-    fn hades() -> ([BlsScalar; WIDTH], [BlsScalar; WIDTH]) {
-        let mut input = [BlsScalar::zero(); WIDTH];
+    fn generate_permuted_state() -> ([BlsScalar; WIDTH], [BlsScalar; WIDTH]) {
+        let mut input_state = [BlsScalar::zero(); WIDTH];
 
-        let mut rng = StdRng::seed_from_u64(0xbeef);
+        let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
-        input
-            .iter_mut()
-            .for_each(|s| *s = BlsScalar::random(&mut rng));
+        input_state.iter_mut().for_each(|scalar_slot| {
+            *scalar_slot = BlsScalar::random(&mut deterministic_rng)
+        });
 
-        let mut output = [BlsScalar::zero(); WIDTH];
+        let mut expected_state = [BlsScalar::zero(); WIDTH];
 
-        output.copy_from_slice(&input);
-        ScalarPermutation::new().permute(&mut output);
+        expected_state.copy_from_slice(&input_state);
+        ScalarPermutation::new().permute(&mut expected_state);
 
-        (input, output)
+        (input_state, expected_state)
     }
 
     /// Setup the test circuit prover and verifier
     fn setup() -> Result<(Prover, Verifier), Error> {
         const CAPACITY: usize = 1 << 10;
 
-        let mut rng = StdRng::seed_from_u64(0xbeef);
+        let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
-        let pp = PublicParameters::setup(CAPACITY, &mut rng)?;
-        let label = b"hades_gadget_tester";
+        let public_parameters =
+            PublicParameters::setup(CAPACITY, &mut deterministic_rng)?;
+        let circuit_label = b"hades_gadget_tester";
 
-        Compiler::compile::<TestCircuit>(&pp, label)
+        Compiler::compile::<TestCircuit>(&public_parameters, circuit_label)
     }
 
     #[test]
     fn preimage() -> Result<(), Error> {
         let (prover, verifier) = setup()?;
 
-        let (i, o) = hades();
+        let (input_state, expected_state) = generate_permuted_state();
 
-        let circuit = TestCircuit { i, o };
-        let mut rng = StdRng::seed_from_u64(0xbeef);
+        let circuit = TestCircuit {
+            input_state,
+            expected_state,
+        };
+        let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
         // Proving
-        let (proof, public_inputs) = prover.prove(&mut rng, &circuit)?;
+        let (proof, public_inputs) = prover.prove(&mut deterministic_rng, &circuit)?;
 
         // Verifying
         verifier.verify(&proof, &public_inputs)?;
@@ -252,15 +265,18 @@ mod tests {
         let (prover, verifier) = setup()?;
 
         // Prepare input & output
-        let i = [BlsScalar::from(5000u64); WIDTH];
-        let mut o = [BlsScalar::from(5000u64); WIDTH];
-        ScalarPermutation::new().permute(&mut o);
+        let input_state = [BlsScalar::from(5000u64); WIDTH];
+        let mut expected_state = [BlsScalar::from(5000u64); WIDTH];
+        ScalarPermutation::new().permute(&mut expected_state);
 
-        let circuit = TestCircuit { i, o };
-        let mut rng = StdRng::seed_from_u64(0xbeef);
+        let circuit = TestCircuit {
+            input_state,
+            expected_state,
+        };
+        let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
         // Proving
-        let (proof, public_inputs) = prover.prove(&mut rng, &circuit)?;
+        let (proof, public_inputs) = prover.prove(&mut deterministic_rng, &circuit)?;
 
         // Verifying
         verifier.verify(&proof, &public_inputs)?;
@@ -275,20 +291,25 @@ mod tests {
         // Generate [31, 0, 0, 0, 0] as real input to the perm but build the
         // proof with [31, 31, 31, 31, 31]. This should fail on verification
         // since the Proof contains incorrect statements.
-        let x_scalar = BlsScalar::from(31u64);
+        let special_scalar = BlsScalar::from(31u64);
 
-        let mut i = [BlsScalar::zero(); WIDTH];
-        i[1] = x_scalar;
+        let mut input_state = [BlsScalar::zero(); WIDTH];
+        input_state[1] = special_scalar;
 
-        let mut o = [BlsScalar::from(31u64); WIDTH];
-        ScalarPermutation::new().permute(&mut o);
+        let mut expected_state = [BlsScalar::from(31u64); WIDTH];
+        ScalarPermutation::new().permute(&mut expected_state);
 
-        let circuit = TestCircuit { i, o };
-        let mut rng = StdRng::seed_from_u64(0xbeef);
+        let circuit = TestCircuit {
+            input_state,
+            expected_state,
+        };
+        let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
         // Proving should fail
         assert!(
-            prover.prove(&mut rng, &circuit).is_err(),
+            prover
+                .prove(&mut deterministic_rng, &circuit)
+                .is_err(),
             "proving should fail since the circuit is invalid"
         );
 
