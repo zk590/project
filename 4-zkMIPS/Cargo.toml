@@ -31,10 +31,7 @@ members = [
   "sha2/lib",
   "sha3/guest",
   "sha3/host",
-  "sha3/lib",
-  "zkm-project-template/guest",
-  "zkm-project-template/host",
-  "zkm-project-template/lib"
+  "sha3/lib"
 ]
 resolver = "2"
 

@@ -1,4 +1,3 @@
-
 use alloc::vec::Vec;
 use core::ops;
 
@@ -18,7 +17,6 @@ use crate::proof_system::{
 use crate::transcript::TranscriptProtocol;
 
 use super::{Circuit, Composer};
-
 
 #[derive(Clone)]
 pub struct Prover {
@@ -61,7 +59,6 @@ impl Prover {
             constraints,
         }
     }
-
 
     /// 将 witness 多项式加盲并转为系数形式，提升零知识隐藏性。
     fn blind_poly<R>(
@@ -195,7 +192,6 @@ impl Prover {
         let label = label.to_vec();
         let prover_key = ProverKey::from_slice(prover_key)?;
 
-
         let commit_key = unsafe { CommitKey::from_slice_unchecked(commit_key) };
 
         let verifier_key = VerifierKey::from_slice(verifier_key)?;
@@ -241,8 +237,6 @@ impl Prover {
             .iter()
             .for_each(|pi| transcript.append_scalar(b"pi", pi));
 
-
-
         let mut a_scalars = vec![BlsScalar::zero(); size];
         let mut b_scalars = vec![BlsScalar::zero(); size];
         let mut c_scalars = vec![BlsScalar::zero(); size];
@@ -264,20 +258,15 @@ impl Prover {
         let c_poly = Self::blind_poly(rng, &c_scalars, 1, &domain);
         let d_poly = Self::blind_poly(rng, &d_scalars, 1, &domain);
 
-
-
         let a_comm = self.commit_key.commit(&a_poly)?;
         let b_comm = self.commit_key.commit(&b_poly)?;
         let c_comm = self.commit_key.commit(&c_poly)?;
         let d_comm = self.commit_key.commit(&d_poly)?;
 
-
         transcript.append_commitment(b"a_comm", &a_comm);
         transcript.append_commitment(b"b_comm", &b_comm);
         transcript.append_commitment(b"c_comm", &c_comm);
         transcript.append_commitment(b"d_comm", &d_comm);
-
-
 
         let beta = transcript.challenge_scalar(b"beta");
         transcript.append_scalar(b"beta", &beta);
@@ -303,8 +292,6 @@ impl Prover {
         let z_comm = self.commit_key.commit(&z_poly)?;
         transcript.append_commitment(b"z_comm", &z_comm);
 
-
-
         let alpha = transcript.challenge_scalar(b"alpha");
         let range_sep_challenge =
             transcript.challenge_scalar(b"range separation challenge");
@@ -315,10 +302,8 @@ impl Prover {
         let var_base_sep_challenge =
             transcript.challenge_scalar(b"variable base separation challenge");
 
-
         let pi_poly = domain.ifft(&dense_public_inputs);
         let pi_poly = Polynomial::from_coefficients_vec(pi_poly);
-
 
         let wires = (&a_poly, &b_poly, &c_poly, &d_poly);
         let args = &(
@@ -330,7 +315,7 @@ impl Prover {
             fixed_base_sep_challenge,
             var_base_sep_challenge,
         );
-        let t_poly = quotient_poly::compute(
+        let t_poly = quotient_poly::build_quotient_polynomial(
             &domain,
             &self.prover_key,
             &z_poly,
@@ -339,7 +324,6 @@ impl Prover {
             args,
         )?;
 
-
         let domain_size = domain.size();
 
         let mut t_low_vec = t_poly[0..domain_size].to_vec();
@@ -347,22 +331,17 @@ impl Prover {
         let mut t_high_vec = t_poly[2 * domain_size..3 * domain_size].to_vec();
         let mut t_fourth_vec = t_poly[3 * domain_size..].to_vec();
 
-
         let b_12 = BlsScalar::random(&mut *rng);
         let b_13 = BlsScalar::random(&mut *rng);
         let b_14 = BlsScalar::random(&mut *rng);
 
-
         t_low_vec.push(b_12);
-
 
         t_mid_vec[0] -= b_12;
         t_mid_vec.push(b_13);
 
-
         t_high_vec[0] -= b_13;
         t_high_vec.push(b_14);
-
 
         t_fourth_vec[0] -= b_14;
 
@@ -371,22 +350,17 @@ impl Prover {
         let t_high_poly = Polynomial::from_coefficients_vec(t_high_vec);
         let t_fourth_poly = Polynomial::from_coefficients_vec(t_fourth_vec);
 
-
         let t_low_comm = self.commit_key.commit(&t_low_poly)?;
         let t_mid_comm = self.commit_key.commit(&t_mid_poly)?;
         let t_high_comm = self.commit_key.commit(&t_high_poly)?;
         let t_fourth_comm = self.commit_key.commit(&t_fourth_poly)?;
-
 
         transcript.append_commitment(b"t_low_comm", &t_low_comm);
         transcript.append_commitment(b"t_mid_comm", &t_mid_comm);
         transcript.append_commitment(b"t_high_comm", &t_high_comm);
         transcript.append_commitment(b"t_fourth_comm", &t_fourth_comm);
 
-
-
         let z_challenge = transcript.challenge_scalar(b"z_challenge");
-
 
         let a_eval = a_poly.evaluate(&z_challenge);
         let b_eval = b_poly.evaluate(&z_challenge);
@@ -414,7 +388,6 @@ impl Prover {
 
         let z_eval = z_poly.evaluate(&(z_challenge * domain.group_gen));
 
-
         transcript.append_scalar(b"a_eval", &a_eval);
         transcript.append_scalar(b"b_eval", &b_eval);
         transcript.append_scalar(b"c_eval", &c_eval);
@@ -426,11 +399,9 @@ impl Prover {
 
         transcript.append_scalar(b"z_eval", &z_eval);
 
-
         let a_w_eval = a_poly.evaluate(&(z_challenge * domain.group_gen));
         let b_w_eval = b_poly.evaluate(&(z_challenge * domain.group_gen));
         let d_w_eval = d_poly.evaluate(&(z_challenge * domain.group_gen));
-
 
         let q_arith_eval =
             self.prover_key.arithmetic.q_arith.0.evaluate(&z_challenge);
@@ -438,11 +409,9 @@ impl Prover {
         let q_l_eval = self.prover_key.fixed_base.q_l.0.evaluate(&z_challenge);
         let q_r_eval = self.prover_key.fixed_base.q_r.0.evaluate(&z_challenge);
 
-
         transcript.append_scalar(b"a_w_eval", &a_w_eval);
         transcript.append_scalar(b"b_w_eval", &b_w_eval);
         transcript.append_scalar(b"d_w_eval", &d_w_eval);
-
 
         transcript.append_scalar(b"q_arith_eval", &q_arith_eval);
         transcript.append_scalar(b"q_c_eval", &q_c_eval);
@@ -467,12 +436,9 @@ impl Prover {
             z_eval,
         };
 
-
-
         let v_challenge = transcript.challenge_scalar(b"v_challenge");
 
-
-        let r_poly = linearization_poly::compute(
+        let r_poly = linearization_poly::build_linearization_polynomial(
             &self.prover_key,
             &(
                 alpha,
@@ -494,7 +460,6 @@ impl Prover {
             &public_inputs,
         );
 
-
         let aggregate_witness = CommitKey::compute_aggregate_witness(
             &[
                 r_poly,
@@ -511,9 +476,7 @@ impl Prover {
         );
         let w_z_chall_comm = self.commit_key.commit(&aggregate_witness)?;
 
-
         let v_w_challenge = transcript.challenge_scalar(b"v_w_challenge");
-
 
         let shifted_aggregate_witness = CommitKey::compute_aggregate_witness(
             &[z_poly, a_poly, b_poly, d_poly],

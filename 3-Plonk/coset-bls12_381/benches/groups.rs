@@ -8,7 +8,6 @@ use coset_bytes::Serializable;
 use criterion::{black_box, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
-
     {
         let g = G1Affine::generator();
         let h = G2Affine::generator();
@@ -40,9 +39,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(&format!("{} check equality", name), move |b| {
             b.iter(|| black_box(a) == black_box(a))
         });
-        c.bench_function(&format!("{} scalar multiplication", name), move |b| {
-            b.iter(|| black_box(a) * black_box(s))
-        });
+        c.bench_function(
+            &format!("{} scalar multiplication", name),
+            move |b| b.iter(|| black_box(a) * black_box(s)),
+        );
         c.bench_function(&format!("{} subgroup check", name), move |b| {
             b.iter(|| black_box(a).is_torsion_free())
         });
@@ -51,7 +51,6 @@ fn criterion_benchmark(c: &mut Criterion) {
             move |b| b.iter(|| G1Affine::from_bytes(black_box(&compressed))),
         );
     }
-
 
     {
         let name = "G1Projective";
@@ -81,17 +80,23 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(&format!("{} mixed addition", name), move |b| {
             b.iter(|| black_box(a).add_mixed(&a_affine))
         });
-        c.bench_function(&format!("{} scalar multiplication", name), move |b| {
-            b.iter(|| black_box(a) * black_box(s))
-        });
-        c.bench_function(&format!("{} batch to affine n={}", name, N), move |b| {
-            b.iter(|| {
-                G1Projective::batch_normalize(black_box(&v), black_box(&mut q));
-                black_box(&q)[0]
-            })
-        });
+        c.bench_function(
+            &format!("{} scalar multiplication", name),
+            move |b| b.iter(|| black_box(a) * black_box(s)),
+        );
+        c.bench_function(
+            &format!("{} batch to affine n={}", name, N),
+            move |b| {
+                b.iter(|| {
+                    G1Projective::batch_normalize(
+                        black_box(&v),
+                        black_box(&mut q),
+                    );
+                    black_box(&q)[0]
+                })
+            },
+        );
     }
-
 
     {
         let name = "G2Affine";
@@ -104,9 +109,10 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(&format!("{} check equality", name), move |b| {
             b.iter(|| black_box(a) == black_box(a))
         });
-        c.bench_function(&format!("{} scalar multiplication", name), move |b| {
-            b.iter(|| black_box(a) * black_box(s))
-        });
+        c.bench_function(
+            &format!("{} scalar multiplication", name),
+            move |b| b.iter(|| black_box(a) * black_box(s)),
+        );
         c.bench_function(&format!("{} subgroup check", name), move |b| {
             b.iter(|| black_box(a).is_torsion_free())
         });
@@ -115,7 +121,6 @@ fn criterion_benchmark(c: &mut Criterion) {
             move |b| b.iter(|| G2Affine::from_bytes(black_box(&compressed))),
         );
     }
-
 
     {
         let name = "G2Projective";
@@ -145,15 +150,22 @@ fn criterion_benchmark(c: &mut Criterion) {
         c.bench_function(&format!("{} mixed addition", name), move |b| {
             b.iter(|| black_box(a).add_mixed(&a_affine))
         });
-        c.bench_function(&format!("{} scalar multiplication", name), move |b| {
-            b.iter(|| black_box(a) * black_box(s))
-        });
-        c.bench_function(&format!("{} batch to affine n={}", name, N), move |b| {
-            b.iter(|| {
-                G2Projective::batch_normalize(black_box(&v), black_box(&mut q));
-                black_box(&q)[0]
-            })
-        });
+        c.bench_function(
+            &format!("{} scalar multiplication", name),
+            move |b| b.iter(|| black_box(a) * black_box(s)),
+        );
+        c.bench_function(
+            &format!("{} batch to affine n={}", name, N),
+            move |b| {
+                b.iter(|| {
+                    G2Projective::batch_normalize(
+                        black_box(&v),
+                        black_box(&mut q),
+                    );
+                    black_box(&q)[0]
+                })
+            },
+        );
     }
 }
 

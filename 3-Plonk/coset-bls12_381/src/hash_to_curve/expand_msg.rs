@@ -1,6 +1,3 @@
-
-
-
 use core::{
     fmt::{self, Debug, Formatter},
     marker::PhantomData,
@@ -18,21 +15,18 @@ use alloc::vec::Vec;
 
 const OVERSIZE_DST_SALT: &[u8] = b"H2C-OVERSIZE-DST-";
 
-
 ///
 
 ///
 
 #[derive(Debug)]
 enum ExpandMsgDst<'x, L: ArrayLength<u8>> {
-
     Hashed(GenericArray<u8, L>),
 
     Raw(&'x [u8]),
 }
 
 impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
-
     pub fn process_xof<H>(dst: &'x [u8]) -> Self
     where
         H: Default + Update + ExtendableOutputDirty,
@@ -50,18 +44,18 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
-
     pub fn process_xmd<H>(dst: &'x [u8]) -> Self
     where
         H: Digest<OutputSize = L>,
     {
         if dst.len() > 255 {
-            Self::Hashed(H::new().chain(OVERSIZE_DST_SALT).chain(&dst).finalize())
+            Self::Hashed(
+                H::new().chain(OVERSIZE_DST_SALT).chain(&dst).finalize(),
+            )
         } else {
             Self::Raw(dst)
         }
     }
-
 
     pub fn data(&'x self) -> &'x [u8] {
         match self {
@@ -69,7 +63,6 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
             Self::Raw(buf) => buf,
         }
     }
-
 
     pub fn len(&'x self) -> usize {
         match self {
@@ -79,29 +72,22 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
     }
 }
 
-
-pub trait ExpandMessage: for<'x> InitExpandMessage<'x> {
-
-
-}
-
+pub trait ExpandMessage: for<'x> InitExpandMessage<'x> {}
 
 pub trait InitExpandMessage<'x> {
-
     type Expander: ExpandMessageState<'x>;
 
-
-    fn init_expand(message: &[u8], dst: &'x [u8], len_in_bytes: usize) -> Self::Expander;
+    fn init_expand(
+        message: &[u8],
+        dst: &'x [u8],
+        len_in_bytes: usize,
+    ) -> Self::Expander;
 }
-
 
 impl<X: for<'x> InitExpandMessage<'x>> ExpandMessage for X {}
 
-
 pub trait ExpandMessageState<'x> {
-
     fn read_into(&mut self, output: &mut [u8]) -> usize;
-
 
     fn remain(&self) -> usize;
 
@@ -117,10 +103,7 @@ pub trait ExpandMessageState<'x> {
     }
 }
 
-
-
 ///
-
 
 ///
 
@@ -160,7 +143,6 @@ where
     type Expander = Self;
 
     fn init_expand(message: &[u8], dst: &[u8], len_in_bytes: usize) -> Self {
-
         let dst = ExpandMsgDst::<U32>::process_xof::<H>(dst);
         let hash = H::default()
             .chain(message)
@@ -175,16 +157,12 @@ where
     }
 }
 
-
-
 ///
 
 ///
 
 #[derive(Debug)]
 pub struct ExpandMsgXmd<H: Digest>(PhantomData<H>);
-
-
 
 ///
 
@@ -213,7 +191,11 @@ where
 {
     type Expander = ExpandMsgXmdState<'x, H>;
 
-    fn init_expand(message: &[u8], dst: &'x [u8], len_in_bytes: usize) -> Self::Expander {
+    fn init_expand(
+        message: &[u8],
+        dst: &'x [u8],
+        len_in_bytes: usize,
+    ) -> Self::Expander {
         let hash_size = <H as Digest>::OutputSize::to_usize();
         let ell = (len_in_bytes + hash_size - 1) / hash_size;
         if ell > 255 {
@@ -294,7 +276,6 @@ mod tests {
     use sha2::{Sha256, Sha512};
     use sha3::{Shake128, Shake256};
 
-
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha256() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA256-128";
@@ -307,7 +288,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -319,7 +301,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -331,7 +314,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -345,7 +329,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -366,7 +351,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -381,7 +367,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -396,7 +383,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -411,7 +399,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -428,7 +417,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -452,11 +442,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }
-
 
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha256_long_dst() {
@@ -474,7 +464,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -486,7 +477,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -498,7 +490,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -512,7 +505,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -533,7 +527,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -548,7 +543,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -563,7 +559,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -578,7 +575,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -595,7 +593,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -619,11 +618,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }
-
 
     #[test]
     fn expand_message_xmd_works_for_draft12_testvectors_sha512() {
@@ -637,7 +636,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -649,7 +649,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -661,7 +662,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -675,7 +677,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -696,7 +699,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -711,7 +715,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -726,7 +731,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -741,7 +747,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -758,7 +765,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -782,11 +790,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXmd::<Sha512>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }
-
 
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake128() {
@@ -800,7 +808,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -812,7 +821,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -824,7 +834,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -838,7 +849,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -859,7 +871,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -874,7 +887,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -889,7 +903,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -904,7 +919,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -921,7 +937,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -945,11 +962,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }
-
 
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake128_long_dst() {
@@ -967,7 +984,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -979,7 +997,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -991,7 +1010,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1005,7 +1025,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1026,7 +1047,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1041,7 +1063,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1056,7 +1079,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1071,7 +1095,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1088,7 +1113,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1112,11 +1138,11 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake128>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }
-
 
     #[test]
     fn expand_message_xof_works_for_draft12_testvectors_shake256() {
@@ -1130,7 +1156,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1142,7 +1169,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1154,7 +1182,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1168,7 +1197,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1189,7 +1219,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1204,7 +1235,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1219,7 +1251,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1234,7 +1267,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1251,7 +1285,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
 
@@ -1275,7 +1310,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes).into_vec(),
+            ExpandMsgXof::<Shake256>::init_expand(msg, dst, len_in_bytes)
+                .into_vec(),
             uniform_bytes
         );
     }

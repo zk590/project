@@ -1,10 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/fft/evaluations.rs）。
 
 //
-
-
-
 
 use super::domain::EvaluationDomain;
 use super::polynomial::Polynomial;
@@ -24,7 +20,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
 #[derive(PartialEq, Eq, Debug, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -33,7 +28,6 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct Evaluations {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) evals: Vec<BlsScalar>,
 
@@ -43,7 +37,6 @@ pub(crate) struct Evaluations {
 }
 
 impl Evaluations {
-
     pub fn to_var_bytes(&self) -> Vec<u8> {
         let mut bytes: Vec<u8> = self.domain.to_bytes().to_vec();
         bytes.extend(
@@ -55,7 +48,6 @@ impl Evaluations {
         bytes
     }
 
-
     pub fn from_slice(bytes: &[u8]) -> Result<Evaluations, Error> {
         let mut buffer = bytes;
         let domain = EvaluationDomain::from_reader(&mut buffer)?;
@@ -66,14 +58,12 @@ impl Evaluations {
         Ok(Evaluations::from_vec_and_domain(evals, domain))
     }
 
-
     pub(crate) const fn from_vec_and_domain(
         evals: Vec<BlsScalar>,
         domain: EvaluationDomain,
     ) -> Self {
         Self { evals, domain }
     }
-
 
     pub(crate) fn interpolate(self) -> Polynomial {
         let Self { mut evals, domain } = self;

@@ -1,22 +1,14 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/bit_iterator.rs）。
 
 //
-
-
-
 
 use core::mem;
 
 #[derive(Debug, Clone, Copy)]
 pub struct BitIterator8<E> {
-
     scalar: E,
 
-
-
     num_of_total_bits: usize,
-
 
     bit_len: usize,
 }

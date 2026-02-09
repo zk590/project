@@ -14,8 +14,9 @@ use rand_core::RngCore;
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -91,7 +92,9 @@ impl ConditionallySelectable for Fp6 {
 impl ConstantTimeEq for Fp6 {
     #[inline(always)]
     fn ct_eq(&self, other: &Self) -> Choice {
-        self.c0.ct_eq(&other.c0) & self.c1.ct_eq(&other.c1) & self.c2.ct_eq(&other.c2)
+        self.c0.ct_eq(&other.c0)
+            & self.c1.ct_eq(&other.c1)
+            & self.c2.ct_eq(&other.c2)
     }
 }
 
@@ -148,13 +151,7 @@ impl Fp6 {
         }
     }
 
-
     pub fn mul_by_nonresidue(&self) -> Self {
-
-
-
-
-
         Fp6 {
             c0: self.c2.mul_by_nonresidue(),
             c1: self.c0,
@@ -162,13 +159,11 @@ impl Fp6 {
         }
     }
 
-
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
         let c1 = self.c1.frobenius_map();
         let c2 = self.c2.frobenius_map();
-
 
         let c1 = c1
             * Fp2 {
@@ -182,7 +177,6 @@ impl Fp6 {
                     0x18f0_2065_5463_8741,
                 ]),
             };
-
 
         let c2 = c2
             * Fp2 {
@@ -205,46 +199,21 @@ impl Fp6 {
         self.c0.is_zero() & self.c1.is_zero() & self.c2.is_zero()
     }
 
-
     ///
-
 
     #[inline]
     fn mul_interleaved(&self, b: &Self) -> Self {
-
-
-
-
-
-
-
-
+        //
 
         //
 
-
-
+        //
 
         //
 
-
-
-
         //
 
-
-
-
         //
-
-
-
-
-        //
-
-
-        //
-
 
         let a = self;
         let b10_p_b11 = b.c1.c0 + b.c1.c1;
@@ -256,11 +225,17 @@ impl Fp6 {
             c0: Fp2 {
                 c0: Fp::sum_of_products(
                     [a.c0.c0, -a.c0.c1, a.c1.c0, -a.c1.c1, a.c2.c0, -a.c2.c1],
-                    [b.c0.c0, b.c0.c1, b20_m_b21, b20_p_b21, b10_m_b11, b10_p_b11],
+                    [
+                        b.c0.c0, b.c0.c1, b20_m_b21, b20_p_b21, b10_m_b11,
+                        b10_p_b11,
+                    ],
                 ),
                 c1: Fp::sum_of_products(
                     [a.c0.c0, a.c0.c1, a.c1.c0, a.c1.c1, a.c2.c0, a.c2.c1],
-                    [b.c0.c1, b.c0.c0, b20_p_b21, b20_m_b21, b10_p_b11, b10_m_b11],
+                    [
+                        b.c0.c1, b.c0.c0, b20_p_b21, b20_m_b21, b10_p_b11,
+                        b10_m_b11,
+                    ],
                 ),
             },
             c1: Fp2 {

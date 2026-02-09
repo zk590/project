@@ -1,21 +1,14 @@
-
-
-
 //
 
-
 use coset_bls12_381::BlsScalar;
+use coset_safe::Safe;
 use plonk::prelude::*;
-use dusk_safe::Safe;
 
 use crate::hades::{MDS_MATRIX, ROUND_CONSTANTS, WIDTH};
 
 use super::Hades;
 
-
-
 pub(crate) struct GadgetPermutation<'a> {
-
     composer: &'a mut Composer,
 }
 
@@ -28,7 +21,7 @@ impl<'a> GadgetPermutation<'a> {
 
 impl<'a> Safe<Witness, WIDTH> for GadgetPermutation<'a> {
     fn permute(&mut self, state: &mut [Witness; WIDTH]) {
-        self.perm(state);
+        self.apply_permutation(state);
     }
 
     fn tag(&mut self, input: &[u8]) -> Witness {
@@ -49,9 +42,6 @@ impl<'a> Hades<Witness> for GadgetPermutation<'a> {
         round: usize,
         state: &mut [Witness; WIDTH],
     ) {
-
-
-
         if round == 0 {
             state.iter_mut().enumerate().for_each(|(i, w)| {
                 let constant = ROUND_CONSTANTS[0][i];
@@ -74,33 +64,16 @@ impl<'a> Hades<Witness> for GadgetPermutation<'a> {
         *value = self.composer.gate_mul(constraint);
     }
 
-
-    fn mul_matrix(&mut self, round: usize, state: &mut [Witness; WIDTH]) {
+    fn apply_mds_matrix(&mut self, round: usize, state: &mut [Witness; WIDTH]) {
         let mut result = [Composer::ZERO; WIDTH];
 
+        //
 
         //
 
-
-
         //
-
-
-
-
-
-
-
-        //
-
-
-
-
-
-
 
         for j in 0..WIDTH {
-
             let c = match round + 1 < Self::ROUNDS {
                 true => ROUND_CONSTANTS[round + 1][j],
                 false => BlsScalar::zero(),
@@ -133,7 +106,7 @@ impl<'a> Hades<Witness> for GadgetPermutation<'a> {
 }
 
 #[cfg(feature = "encryption")]
-impl dusk_safe::Encryption<Witness, WIDTH> for GadgetPermutation<'_> {
+impl coset_safe::Encryption<Witness, WIDTH> for GadgetPermutation<'_> {
     fn subtract(&mut self, minuend: &Witness, subtrahend: &Witness) -> Witness {
         let constraint = Constraint::new()
             .left(1)
@@ -145,7 +118,6 @@ impl dusk_safe::Encryption<Witness, WIDTH> for GadgetPermutation<'_> {
 
     fn is_equal(&mut self, lhs: &Witness, rhs: &Witness) -> bool {
         self.composer.assert_equal(*lhs, *rhs);
-
 
         true
     }
@@ -172,7 +144,8 @@ mod tests {
         fn circuit(&self, composer: &mut Composer) -> Result<(), Error> {
             let zero_witness = Composer::ZERO;
 
-            let mut permuted_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
+            let mut permuted_witnesses: [Witness; WIDTH] =
+                [zero_witness; WIDTH];
 
             let mut input_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
             self.input_state
@@ -182,7 +155,8 @@ mod tests {
                     *witness_slot = composer.append_witness(*input_scalar);
                 });
 
-            let mut expected_witnesses: [Witness; WIDTH] = [zero_witness; WIDTH];
+            let mut expected_witnesses: [Witness; WIDTH] =
+                [zero_witness; WIDTH];
             self.expected_state
                 .iter()
                 .zip(expected_witnesses.iter_mut())
@@ -190,12 +164,9 @@ mod tests {
                     *witness_slot = composer.append_witness(*expected_scalar);
                 });
 
-
             GadgetPermutation::new(composer).permute(&mut input_witnesses);
 
-
             permuted_witnesses.copy_from_slice(&input_witnesses);
-
 
             permuted_witnesses
                 .iter()
@@ -207,7 +178,6 @@ mod tests {
             Ok(())
         }
     }
-
 
     fn generate_permuted_state() -> ([BlsScalar; WIDTH], [BlsScalar; WIDTH]) {
         let mut input_state = [BlsScalar::zero(); WIDTH];
@@ -225,7 +195,6 @@ mod tests {
 
         (input_state, expected_state)
     }
-
 
     fn setup() -> Result<(Prover, Verifier), Error> {
         const CAPACITY: usize = 1 << 10;
@@ -251,9 +220,8 @@ mod tests {
         };
         let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
-
-        let (proof, public_inputs) = prover.prove(&mut deterministic_rng, &circuit)?;
-
+        let (proof, public_inputs) =
+            prover.prove(&mut deterministic_rng, &circuit)?;
 
         verifier.verify(&proof, &public_inputs)?;
 
@@ -263,7 +231,6 @@ mod tests {
     #[test]
     fn preimage_constant() -> Result<(), Error> {
         let (prover, verifier) = setup()?;
-
 
         let input_state = [BlsScalar::from(5000u64); WIDTH];
         let mut expected_state = [BlsScalar::from(5000u64); WIDTH];
@@ -275,9 +242,8 @@ mod tests {
         };
         let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
-
-        let (proof, public_inputs) = prover.prove(&mut deterministic_rng, &circuit)?;
-
+        let (proof, public_inputs) =
+            prover.prove(&mut deterministic_rng, &circuit)?;
 
         verifier.verify(&proof, &public_inputs)?;
 
@@ -287,9 +253,6 @@ mod tests {
     #[test]
     fn preimage_fails() -> Result<(), Error> {
         let (prover, _) = setup()?;
-
-
-
 
         let special_scalar = BlsScalar::from(31u64);
 
@@ -305,11 +268,8 @@ mod tests {
         };
         let mut deterministic_rng = StdRng::seed_from_u64(0xbeef);
 
-
         assert!(
-            prover
-                .prove(&mut deterministic_rng, &circuit)
-                .is_err(),
+            prover.prove(&mut deterministic_rng, &circuit).is_err(),
             "proving should fail since the circuit is invalid"
         );
 

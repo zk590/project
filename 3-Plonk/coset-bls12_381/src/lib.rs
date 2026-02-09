@@ -1,25 +1,14 @@
-
 //!
 
-
 //!
-
-
-
-
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]
-
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![allow(clippy::too_many_arguments)]
 #![allow(clippy::many_single_char_names)]
-
-
-
-
 #![allow(clippy::suspicious_arithmetic_impl)]
 
 #[cfg(feature = "alloc")]
@@ -36,13 +25,6 @@ mod tests;
 #[macro_use]
 mod util;
 
-
-
-pub mod notes {
-    pub mod design;
-    pub mod serialization;
-}
-
 mod coset;
 #[cfg(feature = "groups")]
 use coset::choice;
@@ -53,7 +35,9 @@ mod scalar;
 
 pub use scalar::Scalar as BlsScalar;
 #[cfg(feature = "rkyv-impl")]
-pub use scalar::{ArchivedScalar as ArchivedBlsScalar, ScalarResolver as BlsScalarResolver};
+pub use scalar::{
+    ArchivedScalar as ArchivedBlsScalar, ScalarResolver as BlsScalarResolver,
+};
 pub use scalar::{GENERATOR, ROOT_OF_UNITY, TWO_ADACITY};
 
 #[cfg(feature = "groups")]
@@ -79,7 +63,6 @@ mod fp12;
 #[cfg(feature = "groups")]
 mod fp6;
 
-
 #[cfg(feature = "groups")]
 const BLS_X: u64 = 0xd201_0000_0001_0000;
 #[cfg(feature = "groups")]
@@ -96,10 +79,9 @@ pub use pairings::{multi_miller_loop, G2Prepared};
 
 #[cfg(all(feature = "pairings", feature = "rkyv-impl"))]
 pub use pairings::{
-    ArchivedG2Prepared, ArchivedGt, ArchivedMillerLoopResult, G2PreparedResolver, GtResolver,
-    MillerLoopResultResolver,
+    ArchivedG2Prepared, ArchivedGt, ArchivedMillerLoopResult,
+    G2PreparedResolver, GtResolver, MillerLoopResultResolver,
 };
-
 
 #[cfg(feature = "experimental")]
 pub(crate) use digest::generic_array;

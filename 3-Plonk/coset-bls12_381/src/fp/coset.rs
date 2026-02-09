@@ -1,7 +1,6 @@
 use super::Fp;
 
 impl Fp {
-
     pub const fn internal_repr(&self) -> &[u64; 6] {
         &self.0
     }
@@ -37,12 +36,16 @@ mod serde_support {
             let decoded = hex::decode(&s).map_err(SerdeError::custom)?;
             let decoded_len = decoded.len();
             const FP_BYTES_LEN: usize = 48;
-            let bytes: [u8; FP_BYTES_LEN] = decoded.try_into().map_err(|_| {
-                SerdeError::invalid_length(decoded_len, &FP_BYTES_LEN.to_string().as_str())
-            })?;
-            let fp = Fp::from_bytes(&bytes)
-                .into_option()
-                .ok_or(SerdeError::custom("Failed to deserialize Fp: invalid Fp"))?;
+            let bytes: [u8; FP_BYTES_LEN] =
+                decoded.try_into().map_err(|_| {
+                    SerdeError::invalid_length(
+                        decoded_len,
+                        &FP_BYTES_LEN.to_string().as_str(),
+                    )
+                })?;
+            let fp = Fp::from_bytes(&bytes).into_option().ok_or(
+                SerdeError::custom("Failed to deserialize Fp: invalid Fp"),
+            )?;
             Ok(fp)
         }
     }

@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/proof_system/quotient_poly.rs）。
 
 //
-
 
 use crate::{
     error::Error,
@@ -14,9 +12,7 @@ use coset_bls12_381::BlsScalar;
 #[cfg(feature = "std")]
 use rayon::prelude::*;
 
-
-
-pub(crate) fn compute(
+pub(crate) fn build_quotient_polynomial(
     domain: &EvaluationDomain,
     prover_key: &ProverKey,
     z_poly: &Polynomial,
@@ -45,7 +41,6 @@ pub(crate) fn compute(
         BlsScalar,
     ),
 ) -> Result<Polynomial, Error> {
-
     let domain_8n = EvaluationDomain::new(8 * domain.size())?;
 
     let mut z_eval_8n = domain_8n.coset_fft(z_poly);
@@ -63,7 +58,7 @@ pub(crate) fn compute(
         d_eval_8n.push(d_eval_8n[i]);
     }
 
-    let circuit_satisfiability_terms = compute_circuit_satisfiability_equation(
+    let circuit_satisfiability_terms = build_circuit_satisfiability_terms(
         domain,
         (
             range_challenge,
@@ -76,7 +71,7 @@ pub(crate) fn compute(
         public_inputs_poly,
     );
 
-    let permutation_check_terms = compute_permutation_checks(
+    let permutation_check_terms = build_permutation_check_terms(
         domain,
         prover_key,
         (&a_eval_8n, &b_eval_8n, &c_eval_8n, &d_eval_8n),
@@ -104,8 +99,7 @@ pub(crate) fn compute(
     Ok(Polynomial::from_coefficients_vec(coset))
 }
 
-
-fn compute_circuit_satisfiability_equation(
+fn build_circuit_satisfiability_terms(
     domain: &EvaluationDomain,
     (
         range_challenge,
@@ -142,14 +136,9 @@ fn compute_circuit_satisfiability_equation(
             let d_shift_eval = &d_eval_8n[index + 8];
             let public_eval = &public_eval_8n[index];
 
-            let t_arith =
-                prover_key.arithmetic.compute_quotient_i(
-                    index,
-                    a_eval,
-                    b_eval,
-                    c_eval,
-                    d_eval,
-                );
+            let t_arith = prover_key
+                .arithmetic
+                .compute_quotient_i(index, a_eval, b_eval, c_eval, d_eval);
 
             let t_range = prover_key.range.compute_quotient_i(
                 index,
@@ -197,15 +186,13 @@ fn compute_circuit_satisfiability_equation(
                 d_shift_eval,
             );
 
-
-
             t_arith + t_range + t_logic + t_fixed + t_var + public_eval
         })
         .collect();
     quotient_terms
 }
 
-fn compute_permutation_checks(
+fn build_permutation_check_terms(
     domain: &EvaluationDomain,
     prover_key: &ProverKey,
     (a_eval_8n, b_eval_8n, c_eval_8n, d_eval_8n): (
@@ -219,7 +206,7 @@ fn compute_permutation_checks(
 ) -> Vec<BlsScalar> {
     let domain_8n = EvaluationDomain::new(8 * domain.size()).unwrap();
     let l1_poly_alpha =
-        compute_first_lagrange_poly_scaled(domain, alpha.square());
+        build_scaled_first_lagrange_poly(domain, alpha.square());
     let l1_alpha_sq_evals = domain_8n.coset_fft(&l1_poly_alpha);
 
     #[cfg(not(feature = "std"))]
@@ -247,7 +234,7 @@ fn compute_permutation_checks(
         .collect();
     permutation_terms
 }
-fn compute_first_lagrange_poly_scaled(
+fn build_scaled_first_lagrange_poly(
     domain: &EvaluationDomain,
     scale: BlsScalar,
 ) -> Polynomial {

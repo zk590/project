@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/range/proverkey.rs）。
 
 //
-
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -46,8 +45,6 @@ impl ProverKey {
         let kappa_sq = kappa.square();
         let kappa_cu = kappa_sq * kappa;
 
-
-
         //
         let c_minus_4d_delta = delta(c_i - four * d_i);
         let b_minus_4c_delta = delta(b_i - four * c_i) * kappa;
@@ -73,9 +70,6 @@ impl ProverKey {
         let kappa_sq = kappa.square();
         let kappa_cu = kappa_sq * kappa;
 
-
-
-
         let c_minus_4d_delta =
             delta(evaluations.c_eval - four * evaluations.d_eval);
         let b_minus_4c_delta =
@@ -94,7 +88,6 @@ impl ProverKey {
         q_range_poly * &combined_range_term
     }
 }
-
 
 pub(crate) fn delta(f: BlsScalar) -> BlsScalar {
     let f_1 = f - BlsScalar::one();

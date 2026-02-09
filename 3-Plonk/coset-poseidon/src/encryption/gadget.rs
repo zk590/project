@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use alloc::vec::Vec;
 
@@ -10,8 +6,6 @@ use plonk::prelude::{Composer, Witness, WitnessPoint};
 
 use crate::hades::GadgetPermutation;
 use crate::{Domain, Error};
-
-
 
 /// 电路内的 Poseidon 加密 gadget，返回密文 witness 向量。
 pub fn encrypt_gadget(
@@ -21,7 +15,7 @@ pub fn encrypt_gadget(
     nonce_witness: &Witness,
 ) -> Result<Vec<Witness>, Error> {
     let shared_secret_coordinates = [*shared_secret.x(), *shared_secret.y()];
-    Ok(dusk_safe::encrypt(
+    Ok(coset_safe::encrypt(
         GadgetPermutation::new(composer),
         Domain::Encryption,
         plaintext_message,
@@ -29,9 +23,6 @@ pub fn encrypt_gadget(
         nonce_witness,
     )?)
 }
-
-
-
 
 /// 电路内的 Poseidon 解密 gadget。
 pub fn decrypt_gadget(
@@ -41,7 +32,7 @@ pub fn decrypt_gadget(
     nonce_witness: &Witness,
 ) -> Result<Vec<Witness>, Error> {
     let shared_secret_coordinates = [*shared_secret.x(), *shared_secret.y()];
-    Ok(dusk_safe::decrypt(
+    Ok(coset_safe::decrypt(
         GadgetPermutation::new(composer),
         Domain::Encryption,
         ciphertext,

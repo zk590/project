@@ -1,12 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/fft.rs）。
 
 //
-
-
-
-
-
 
 cfg_if::cfg_if!(
 if #[cfg(feature = "alloc")]

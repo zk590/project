@@ -61,13 +61,6 @@ pub trait DeserializableSlice<const N: usize>: Serializable<N> {
 
 impl<T, const N: usize> DeserializableSlice<N> for T where T: Serializable<N> {}
 
-
-///
-
-///
-
-
-
 pub trait Read {
 
     /// 返回剩余可读容量。
@@ -92,9 +85,6 @@ impl Read for &[u8] {
         let bytes_to_read = buffer.len();
         let (head, tail) = self.split_at(bytes_to_read);
 
-
-
-
         if bytes_to_read == 1 {
             buffer[0] = head[0];
         } else {
@@ -105,11 +95,6 @@ impl Read for &[u8] {
         Ok(bytes_to_read)
     }
 }
-
-
-///
-
-///
 
 pub trait Write {
 

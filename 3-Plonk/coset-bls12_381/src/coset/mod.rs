@@ -1,9 +1,3 @@
-
-
-
-//
-
-
 pub(crate) mod choice;
 
 #[cfg(all(feature = "groups", feature = "alloc"))]

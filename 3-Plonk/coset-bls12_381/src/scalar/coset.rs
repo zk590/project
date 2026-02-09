@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use core::cmp::{Ord, Ordering, PartialOrd};
 use core::convert::TryFrom;
@@ -36,13 +32,9 @@ impl Ord for Scalar {
 impl Serializable<32> for Scalar {
     type Error = BytesError;
 
-
-
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         self.to_bytes()
     }
-
-
 
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         Self::from_bytes(buf)
@@ -63,25 +55,34 @@ mod serde_support {
     use super::*;
 
     impl Serialize for Scalar {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        fn serialize<S: Serializer>(
+            &self,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
             let s = hex::encode(self.to_bytes());
             s.serialize(serializer)
         }
     }
 
     impl<'de> Deserialize<'de> for Scalar {
-        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        fn deserialize<D: Deserializer<'de>>(
+            deserializer: D,
+        ) -> Result<Self, D::Error> {
             let s = String::deserialize(deserializer)?;
             let decoded = hex::decode(&s).map_err(SerdeError::custom)?;
             let decoded_len = decoded.len();
-            let bytes: [u8; Scalar::SIZE] = decoded.try_into().map_err(|_| {
-                SerdeError::invalid_length(decoded_len, &Scalar::SIZE.to_string().as_str())
-            })?;
-            let scalar = Scalar::from_bytes(&bytes)
-                .into_option()
-                .ok_or(SerdeError::custom(
+            let bytes: [u8; Scalar::SIZE] =
+                decoded.try_into().map_err(|_| {
+                    SerdeError::invalid_length(
+                        decoded_len,
+                        &Scalar::SIZE.to_string().as_str(),
+                    )
+                })?;
+            let scalar = Scalar::from_bytes(&bytes).into_option().ok_or(
+                SerdeError::custom(
                     "Failed to deserialize Scalar: invalid Scalar",
-                ))?;
+                ),
+            )?;
             Ok(scalar)
         }
     }
@@ -116,7 +117,8 @@ mod serde_support {
             let length_31_enc =
                 "\"fe9a9c1876745ca351435dec31217662ff1fcf67287de6fd9b6c7de1d0846b\"";
 
-            let scalar: Result<Scalar, _> = serde_json::from_str(&length_31_enc);
+            let scalar: Result<Scalar, _> =
+                serde_json::from_str(&length_31_enc);
             assert!(scalar.is_err());
         }
 
@@ -125,7 +127,8 @@ mod serde_support {
             let length_33_enc =
                 "\"fe9a9c1876745ca351435dec31217662ff1fcf67287de6fd9b6c7de1d0846b2100\"";
 
-            let scalar: Result<Scalar, _> = serde_json::from_str(&length_33_enc);
+            let scalar: Result<Scalar, _> =
+                serde_json::from_str(&length_33_enc);
             assert!(scalar.is_err());
         }
     }
@@ -201,22 +204,17 @@ impl Hash for Scalar {
 }
 
 impl Scalar {
-
     pub fn is_zero(&self) -> Choice {
         self.ct_eq(&Scalar::zero())
     }
-
 
     pub fn is_one(&self) -> Choice {
         self.ct_eq(&Scalar::one())
     }
 
-
     pub const fn internal_repr(&self) -> &[u64; 4] {
         &self.0
     }
-
-
 
     pub fn to_bits(&self) -> [u8; 256] {
         let mut res = [0u8; 256];
@@ -229,11 +227,7 @@ impl Scalar {
         res
     }
 
-
-
     pub fn to_be_bytes(&self) -> [u8; Self::SIZE] {
-
-
         let tmp = self.reduce();
 
         let mut res = [0; Self::SIZE];
@@ -245,13 +239,11 @@ impl Scalar {
         res
     }
 
-
-
     pub fn reduce(&self) -> Scalar {
-        Scalar::montgomery_reduce(self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0)
+        Scalar::montgomery_reduce(
+            self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
+        )
     }
-
-
 
     pub fn pow_of_2(by: u64) -> Self {
         let two = Scalar::from(2u64);
@@ -265,24 +257,6 @@ impl Scalar {
         res
     }
 
-
-
-
-    ///
-
-
-
-
-
-
-    ///
-
-
-    ///
-
-    ///
-
-    /// ```
     pub fn hash_to_scalar(input: &[u8]) -> Scalar {
         let state = blake2b_simd::Params::new()
             .hash_length(64)
@@ -292,7 +266,7 @@ impl Scalar {
 
         let bytes = state.as_bytes();
 
-        Scalar::from_u512([
+        Scalar::reduce_u512_words([
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
@@ -303,7 +277,6 @@ impl Scalar {
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[56..64]).unwrap()),
         ])
     }
-
 
     #[inline]
     pub fn divn(&mut self, mut n: u32) {
@@ -364,7 +337,8 @@ fn test_iter_sum() {
 
 #[test]
 fn test_iter_prod() {
-    let scalars = vec![Scalar::one() + Scalar::one(), Scalar::one() + Scalar::one()];
+    let scalars =
+        vec![Scalar::one() + Scalar::one(), Scalar::one() + Scalar::one()];
     let res: Scalar = scalars.iter().product();
     assert_eq!(res, Scalar::from(4u64));
 }
@@ -373,25 +347,29 @@ fn test_iter_prod() {
 fn bit_repr() {
     let two_pow_128 = Scalar::from(2u64).pow(&[128, 0, 0, 0]);
     let two_pow_128_bits = [
-        0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 1, 0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
     assert_eq!(&two_pow_128.to_bits()[..], &two_pow_128_bits[..]);
 
-    let two_pow_128_minus_rand = Scalar::from(2u64).pow(&[128, 0, 0, 0]) - Scalar::from(7568589u64);
+    let two_pow_128_minus_rand =
+        Scalar::from(2u64).pow(&[128, 0, 0, 0]) - Scalar::from(7568589u64);
     let two_pow_128_bits = [
-        1u8, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-        1, 1, 1, 1, 1, 1, 1, 1,
+        1u8, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 0,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1,
     ];
     assert_eq!(
         &two_pow_128_minus_rand.to_bits()[..128],
@@ -425,14 +403,12 @@ fn test_scalar_eq_and_hash() {
     ]);
     let r2 = Scalar::from(7);
 
-
     assert!(r0 == r1);
     assert!(r0 != r2);
 
     let hash_r0 = Keccak256::digest(&r0.to_bytes());
     let hash_r1 = Keccak256::digest(&r1.to_bytes());
     let hash_r2 = Keccak256::digest(&r2.to_bytes());
-
 
     assert_eq!(hash_r0, hash_r1);
     assert_ne!(hash_r0, hash_r2);
@@ -443,32 +419,34 @@ fn test_to_be_bytes() {
     assert_eq!(
         Scalar::zero().to_be_bytes(),
         [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
         ]
     );
 
     assert_eq!(
         Scalar::one().to_be_bytes(),
         [
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 1
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1
         ]
     );
 
     assert_eq!(
         R2.to_be_bytes(),
         [
-            24, 36, 177, 89, 172, 197, 5, 111, 153, 140, 79, 239, 236, 188, 79, 245, 88, 132, 183,
-            250, 0, 3, 72, 2, 0, 0, 0, 1, 255, 255, 255, 254
+            24, 36, 177, 89, 172, 197, 5, 111, 153, 140, 79, 239, 236, 188, 79,
+            245, 88, 132, 183, 250, 0, 3, 72, 2, 0, 0, 0, 1, 255, 255, 255,
+            254
         ]
     );
 
     assert_eq!(
         (-&Scalar::one()).to_be_bytes(),
         [
-            115, 237, 167, 83, 41, 157, 125, 72, 51, 57, 216, 8, 9, 161, 216, 5, 83, 189, 164, 2,
-            255, 254, 91, 254, 255, 255, 255, 255, 0, 0, 0, 0
+            115, 237, 167, 83, 41, 157, 125, 72, 51, 57, 216, 8, 9, 161, 216,
+            5, 83, 189, 164, 2, 255, 254, 91, 254, 255, 255, 255, 255, 0, 0, 0,
+            0
         ]
     );
 }
@@ -481,7 +459,6 @@ mod fuzz {
     use crate::util::sbb;
 
     fn is_scalar_in_range(scalar: &Scalar) -> bool {
-
         let borrow = scalar
             .0
             .iter()

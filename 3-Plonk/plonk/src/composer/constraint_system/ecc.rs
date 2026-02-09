@@ -1,12 +1,9 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/composer/constraint_system/ecc.rs）。
 
 //
 
-
 use crate::prelude::Witness;
 use coset_bls12_381::BlsScalar;
-
 
 #[derive(Debug, Clone, Copy)]
 pub struct WitnessPoint {
@@ -20,11 +17,9 @@ impl WitnessPoint {
         Self { x, y }
     }
 
-
     pub const fn x(&self) -> &Witness {
         &self.x
     }
-
 
     pub const fn y(&self) -> &Witness {
         &self.y
@@ -33,27 +28,16 @@ impl WitnessPoint {
 
 #[derive(Debug, Clone, Copy)]
 
-
 pub(crate) struct WnafRound<T: Into<Witness>> {
-
-
-
     pub acc_x: T,
 
     pub acc_y: T,
 
-
-
     pub accumulated_bit: T,
-
-
-
 
     pub xy_alpha: T,
 
-
     pub x_beta: BlsScalar,
-
 
     pub y_beta: BlsScalar,
 

@@ -1,23 +1,17 @@
-
-
-
-//
-
-
+// 模块说明：本文件实现 PLONK 组件（src/debugger.rs）。
 
 
 use std::env;
 use std::path::PathBuf;
 
 use coset_bls12_381::BlsScalar;
-use dusk_cdf::{
+use coset_cdf::{
     BaseConfig, Config, EncodableConstraint, EncodableSource, EncodableWitness,
     Encoder, EncoderContextFileProvider, Polynomial, Selectors, WiredWitnesses,
 };
 
 use crate::composer::{Constraint, Selector, WiredWitness, Witness};
 use crate::runtime::RuntimeEvent;
-
 
 #[derive(Debug, Clone)]
 pub(crate) struct Debugger {
@@ -26,18 +20,16 @@ pub(crate) struct Debugger {
 }
 
 impl Debugger {
-
     fn resolve_caller() -> EncodableSource {
         let mut source = None;
 
         backtrace::trace(|frame| {
-
             backtrace::resolve_frame(frame, |symbol| {
                 if symbol
                     .name()
                     .map(|n| n.to_string())
                     .filter(|s| !s.starts_with("backtrace::"))
-                    .filter(|s| !s.starts_with("dusk_plonk::"))
+                    .filter(|s| !s.starts_with("coset_plonk::"))
                     .filter(|s| !s.starts_with("core::"))
                     .filter(|s| !s.starts_with("std::"))
                     .is_some()
@@ -120,7 +112,6 @@ impl Debugger {
 
                 let wc = self
                     .witnesses
-
                     .get(witnesses.o)
                     .map(|(_, _, v)| *v)
                     .unwrap_or_default();
@@ -130,7 +121,6 @@ impl Debugger {
                     .get(witnesses.d)
                     .map(|(_, _, v)| *v)
                     .unwrap_or_default();
-
 
                 let evaluation = qm * wa * wb
                     + ql * wa

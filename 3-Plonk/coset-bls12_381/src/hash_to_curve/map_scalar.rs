@@ -1,11 +1,8 @@
-
-
 use super::HashToField;
 use crate::generic_array::{typenum::U48, GenericArray};
 use crate::scalar::Scalar;
 
 impl HashToField for Scalar {
-
     type InputLength = U48;
 
     fn from_okm(okm: &GenericArray<u8, U48>) -> Scalar {
@@ -33,7 +30,8 @@ fn test_hash_to_scalar() {
         ),
     ];
     for (input, expected) in tests {
-        let output = format!("{:?}", Scalar::from_okm(GenericArray::from_slice(input)));
+        let output =
+            format!("{:?}", Scalar::from_okm(GenericArray::from_slice(input)));
         assert_eq!(&output, expected);
     }
 }

@@ -2,7 +2,7 @@
 use alloc::boxed::Box;
 use core::cell::{Ref, RefCell};
 
-use crate::{capacity, init_array, Aggregate};
+use crate::{init_fixed_array, level_capacity, Aggregate};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[doc(hidden)]
@@ -28,7 +28,7 @@ where
         }
     }
     /// 读取当前节点聚合值；若缓存为空则按子节点现算并缓存。
-    pub(crate) fn item(&self) -> Ref<'_, T> {
+    pub(crate) fn aggregated_item(&self) -> Ref<'_, T> {
 
         if self.item.borrow().is_none() {
 
@@ -36,10 +36,10 @@ where
             let mut item_refs = [empty_subtree; A];
 
             let child_items: [Option<Ref<'_, T>>; A] =
-                init_array(|child_index| {
+                init_fixed_array(|child_index| {
                     self.children[child_index]
                         .as_ref()
-                        .map(|child_node| child_node.item())
+                        .map(|child_node| child_node.aggregated_item())
                 });
 
             let mut has_children = false;
@@ -64,8 +64,11 @@ where
         Ref::map(self.item.borrow(), |item| item.as_ref().unwrap())
     }
     /// 计算给定高度与全局位置对应的子节点索引与子位置。
-    pub(crate) fn child_location(height: usize, position: u64) -> (usize, u64) {
-        let child_cap = capacity(A as u64, H - height - 1);
+    pub(crate) fn child_index_and_offset(
+        height: usize,
+        position: u64,
+    ) -> (usize, u64) {
+        let child_cap = level_capacity(A as u64, H - height - 1);
 
 
 
@@ -88,7 +91,8 @@ where
         }
         self.item.replace(None);
 
-        let (child_index, child_pos) = Self::child_location(height, position);
+        let (child_index, child_pos) =
+            Self::child_index_and_offset(height, position);
 
         let selected_child = &mut self.children[child_index];
         if selected_child.is_none() {
@@ -109,7 +113,8 @@ where
         }
         self.item.replace(None);
 
-        let (child_index, child_pos) = Self::child_location(height, position);
+        let (child_index, child_pos) =
+            Self::child_index_and_offset(height, position);
 
         let selected_child = self.children[child_index]
             .as_mut()

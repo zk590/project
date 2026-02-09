@@ -1,3 +1,5 @@
+//! `serde` 适配层：将 JubJub 点编码为十六进制字符串进行序列化。
+
 extern crate alloc;
 
 use alloc::string::{String, ToString};

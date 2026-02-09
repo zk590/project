@@ -1,22 +1,16 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/proof.rs）。
 
 //
-
 
 use super::Commitment;
 use coset_bls12_381::BlsScalar;
 
-
-
 #[derive(Copy, Clone, Debug)]
 #[allow(dead_code)]
 pub(crate) struct Proof {
-
     pub(crate) commitment_to_witness: Commitment,
 
     pub(crate) evaluated_point: BlsScalar,
-
 
     pub(crate) commitment_to_polynomial: Commitment,
 }
@@ -31,24 +25,18 @@ pub(crate) mod alloc {
     #[cfg(feature = "std")]
     use rayon::prelude::*;
 
-
-
     #[derive(Debug)]
     #[allow(dead_code)]
     pub(crate) struct AggregateProof {
-
         pub(crate) commitment_to_witness: Commitment,
 
-
         pub(crate) evaluated_points: Vec<BlsScalar>,
-
 
         pub(crate) commitments_to_polynomials: Vec<Commitment>,
     }
 
     #[allow(dead_code)]
     impl AggregateProof {
-
         pub(crate) fn with_witness(witness: Commitment) -> AggregateProof {
             AggregateProof {
                 commitment_to_witness: witness,
@@ -57,13 +45,10 @@ pub(crate) mod alloc {
             }
         }
 
-
-
         pub(crate) fn add_part(&mut self, part: (BlsScalar, Commitment)) {
             self.evaluated_points.push(part.0);
             self.commitments_to_polynomials.push(part.1);
         }
-
 
         pub(crate) fn flatten(&self, v_challenge: &BlsScalar) -> Proof {
             let powers = powers_of(
@@ -86,7 +71,6 @@ pub(crate) mod alloc {
             #[cfg(feature = "std")]
             let flattened_poly_evaluations_iter =
                 self.evaluated_points.par_iter().zip(powers.par_iter());
-
 
             let flattened_poly_commitments: G1Projective =
                 flattened_poly_commitments_iter

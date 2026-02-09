@@ -7,7 +7,10 @@ use crate::fp::Fp;
 use crate::fp12::Fp12;
 use crate::fp2::Fp2;
 use crate::fp6::Fp6;
-use crate::{BlsScalar, G1Affine, G1Projective, G2Affine, G2Projective, BLS_X, BLS_X_IS_NEGATIVE};
+use crate::{
+    BlsScalar, G1Affine, G1Projective, G2Affine, G2Projective, BLS_X,
+    BLS_X_IS_NEGATIVE,
+};
 
 use core::borrow::Borrow;
 use core::fmt;
@@ -26,10 +29,9 @@ use pairing::MultiMillerLoop;
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
-
-
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Copy, Clone, Debug)]
@@ -56,13 +58,11 @@ impl ConditionallySelectable for MillerLoopResult {
 }
 
 impl MillerLoopResult {
-
-
-
     /// 对 Miller 循环结果做最终指数化，映射到 GT 群。
     pub fn final_exponentiation(&self) -> Gt {
         #[must_use]
         fn fp4_square(a: Fp2, b: Fp2) -> (Fp2, Fp2) {
+            // 将 `(a + bu)^2` 在 Fp4 子结构上展开，减少通用乘法次数。
             let t0 = a.square();
             let t1 = b.square();
             let mut t2 = t1.mul_by_nonresidue();
@@ -75,10 +75,9 @@ impl MillerLoopResult {
             (c0, c1)
         }
 
-
-
         #[must_use]
         fn cyclotomic_square(f: Fp12) -> Fp12 {
+            // 在 cyclotomic 子群内使用专用平方公式，比通用 Fp12 平方更省约束/乘法。
             let mut z0 = f.c0.c0;
             let mut z4 = f.c0.c1;
             let mut z3 = f.c0.c2;
@@ -87,7 +86,6 @@ impl MillerLoopResult {
             let mut z5 = f.c1.c2;
 
             let (t0, t1) = fp4_square(z0, z1);
-
 
             z0 = t0 - z0;
             z0 = z0 + z0 + t0;
@@ -98,13 +96,11 @@ impl MillerLoopResult {
             let (mut t0, t1) = fp4_square(z2, z3);
             let (t2, t3) = fp4_square(z4, z5);
 
-
             z4 = t0 - z4;
             z4 = z4 + z4 + t0;
 
             z5 = t1 + z5;
             z5 = z5 + z5 + t1;
-
 
             t0 = t3.mul_by_nonresidue();
             z2 = t0 + z2;
@@ -127,11 +123,15 @@ impl MillerLoopResult {
             }
         }
         #[must_use]
-        fn cycolotomic_exp(f: Fp12) -> Fp12 {
+        fn cyclotomic_exp_by_x(f: Fp12) -> Fp12 {
+            // 固定常量 x 的幂运算，作为最终指数化 hard part 的核心步骤。
             let bls_x = BLS_X;
             let mut accumulator = Fp12::one();
             let mut found_one = false;
-            for bit_is_set in (0..64).rev().map(|bit_index| ((bls_x >> bit_index) & 1) == 1) {
+            for bit_is_set in (0..64)
+                .rev()
+                .map(|bit_index| ((bls_x >> bit_index) & 1) == 1)
+            {
                 if found_one {
                     accumulator = cyclotomic_square(accumulator)
                 } else {
@@ -154,21 +154,22 @@ impl MillerLoopResult {
             .frobenius_map()
             .frobenius_map()
             .frobenius_map();
-        Gt(final_exponentiation_value.invert()
+        Gt(final_exponentiation_value
+            .invert()
             .map(|mut t1| {
                 let mut t2 = t0 * t1;
                 t1 = t2;
                 t2 = t2.frobenius_map().frobenius_map();
                 t2 *= t1;
                 t1 = cyclotomic_square(t2).conjugate();
-                let mut t3 = cycolotomic_exp(t2);
+                let mut t3 = cyclotomic_exp_by_x(t2);
                 let mut t4 = cyclotomic_square(t3);
                 let mut t5 = t1 * t3;
-                t1 = cycolotomic_exp(t5);
-                t0 = cycolotomic_exp(t1);
-                let mut t6 = cycolotomic_exp(t0);
+                t1 = cyclotomic_exp_by_x(t5);
+                t0 = cyclotomic_exp_by_x(t1);
+                let mut t6 = cyclotomic_exp_by_x(t0);
                 t6 *= t4;
-                t4 = cycolotomic_exp(t6);
+                t4 = cyclotomic_exp_by_x(t6);
                 t5 = t5.conjugate();
                 t4 *= t5 * t2;
                 t5 = t2.conjugate();
@@ -184,9 +185,6 @@ impl MillerLoopResult {
 
                 final_exponentiation_value
             })
-
-
-
             .unwrap())
     }
 }
@@ -200,7 +198,11 @@ impl<'a, 'b> Add<&'b MillerLoopResult> for &'a MillerLoopResult {
     }
 }
 
-impl_add_binop_specify_output!(MillerLoopResult, MillerLoopResult, MillerLoopResult);
+impl_add_binop_specify_output!(
+    MillerLoopResult,
+    MillerLoopResult,
+    MillerLoopResult
+);
 
 impl AddAssign<MillerLoopResult> for MillerLoopResult {
     #[inline]
@@ -216,14 +218,14 @@ impl<'b> AddAssign<&'b MillerLoopResult> for MillerLoopResult {
     }
 }
 
-
-
 ///
-
 
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Copy, Clone, Debug)]
-#[cfg_attr(feature = "rkyv-impl", derive(Archive, RkyvDeserialize, RkyvSerialize))]
+#[cfg_attr(
+    feature = "rkyv-impl",
+    derive(Archive, RkyvDeserialize, RkyvSerialize)
+)]
 #[cfg_attr(feature = "rkyv-impl", archive_attr(derive(CheckBytes)))]
 pub struct Gt(pub(crate) Fp12);
 
@@ -263,11 +265,9 @@ impl PartialEq for Gt {
 }
 
 impl Gt {
-
     pub fn identity() -> Gt {
         Gt(Fp12::one())
     }
-
 
     pub fn double(&self) -> Gt {
         Gt(self.0.square())
@@ -279,7 +279,6 @@ impl<'a> Neg for &'a Gt {
 
     #[inline]
     fn neg(self) -> Gt {
-
         Gt(self.0.conjugate())
     }
 }
@@ -317,17 +316,15 @@ impl<'a, 'b> Mul<&'b BlsScalar> for &'a Gt {
     fn mul(self, other: &'b BlsScalar) -> Self::Output {
         let mut accumulated_gt = Gt::identity();
 
-
-
-
         //
-
 
         for bit in other
             .to_bytes()
             .iter()
             .rev()
-            .flat_map(|byte| (0..8).rev().map(move |i| Choice::from((byte >> i) & 1u8)))
+            .flat_map(|byte| {
+                (0..8).rev().map(move |i| Choice::from((byte >> i) & 1u8))
+            })
             .skip(1)
         {
             accumulated_gt = accumulated_gt.double();
@@ -364,9 +361,6 @@ impl Group for Gt {
         loop {
             let inner = Fp12::random(&mut rng);
 
-
-
-
             if !bool::from(inner.is_zero()) {
                 return MillerLoopResult(inner).final_exponentiation();
             }
@@ -378,7 +372,6 @@ impl Group for Gt {
     }
 
     fn generator() -> Self {
-
         Gt(Fp12 {
             c0: Fp6 {
                 c0: Fp2 {
@@ -504,12 +497,6 @@ impl Group for Gt {
     }
 }
 
-
-
-
-
-
-
 ///
 
 #[cfg(feature = "alloc")]
@@ -551,8 +538,11 @@ impl From<G2Affine> for G2Prepared {
         }
 
         let is_identity = g2_point.is_identity();
-        let selected_point =
-            G2Affine::conditional_select(&g2_point, &G2Affine::generator(), is_identity);
+        let selected_point = G2Affine::conditional_select(
+            &g2_point,
+            &G2Affine::generator(),
+            is_identity,
+        );
 
         let mut adder = Adder {
             cur: G2Projective::from(selected_point),
@@ -574,9 +564,10 @@ impl From<G2Affine> for G2Prepared {
 #[cfg(feature = "alloc")]
 #[cfg_attr(docsrs, doc(cfg(all(feature = "pairings", feature = "alloc"))))]
 
-
 /// 对多组 `(G1, G2Prepared)` 同时执行 Miller 循环并合并结果。
-pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult {
+pub fn multi_miller_loop(
+    terms: &[(&G1Affine, &G2Prepared)],
+) -> MillerLoopResult {
     struct Adder<'a, 'b, 'c> {
         terms: &'c [(&'a G1Affine, &'b G2Prepared)],
         index: usize,
@@ -588,9 +579,12 @@ pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult
         fn doubling_step(&mut self, mut f: Self::Output) -> Self::Output {
             let index = self.index;
             for term in self.terms {
-                let either_identity = term.0.is_identity() | Choice::from(term.1.infinity);
+                // 任一端为无穷点时该项对乘积单位元无贡献，跳过线函数应用。
+                let either_identity =
+                    term.0.is_identity() | Choice::from(term.1.infinity);
 
-                let new_f = ell(f, &term.1.coeffs[index], term.0);
+                let new_f =
+                    apply_line_function(f, &term.1.coeffs[index], term.0);
                 f = Fp12::conditional_select(&new_f, &f, either_identity);
             }
             self.index += 1;
@@ -600,9 +594,11 @@ pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult
         fn addition_step(&mut self, mut f: Self::Output) -> Self::Output {
             let index = self.index;
             for term in self.terms {
-                let either_identity = term.0.is_identity() | Choice::from(term.1.infinity);
+                let either_identity =
+                    term.0.is_identity() | Choice::from(term.1.infinity);
 
-                let new_f = ell(f, &term.1.coeffs[index], term.0);
+                let new_f =
+                    apply_line_function(f, &term.1.coeffs[index], term.0);
                 f = Fp12::conditional_select(&new_f, &f, either_identity);
             }
             self.index += 1;
@@ -627,7 +623,6 @@ pub fn multi_miller_loop(terms: &[(&G1Affine, &G2Prepared)]) -> MillerLoopResult
     MillerLoopResult(miller_value)
 }
 
-
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 /// 计算最优 Ate 配对并返回 GT 元素。
 pub fn pairing(p: &G1Affine, q: &G2Affine) -> Gt {
@@ -642,11 +637,11 @@ pub fn pairing(p: &G1Affine, q: &G2Affine) -> Gt {
 
         fn doubling_step(&mut self, f: Self::Output) -> Self::Output {
             let coeffs = doubling_step(&mut self.cur);
-            ell(f, &coeffs, &self.p)
+            apply_line_function(f, &coeffs, &self.p)
         }
         fn addition_step(&mut self, f: Self::Output) -> Self::Output {
             let coeffs = addition_step(&mut self.cur, &self.base);
-            ell(f, &coeffs, &self.p)
+            apply_line_function(f, &coeffs, &self.p)
         }
         fn square_output(f: Self::Output) -> Self::Output {
             f.square()
@@ -660,8 +655,16 @@ pub fn pairing(p: &G1Affine, q: &G2Affine) -> Gt {
     }
 
     let either_identity = p.is_identity() | q.is_identity();
-    let selected_p = G1Affine::conditional_select(p, &G1Affine::generator(), either_identity);
-    let selected_q = G2Affine::conditional_select(q, &G2Affine::generator(), either_identity);
+    let selected_p = G1Affine::conditional_select(
+        p,
+        &G1Affine::generator(),
+        either_identity,
+    );
+    let selected_q = G2Affine::conditional_select(
+        q,
+        &G2Affine::generator(),
+        either_identity,
+    );
 
     let mut adder = Adder {
         cur: G2Projective::from(selected_q),
@@ -688,13 +691,11 @@ trait MillerLoopDriver {
     fn one() -> Self::Output;
 }
 
-
-
-
 /// 通用 Miller 循环驱动，支持单对和多对输入。
 fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
     let mut miller_value = D::one();
 
+    // 按 BLS 参数 x 的二进制位（从高到低）执行双线性 Miller 累乘。
     let mut found_one = false;
     for bit_is_set in (0..64)
         .rev()
@@ -724,7 +725,11 @@ fn miller_loop<D: MillerLoopDriver>(driver: &mut D) -> D::Output {
 }
 
 /// 将一条切线/割线系数作用到累乘值 `f` 上。
-fn ell(f: Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
+fn apply_line_function(
+    f: Fp12,
+    coeffs: &(Fp2, Fp2, Fp2),
+    p: &G1Affine,
+) -> Fp12 {
     let mut c0 = coeffs.0;
     let mut c1 = coeffs.1;
 
@@ -739,7 +744,7 @@ fn ell(f: Fp12, coeffs: &(Fp2, Fp2, Fp2), p: &G1Affine) -> Fp12 {
 
 /// Miller 循环中的 G2 倍点步骤，返回线函数系数。
 fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
-
+    // Jacobian 坐标倍点；同时返回本轮线函数在 Fp2 上的三个系数。
     let tmp0 = r.x.square();
     let tmp1 = r.y.square();
     let tmp2 = tmp1.square();
@@ -771,7 +776,7 @@ fn doubling_step(r: &mut G2Projective) -> (Fp2, Fp2, Fp2) {
 
 /// Miller 循环中的 G2 加点步骤，返回线函数系数。
 fn addition_step(r: &mut G2Projective, q: &G2Affine) -> (Fp2, Fp2, Fp2) {
-
+    // Jacobian + Affine 混合加法；同样返回线函数系数供 Miller 累乘使用。
     let zsquared = r.z.square();
     let ysquared = q.y.square();
     let t0 = zsquared * q.x;
@@ -820,7 +825,6 @@ impl PairingCurveAffine for G2Affine {
     }
 }
 
-
 #[cfg_attr(docsrs, doc(cfg(feature = "pairings")))]
 #[derive(Clone, Debug)]
 pub struct Bls12;
@@ -851,7 +855,9 @@ impl MultiMillerLoop for Bls12 {
     type G2Prepared = G2Prepared;
     type Result = MillerLoopResult;
 
-    fn multi_miller_loop(terms: &[(&Self::G1Affine, &Self::G2Prepared)]) -> Self::Result {
+    fn multi_miller_loop(
+        terms: &[(&Self::G1Affine, &Self::G2Prepared)],
+    ) -> Self::Result {
         multi_miller_loop(terms)
     }
 }
@@ -868,8 +874,10 @@ fn test_gt_generator() {
 fn test_bilinearity() {
     use crate::BlsScalar;
 
-    let left_scalar = BlsScalar::from_raw([1, 2, 3, 4]).invert().unwrap().square();
-    let right_scalar = BlsScalar::from_raw([5, 6, 7, 8]).invert().unwrap().square();
+    let left_scalar =
+        BlsScalar::from_raw([1, 2, 3, 4]).invert().unwrap().square();
+    let right_scalar =
+        BlsScalar::from_raw([5, 6, 7, 8]).invert().unwrap().square();
     let product_scalar = left_scalar * right_scalar;
 
     let g1_point = G1Affine::from(G1Affine::generator() * left_scalar);
@@ -878,12 +886,17 @@ fn test_bilinearity() {
 
     assert!(pairing_result != Gt::identity());
 
-    let expected_g1_point = G1Affine::from(G1Affine::generator() * product_scalar);
+    let expected_g1_point =
+        G1Affine::from(G1Affine::generator() * product_scalar);
 
-    assert_eq!(pairing_result, pairing(&expected_g1_point, &G2Affine::generator()));
     assert_eq!(
         pairing_result,
-        pairing(&G1Affine::generator(), &G2Affine::generator()) * product_scalar
+        pairing(&expected_g1_point, &G2Affine::generator())
+    );
+    assert_eq!(
+        pairing_result,
+        pairing(&G1Affine::generator(), &G2Affine::generator())
+            * product_scalar
     );
 }
 
@@ -906,19 +919,23 @@ fn test_multi_miller_loop() {
     let b1 = G2Affine::generator();
 
     let a2 = G1Affine::from(
-        G1Affine::generator() * BlsScalar::from_raw([1, 2, 3, 4]).invert().unwrap().square(),
+        G1Affine::generator()
+            * BlsScalar::from_raw([1, 2, 3, 4]).invert().unwrap().square(),
     );
     let b2 = G2Affine::from(
-        G2Affine::generator() * BlsScalar::from_raw([4, 2, 2, 4]).invert().unwrap().square(),
+        G2Affine::generator()
+            * BlsScalar::from_raw([4, 2, 2, 4]).invert().unwrap().square(),
     );
 
     let a3 = G1Affine::identity();
     let b3 = G2Affine::from(
-        G2Affine::generator() * BlsScalar::from_raw([9, 2, 2, 4]).invert().unwrap().square(),
+        G2Affine::generator()
+            * BlsScalar::from_raw([9, 2, 2, 4]).invert().unwrap().square(),
     );
 
     let a4 = G1Affine::from(
-        G1Affine::generator() * BlsScalar::from_raw([5, 5, 5, 5]).invert().unwrap().square(),
+        G1Affine::generator()
+            * BlsScalar::from_raw([5, 5, 5, 5]).invert().unwrap().square(),
     );
     let b4 = G2Affine::identity();
 
@@ -985,11 +1002,19 @@ fn test_miller_loop_result_zeroize() {
 #[test]
 fn tricking_miller_loop_result() {
     assert_eq!(
-        multi_miller_loop(&[(&G1Affine::identity(), &G2Affine::generator().into())]).0,
+        multi_miller_loop(&[(
+            &G1Affine::identity(),
+            &G2Affine::generator().into()
+        )])
+        .0,
         Fp12::one()
     );
     assert_eq!(
-        multi_miller_loop(&[(&G1Affine::generator(), &G2Affine::identity().into())]).0,
+        multi_miller_loop(&[(
+            &G1Affine::generator(),
+            &G2Affine::identity().into()
+        )])
+        .0,
         Fp12::one()
     );
     assert_ne!(

@@ -1,10 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/srs.rs）。
 
 //
-
-
-
 
 use super::key::{CommitKey, OpeningKey};
 use crate::{error::Error, util};
@@ -22,10 +18,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
-
-
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -35,7 +27,6 @@ use rkyv::{
 )]
 
 pub struct PublicParameters {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) commit_key: CommitKey,
 
@@ -44,46 +35,29 @@ pub struct PublicParameters {
 }
 
 impl PublicParameters {
-
-
-
-
     const ADDED_BLINDING_DEGREE: usize = 6;
-
-
-
-
-
 
     pub fn setup<R: RngCore + CryptoRng>(
         mut max_degree: usize,
         mut rng: &mut R,
     ) -> Result<PublicParameters, Error> {
-
         if max_degree < 1 {
             return Err(Error::DegreeIsZero);
         }
 
-
         max_degree += Self::ADDED_BLINDING_DEGREE;
-
 
         let x = BlsScalar::random(&mut rng);
 
-
         let powers_of_x = util::powers_of(&x, max_degree);
-
 
         let g = util::random_g1_point(&mut rng);
         let powers_of_g: Vec<G1Projective> =
             util::slow_multiscalar_mul_single_base(&powers_of_x, g);
         assert_eq!(powers_of_g.len(), max_degree + 1);
 
-
         let mut normalized_g = vec![G1Affine::identity(); max_degree + 1];
         G1Projective::batch_normalize(&powers_of_g, &mut normalized_g);
-
-
 
         let h: G2Affine = util::random_g2_point(&mut rng).into();
         let x_2: G2Affine = (h * x).into();
@@ -96,36 +70,12 @@ impl PublicParameters {
         })
     }
 
-
-    ///
-
-
-
-
-    ///
-
-
-
-
-
     pub fn to_raw_var_bytes(&self) -> Vec<u8> {
         let mut bytes = self.opening_key.to_bytes().to_vec();
         bytes.extend(&self.commit_key.to_raw_var_bytes());
 
         bytes
     }
-
-
-
-    ///
-
-
-
-    ///
-
-
-
-
 
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let opening_key = &bytes[..OpeningKey::SIZE];
@@ -141,22 +91,11 @@ impl PublicParameters {
         }
     }
 
-
     pub fn to_var_bytes(&self) -> Vec<u8> {
         let mut bytes = self.opening_key.to_bytes().to_vec();
         bytes.extend(self.commit_key.to_var_bytes().iter());
         bytes
     }
-
-
-
-
-    ///
-
-
-
-
-
 
     pub fn from_slice(bytes: &[u8]) -> Result<PublicParameters, Error> {
         if bytes.len() <= OpeningKey::SIZE {
@@ -174,13 +113,6 @@ impl PublicParameters {
         Ok(public_parameters)
     }
 
-
-
-
-
-    ///
-
-
     pub(crate) fn trim(
         &self,
         truncated_degree: usize,
@@ -191,8 +123,6 @@ impl PublicParameters {
         let opening_key = self.opening_key.clone();
         Ok((truncated_prover_key, opening_key))
     }
-
-
 
     pub fn max_degree(&self) -> usize {
         self.commit_key.max_degree()

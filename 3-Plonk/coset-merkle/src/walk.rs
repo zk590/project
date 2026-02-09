@@ -31,7 +31,7 @@ where
 
 
     /// 深度优先推进到下一个满足谓词的叶子项。
-    pub(crate) fn advance(
+    pub(crate) fn advance_depth_first(
         &mut self,
         node: &'a Node<T, H, A>,
         level_index: usize,
@@ -46,7 +46,7 @@ where
             for child_index in *child_cursor..A {
                 *child_cursor = child_index + 1;
                 if let Some(leaf) = &node.children[child_index] {
-                    let leaf = leaf.item();
+                    let leaf = leaf.aggregated_item();
                     if (self.walker)(&*leaf) {
                         return Some(leaf);
                     }
@@ -67,7 +67,7 @@ where
                 self.indices[level_index] = child_index;
                 if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
-                    if (self.walker)(&*child.item()) {
+                    if (self.walker)(&*child.aggregated_item()) {
                         self.path[level_index] = Some(child);
                         break;
                     }
@@ -81,7 +81,9 @@ where
 
 
         if let Some(child) = self.path[level_index] {
-            if let Some(item) = self.advance(child, level_index + 1) {
+            if let Some(item) =
+                self.advance_depth_first(child, level_index + 1)
+            {
                 return Some(item);
             }
 
@@ -90,9 +92,11 @@ where
 
                 if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
-                    if (self.walker)(&*child.item()) {
+                    if (self.walker)(&*child.aggregated_item()) {
                         self.path[level_index] = Some(child);
-                        match self.advance(child, level_index + 1) {
+                        match self
+                            .advance_depth_first(child, level_index + 1)
+                        {
                             Some(item) => return Some(item),
                             None => continue,
                         }
@@ -116,7 +120,7 @@ where
     type Item = Ref<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.advance(self.root, 0)
+        self.advance_depth_first(self.root, 0)
     }
 }
 

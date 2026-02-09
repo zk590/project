@@ -1,32 +1,20 @@
-
-
+// 模块说明：本文件实现 Poseidon 组件（src/error.rs）。
 
 //
 
-
-use dusk_safe::Error as SafeError;
-
+use coset_safe::Error as SafeError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
-
-
     IOPatternViolation,
-
 
     InvalidIOPattern,
 
-
     TooFewInputElements,
-
-
 
     EncryptionFailed,
 
-
-
     DecryptionFailed,
-
 
     InvalidPoint,
 }

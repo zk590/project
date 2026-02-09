@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/ecc/scalar_mul/fixed_base/verifierkey.rs）。
 
 //
-
 
 use crate::commitment_scheme::Commitment;
 
@@ -68,7 +67,6 @@ mod alloc {
             let accumulated_bit_w = evaluations.d_w_eval;
             let bit = extract_bit(&accumulated_bit, &accumulated_bit_w);
 
-
             let bit_consistency = check_bit_consistency(bit);
 
             let y_alpha = (bit.square() * (y_beta_eval - BlsScalar::one()))
@@ -76,21 +74,22 @@ mod alloc {
 
             let x_alpha = x_beta_poly * bit;
 
-
             let xy_consistency =
                 ((bit * evaluations.q_c_eval) - xy_alpha) * kappa;
 
-
             let shifted_acc_x = acc_x_w;
-            let x_consistency_lhs = shifted_acc_x + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
+            let x_consistency_lhs = shifted_acc_x
+                + (shifted_acc_x * xy_alpha * acc_x * acc_y * EDWARDS_D);
             let x_consistency_rhs = (x_alpha * acc_y) + (y_alpha * acc_x);
-            let x_acc_consistency = (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
-
+            let x_acc_consistency =
+                (x_consistency_lhs - x_consistency_rhs) * kappa_sq;
 
             let shifted_acc_y = acc_y_w;
-            let y_consistency_lhs = shifted_acc_y - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
+            let y_consistency_lhs = shifted_acc_y
+                - (shifted_acc_y * xy_alpha * acc_x * acc_y * EDWARDS_D);
             let y_consistency_rhs = (x_alpha * acc_x) + (y_alpha * acc_y);
-            let y_acc_consistency = (y_consistency_lhs - y_consistency_rhs) * kappa_cu;
+            let y_acc_consistency =
+                (y_consistency_lhs - y_consistency_rhs) * kappa_cu;
 
             let combined_identity = bit_consistency
                 + x_acc_consistency

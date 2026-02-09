@@ -1,5 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+//! Fr 标量域运算性能基准：加减乘、平方、求逆与字节编解码。
+
 use coset_jubjub::*;
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_add_assign(c: &mut Criterion) {
     let mut n = Fr::one();

@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/arithmetic/proverkey.rs）。
 
 //
-
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -57,8 +56,6 @@ impl ProverKey {
         let q_c_i = &self.q_c.1[index];
         let q_arith_i = &self.q_arith.1[index];
 
-
-
         //
         let mul_selector_term = a_i * b_i * q_m_i;
         let left_selector_term = a_i * q_l_i;
@@ -86,22 +83,16 @@ impl ProverKey {
         let q_f_poly = &self.q_f.0;
         let q_c_poly = &self.q_c.0;
 
-
-
         //
 
         let witness_product = evaluations.a_eval * evaluations.b_eval;
         let mul_selector_term = q_m_poly * &witness_product;
 
-
         let left_selector_term = q_l_poly * &evaluations.a_eval;
-
 
         let right_selector_term = q_r_poly * &evaluations.b_eval;
 
-
         let output_selector_term = q_o_poly * &evaluations.c_eval;
-
 
         let fourth_wire_term = q_f_poly * &evaluations.d_eval;
 

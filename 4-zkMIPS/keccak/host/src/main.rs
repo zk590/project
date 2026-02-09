@@ -156,7 +156,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         proof
     };
 
-    // 注意：证明生成的时间已经在各个分支中分别测量并输出了
     
     // 验证证明
     println!("验证证明...");

@@ -1,10 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/proof_system.rs）。
 
 //
-
-
-
 
 pub(crate) mod linearization_poly;
 pub(crate) mod proof;

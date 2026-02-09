@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/permutation/verifierkey.rs）。
 
 //
-
 
 use crate::commitment_scheme::Commitment;
 
@@ -55,10 +54,6 @@ mod alloc {
         ) {
             let alpha_sq = alpha.square();
 
-
-
-
-
             let identity_permutation_term = {
                 let beta_z = beta * z_challenge;
                 let a_contribution = evaluations.a_eval + beta_z + gamma;
@@ -73,9 +68,11 @@ mod alloc {
                 let d_contribution =
                     (evaluations.d_eval + beta_k3_z + gamma) * alpha;
 
-                a_contribution * b_contribution * c_contribution * d_contribution
+                a_contribution
+                    * b_contribution
+                    * c_contribution
+                    * d_contribution
             };
-
 
             let lagrange_first_term = l1_eval * alpha_sq;
 
@@ -83,10 +80,6 @@ mod alloc {
                 identity_permutation_term + lagrange_first_term + u_challenge,
             );
             points.push(z_comm);
-
-
-
-
 
             let copy_permutation_term = {
                 let beta_sigma_1 = beta * evaluations.s_sigma_1_eval;

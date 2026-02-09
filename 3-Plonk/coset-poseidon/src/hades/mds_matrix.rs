@@ -1,15 +1,8 @@
-
-
-
 //
-
 
 use coset_bls12_381::BlsScalar;
 
 use crate::hades::WIDTH;
-
-
-
 
 /// Poseidon 置换使用的 MDS 矩阵常量（从二进制资源加载）。
 pub const MDS_MATRIX: [[BlsScalar; WIDTH]; WIDTH] = {
@@ -21,10 +14,10 @@ pub const MDS_MATRIX: [[BlsScalar; WIDTH]; WIDTH] = {
     while i < WIDTH {
         let mut j = 0;
         while j < WIDTH {
-            let a = super::u64_from_buffer(bytes, k);
-            let b = super::u64_from_buffer(bytes, k + 8);
-            let c = super::u64_from_buffer(bytes, k + 16);
-            let d = super::u64_from_buffer(bytes, k + 24);
+            let a = super::read_u64_le_from_bytes(bytes, k);
+            let b = super::read_u64_le_from_bytes(bytes, k + 8);
+            let c = super::read_u64_le_from_bytes(bytes, k + 16);
+            let d = super::read_u64_le_from_bytes(bytes, k + 24);
             k += 32;
 
             mds[i][j] = BlsScalar::from_raw([a, b, c, d]);

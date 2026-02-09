@@ -1,36 +1,10 @@
-
-
-//!
-
-//!
-
-
-
-
-
-
-
-
-
-//!
-
-//!
-
-
-
-//!
-
+//! JubJub 椭圆曲线库入口，导出标量域、点运算与可选功能模块。
 
 #![no_std]
-
 #![deny(rustdoc::broken_intra_doc_links)]
 #![deny(missing_debug_implementations)]
 #![allow(missing_docs)]
 #![deny(unsafe_code)]
-
-
-
-
 #![allow(clippy::suspicious_arithmetic_impl)]
 
 #[cfg(feature = "alloc")]
@@ -60,7 +34,6 @@ use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use group::WnafGroup;
 
-
 //
 mod coset;
 pub use coset::{
@@ -76,18 +49,13 @@ pub type JubJubScalar = Fr;
 pub use coset_bls12_381::BlsScalar;
 pub use coset_bls12_381::BlsScalar as Fq;
 
-
 #[macro_use]
 mod util;
 
 mod fr;
 pub use fr::Fr;
 
-
-
 pub type Base = Fq;
-
-
 
 pub type Scalar = Fr;
 
@@ -95,8 +63,6 @@ const FR_MODULUS_BYTES: [u8; 32] = [
     183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32, 104, 166,
     0, 59, 52, 1, 1, 59, 103, 6, 169, 175, 51, 101, 234, 180, 125, 14,
 ];
-
-
 
 #[derive(Clone, Copy, Debug, Eq)]
 #[cfg_attr(
@@ -117,8 +83,6 @@ impl fmt::Display for AffinePoint {
 
 impl Neg for AffinePoint {
     type Output = AffinePoint;
-
-
 
     #[inline]
     fn neg(self) -> AffinePoint {
@@ -150,17 +114,6 @@ impl ConditionallySelectable for AffinePoint {
     }
 }
 
-
-
-
-///
-
-
-///
-
-
-
-
 #[derive(Clone, Copy, Debug, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -183,11 +136,6 @@ impl fmt::Display for ExtendedPoint {
 
 impl ConstantTimeEq for ExtendedPoint {
     fn ct_eq(&self, other: &Self) -> Choice {
-
-
-
-
-
         (self.u * other.z).ct_eq(&(other.u * self.z))
             & (self.v * other.z).ct_eq(&(other.v * self.z))
     }
@@ -226,9 +174,6 @@ where
 impl Neg for ExtendedPoint {
     type Output = ExtendedPoint;
 
-
-
-
     #[inline]
     fn neg(self) -> ExtendedPoint {
         ExtendedPoint {
@@ -242,8 +187,6 @@ impl Neg for ExtendedPoint {
 }
 
 impl From<AffinePoint> for ExtendedPoint {
-
-
     fn from(affine: AffinePoint) -> ExtendedPoint {
         ExtendedPoint {
             u: affine.u,
@@ -256,14 +199,7 @@ impl From<AffinePoint> for ExtendedPoint {
 }
 
 impl<'a> From<&'a ExtendedPoint> for AffinePoint {
-
-
-
-
-
     fn from(extended: &'a ExtendedPoint) -> AffinePoint {
-
-
         let zinv = extended.z.invert().unwrap();
 
         AffinePoint {
@@ -279,9 +215,6 @@ impl From<ExtendedPoint> for AffinePoint {
     }
 }
 
-
-
-
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -295,7 +228,6 @@ pub struct AffineNielsPoint {
 }
 
 impl AffineNielsPoint {
-
     pub const fn identity() -> Self {
         AffineNielsPoint {
             v_plus_u: Fq::one(),
@@ -310,11 +242,7 @@ impl AffineNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-
-
-
         //
-
 
         for bit in by
             .as_bits::<Lsb0>()
@@ -330,8 +258,6 @@ impl AffineNielsPoint {
 
         accumulated_point
     }
-
-
 
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
@@ -362,8 +288,6 @@ impl ConditionallySelectable for AffineNielsPoint {
     }
 }
 
-
-
 #[derive(Clone, Copy, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -393,7 +317,6 @@ impl ConditionallySelectable for ExtendedNielsPoint {
 }
 
 impl ExtendedNielsPoint {
-
     pub const fn identity() -> Self {
         ExtendedNielsPoint {
             v_plus_u: Fq::one(),
@@ -409,11 +332,7 @@ impl ExtendedNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-
-
-
         //
-
 
         for bit in by
             .iter()
@@ -431,8 +350,6 @@ impl ExtendedNielsPoint {
         accumulated_point
     }
 
-
-
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
     }
@@ -448,14 +365,12 @@ impl<'a, 'b> Mul<&'b Fr> for &'a ExtendedNielsPoint {
 
 impl_binops_multiplicative_mixed!(ExtendedNielsPoint, Fr, ExtendedPoint);
 
-
 pub const EDWARDS_D: Fq = Fq::from_raw([
     0x0106_5fd6_d634_3eb1,
     0x292d_7f6d_3757_9d26,
     0xf5fd_9207_e6bd_7fd4,
     0x2a93_18e7_4bfa_2b48,
 ]);
-
 
 const EDWARDS_D2: Fq = Fq::from_raw([
     0x020c_bfad_ac68_7d62,
@@ -473,35 +388,25 @@ impl AffinePoint {
         }
     }
 
-
     /// 判断是否为单位元。
     pub fn is_identity(&self) -> Choice {
         ExtendedPoint::from(*self).is_identity()
     }
-
-
 
     /// 乘以协因子 8，将点映射到素数阶子群。
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         ExtendedPoint::from(*self).mul_by_cofactor()
     }
 
-
     /// 判断是否为小阶点（8-扭子群）。
     pub fn is_small_order(&self) -> Choice {
         ExtendedPoint::from(*self).is_small_order()
     }
 
-
-
     /// 判断是否属于素数阶子群。
     pub fn is_torsion_free(&self) -> Choice {
         ExtendedPoint::from(*self).is_torsion_free()
     }
-
-
-
-
 
     /// 判断是否为素数阶且非单位元。
     pub fn is_prime_order(&self) -> Choice {
@@ -509,87 +414,44 @@ impl AffinePoint {
         extended.is_torsion_free() & (!extended.is_identity())
     }
 
-
     /// 压缩编码为 32 字节（v 坐标 + u 符号位）。
     pub fn to_bytes(&self) -> [u8; 32] {
         let mut encoded_bytes = self.v.to_bytes();
         let u_bytes = self.u.to_bytes();
-
-
 
         encoded_bytes[31] |= u_bytes[0] << 7;
 
         encoded_bytes
     }
 
-
-
-
     /// 按 ZIP-216 规则从 32 字节反序列化点。
     pub fn from_bytes(b: [u8; 32]) -> CtOption<Self> {
-        Self::from_bytes_inner(b, 1.into())
+        Self::decode_from_bytes_with_zip216_flag(b, 1.into())
     }
-
-
-
-    ///
-
-
-
-
-    ///
-
-
-    ///
-
-
-    ///
-
 
     /// 按 Pre-ZIP-216 兼容规则反序列化点。
     pub fn from_bytes_pre_zip216_compatibility(b: [u8; 32]) -> CtOption<Self> {
-        Self::from_bytes_inner(b, 0.into())
+        Self::decode_from_bytes_with_zip216_flag(b, 0.into())
     }
 
-    fn from_bytes_inner(
+    fn decode_from_bytes_with_zip216_flag(
         mut b: [u8; 32],
         zip_216_enabled: Choice,
     ) -> CtOption<Self> {
-
         let sign = b[31] >> 7;
-
 
         b[31] &= 0b0111_1111;
 
-
         Fq::from_bytes(&b).and_then(|v| {
-
-
-
-
-
-
-
-
-
-
-
             let v2 = v.square();
 
             ((v2 - Fq::one())
                 * ((Fq::one() + EDWARDS_D * v2).invert().unwrap_or(Fq::zero())))
             .sqrt()
             .and_then(|u| {
-
                 let flip_sign = Choice::from((u.to_bytes()[0] ^ sign) & 1);
                 let u_negated = -u;
                 let final_u = Fq::conditional_select(&u, &u_negated, flip_sign);
-
-
-
-
-
-
 
                 let u_is_zero = u.ct_eq(&Fq::zero());
                 CtOption::new(
@@ -599,10 +461,6 @@ impl AffinePoint {
             })
         })
     }
-
-
-    ///
-
 
     /// 批量反序列化点，复用批量求逆降低开销。
     #[cfg(feature = "alloc")]
@@ -640,26 +498,11 @@ impl AffinePoint {
 
         let items: Vec<_> = items
             .map(|mut b| {
-
                 let sign = b[31] >> 7;
-
 
                 b[31] &= 0b0111_1111;
 
-
                 Fq::from_bytes(&b).map(|v| {
-
-
-
-
-
-
-
-
-
-
-
-
                     let v2 = v.square();
 
                     Item {
@@ -687,19 +530,12 @@ impl AffinePoint {
                          v, sign, numerator, ..
                      }| {
                         (numerator * inv_denominator).sqrt().and_then(|u| {
-
                             let flip_sign =
                                 Choice::from((u.to_bytes()[0] ^ sign) & 1);
                             let u_negated = -u;
                             let final_u = Fq::conditional_select(
                                 &u, &u_negated, flip_sign,
                             );
-
-
-
-
-
-
 
                             let u_is_zero = u.ct_eq(&Fq::zero());
                             CtOption::new(
@@ -713,16 +549,13 @@ impl AffinePoint {
             .collect()
     }
 
-
     pub fn get_u(&self) -> Fq {
         self.u
     }
 
-
     pub fn get_v(&self) -> Fq {
         self.v
     }
-
 
     /// 转为扩展坐标表示。
     pub const fn to_extended(&self) -> ExtendedPoint {
@@ -735,8 +568,6 @@ impl AffinePoint {
         }
     }
 
-
-
     /// 转为 Niels 形式以加速点加法。
     pub const fn to_niels(&self) -> AffineNielsPoint {
         AffineNielsPoint {
@@ -746,18 +577,13 @@ impl AffinePoint {
         }
     }
 
-
-
     /// 从原始坐标构造点，不做合法性检查。
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> AffinePoint {
         AffinePoint { u, v }
     }
 
-
-
-
     #[cfg(test)]
-    fn is_on_curve_vartime(&self) -> bool {
+    fn satisfies_curve_equation_vartime(&self) -> bool {
         let u2 = self.u.square();
         let v2 = self.v.square();
 
@@ -777,48 +603,30 @@ impl ExtendedPoint {
         }
     }
 
-
     /// 判断是否为单位元。
     pub fn is_identity(&self) -> Choice {
-
-
-
         self.u.ct_eq(&Fq::zero()) & self.v.ct_eq(&self.z)
     }
 
-
     /// 判断是否为小阶点（位于协因子子群）。
     pub fn is_small_order(&self) -> Choice {
-
-
-
-
         self.double().double().u.ct_eq(&Fq::zero())
     }
-
-
 
     /// 判断是否属于素数阶子群。
     pub fn is_torsion_free(&self) -> Choice {
         self.multiply(&FR_MODULUS_BYTES).is_identity()
     }
 
-
-
-
-
     /// 判断是否为素数阶且非单位元。
     pub fn is_prime_order(&self) -> Choice {
         self.is_torsion_free() & (!self.is_identity())
     }
 
-
     /// 乘以协因子 8。
     pub fn mul_by_cofactor(&self) -> ExtendedPoint {
         self.double().double().double()
     }
-
-
 
     /// 转为扩展 Niels 形式以加速加法。
     pub fn to_niels(&self) -> ExtendedNielsPoint {
@@ -830,81 +638,31 @@ impl ExtendedPoint {
         }
     }
 
-
-
     /// 点倍加（extended coordinates doubling）。
     pub fn double(&self) -> ExtendedPoint {
-
-
-
-
         //
 
-
         //
-
-
-
-
-        //
-
-
-
-
-
-
-
-
 
         //
 
         //
 
-
-
-
-
-
-
-
-
-
         //
 
-
-
         //
-
-
-
-
-
-
-
-
-
 
         //
 
         //
 
-
-
-
-
-
-
-
-
+        //
 
         //
 
         //
 
-
-
         //
-
 
         let u_squared = self.u.square();
         let v_squared = self.v.square();
@@ -912,8 +670,6 @@ impl ExtendedPoint {
         let uv2 = (self.u + self.v).square();
         let v_plus_u_squared = v_squared + u_squared;
         let v_minus_u_squared = v_squared - u_squared;
-
-
 
         CompletedPoint {
             u: uv2 - v_plus_u_squared,
@@ -929,20 +685,16 @@ impl ExtendedPoint {
         self.to_niels().multiply(by)
     }
 
-
-    ///
-
-    ///
-
     /// 批量将扩展坐标点转换为仿射坐标点。
-    fn batch_normalize(projective_points: &[Self], affine_points: &mut [AffinePoint]) {
+    fn batch_normalize(
+        projective_points: &[Self],
+        affine_points: &mut [AffinePoint],
+    ) {
         assert_eq!(projective_points.len(), affine_points.len());
 
         for (projective_point, affine_point) in
             projective_points.iter().zip(affine_points.iter_mut())
         {
-
-
             affine_point.u = projective_point.z;
         }
 
@@ -952,28 +704,22 @@ impl ExtendedPoint {
             |affine_point| &mut affine_point.v,
         );
 
-        for (projective_point, affine_point) in projective_points
-            .iter()
-            .zip(affine_points.iter_mut())
-            .rev()
+        for (projective_point, affine_point) in
+            projective_points.iter().zip(affine_points.iter_mut()).rev()
         {
             let z_inverse = affine_point.u;
-
 
             affine_point.u = projective_point.u * z_inverse;
             affine_point.v = projective_point.v * z_inverse;
         }
     }
 
-
-
-
     #[cfg(test)]
-    fn is_on_curve_vartime(&self) -> bool {
+    fn satisfies_extended_curve_equation_vartime(&self) -> bool {
         let affine = AffinePoint::from(*self);
 
         self.z != Fq::zero()
-            && affine.is_on_curve_vartime()
+            && affine.satisfies_curve_equation_vartime()
             && (affine.u * affine.v * self.z == self.t1 * self.t2)
     }
 }
@@ -993,29 +739,12 @@ impl<'a, 'b> Add<&'b ExtendedNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b ExtendedNielsPoint) -> ExtendedPoint {
-
-
-
         //
-
-
-
-
-
-
-
-
-
-
-
-
 
         let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
         let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
         let t_term = self.t1 * self.t2 * other.t2d;
         let z_term = (self.z * other.z).double();
-
-
 
         CompletedPoint {
             u: v_plus_u_term - v_minus_u_term,
@@ -1054,16 +783,10 @@ impl<'a, 'b> Add<&'b AffineNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b AffineNielsPoint) -> ExtendedPoint {
-
-
-
-
         let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
         let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
         let t_term = self.t1 * self.t2 * other.t2d;
         let z_term = self.z.double();
-
-
 
         CompletedPoint {
             u: v_plus_u_term - v_minus_u_term,
@@ -1137,10 +860,6 @@ impl<'a, 'b> Sub<&'b AffinePoint> for &'a ExtendedPoint {
 
 impl_binops_additive!(ExtendedPoint, AffinePoint);
 
-
-
-
-
 struct CompletedPoint {
     u: Fq,
     v: Fq,
@@ -1149,13 +868,6 @@ struct CompletedPoint {
 }
 
 impl CompletedPoint {
-
-
-    ///
-
-    ///
-
-
     #[inline]
     fn into_extended(self) -> ExtendedPoint {
         ExtendedPoint {
@@ -1169,29 +881,21 @@ impl CompletedPoint {
 }
 
 impl Default for AffinePoint {
-
     fn default() -> AffinePoint {
         AffinePoint::identity()
     }
 }
 
 impl Default for ExtendedPoint {
-
     fn default() -> ExtendedPoint {
         ExtendedPoint::identity()
     }
 }
 
-
-
-
-
-
 /// 对扩展点切片做原地归一化，并返回仿射点迭代器。
 pub fn batch_normalize(
     points: &mut [ExtendedPoint],
 ) -> impl Iterator<Item = AffinePoint> + '_ {
-
     BatchInverter::invert_with_internal_scratch(
         points,
         |point| &mut point.z,
@@ -1202,7 +906,6 @@ pub fn batch_normalize(
         let mut normalized_point = *point;
         let z_inverse = normalized_point.z;
 
-
         normalized_point.u *= &z_inverse;
         normalized_point.v *= &z_inverse;
         normalized_point.z = Fq::one();
@@ -1212,16 +915,10 @@ pub fn batch_normalize(
         *point = normalized_point;
     }
 
-
-
-
-
-    points
-        .iter()
-        .map(|point| AffinePoint {
-            u: point.u,
-            v: point.v,
-        })
+    points.iter().map(|point| AffinePoint {
+        u: point.u,
+        v: point.v,
+    })
 }
 
 impl<'a, 'b> Mul<&'b Fr> for &'a AffinePoint {
@@ -1233,8 +930,6 @@ impl<'a, 'b> Mul<&'b Fr> for &'a AffinePoint {
 }
 
 impl_binops_multiplicative_mixed!(AffinePoint, Fr, ExtendedPoint);
-
-
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(
@@ -1269,14 +964,6 @@ impl ConditionallySelectable for SubgroupPoint {
 }
 
 impl SubgroupPoint {
-
-
-    ///
-
-
-
-    ///
-
     /// 从原始坐标构造子群点（调用方需保证输入在子群内）。
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> Self {
         SubgroupPoint(AffinePoint::from_raw_unchecked(u, v).to_extended())
@@ -1371,7 +1058,6 @@ impl Group for ExtendedPoint {
             let random_v = Fq::random(&mut rng);
             let flip_sign = rng.next_u32() % 2 != 0;
 
-
             let v_squared = random_v.square();
             let candidate_point = ((v_squared - Fq::one())
                 * ((Fq::one() + EDWARDS_D * v_squared)
@@ -1444,7 +1130,6 @@ impl Group for SubgroupPoint {
 #[cfg(feature = "alloc")]
 impl WnafGroup for ExtendedPoint {
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize {
-
         const RECOMMENDATIONS: [usize; 12] =
             [1, 3, 7, 20, 43, 120, 273, 563, 1630, 3128, 7933, 62569];
 
@@ -1504,8 +1189,6 @@ impl CofactorCurveAffine for AffinePoint {
     }
 
     fn generator() -> Self {
-
-
         AffinePoint {
             u: Fq::from_raw([
                 0xe4b3_d35d_f1a7_adfe,
@@ -1539,7 +1222,6 @@ impl GroupEncoding for ExtendedPoint {
     }
 
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
-
         AffinePoint::from_bytes(*bytes).map(Self::from)
     }
 
@@ -1582,7 +1264,7 @@ impl GroupEncoding for AffinePoint {
 
 #[test]
 fn test_is_on_curve_var() {
-    assert!(AffinePoint::identity().is_on_curve_vartime());
+    assert!(AffinePoint::identity().satisfies_curve_equation_vartime());
 }
 
 #[test]
@@ -1645,7 +1327,7 @@ fn test_assoc() {
         ]),
     })
     .mul_by_cofactor();
-    assert!(point.is_on_curve_vartime());
+    assert!(point.satisfies_extended_curve_equation_vartime());
 
     assert_eq!(
         (point * Fr::from(1000u64)) * Fr::from(3938u64),
@@ -1678,11 +1360,13 @@ fn test_batch_normalize() {
     }
 
     for point in &points {
-        assert!(point.is_on_curve_vartime());
+        assert!(point.satisfies_extended_curve_equation_vartime());
     }
 
-    let expected: std::vec::Vec<_> =
-        points.iter().map(|point| AffinePoint::from(*point)).collect();
+    let expected: std::vec::Vec<_> = points
+        .iter()
+        .map(|point| AffinePoint::from(*point))
+        .collect();
     let mut normalized_points_0 = vec![AffinePoint::identity(); points.len()];
     ExtendedPoint::batch_normalize(&points, &mut normalized_points_0);
     for i in 0..10 {
@@ -1692,14 +1376,14 @@ fn test_batch_normalize() {
         batch_normalize(&mut points).collect();
     for i in 0..10 {
         assert!(expected[i] == normalized_points_1[i]);
-        assert!(points[i].is_on_curve_vartime());
+        assert!(points[i].satisfies_extended_curve_equation_vartime());
         assert!(AffinePoint::from(points[i]) == expected[i]);
     }
     let normalized_points_2: std::vec::Vec<_> =
         batch_normalize(&mut points).collect();
     for i in 0..10 {
         assert!(expected[i] == normalized_points_2[i]);
-        assert!(points[i].is_on_curve_vartime());
+        assert!(points[i].satisfies_extended_curve_equation_vartime());
         assert!(AffinePoint::from(points[i]) == expected[i]);
     }
 }
@@ -1832,7 +1516,7 @@ fn find_curve_generator() {
         let maybe_affine = AffinePoint::from_bytes(trial_bytes);
         if bool::from(maybe_affine.is_some()) {
             let affine_point = maybe_affine.unwrap();
-            assert!(affine_point.is_on_curve_vartime());
+            assert!(affine_point.satisfies_curve_equation_vartime());
             let point = ExtendedPoint::from(affine_point);
             let point = point.multiply(&FR_MODULUS_BYTES);
             assert!(bool::from(point.is_small_order()));
@@ -1921,11 +1605,7 @@ fn test_mul_consistency() {
         ]),
     })
     .mul_by_cofactor();
-    assert_eq!(
-        point * product_scalar,
-        (point * left_scalar) * right_scalar
-    );
-
+    assert_eq!(point * product_scalar, (point * left_scalar) * right_scalar);
 
     assert_eq!(
         point * product_scalar,
@@ -1939,7 +1619,6 @@ fn test_mul_consistency() {
         point.to_niels() * product_scalar,
         (point.to_niels() * left_scalar) * right_scalar
     );
-
 
     let point_affine_niels = AffinePoint::from(point).to_niels();
     assert_eq!(
@@ -2048,10 +1727,11 @@ fn test_serialization_consistency() {
     let batched_points =
         AffinePoint::batch_from_bytes(expected_serializations.iter().cloned());
 
-    for (expected_serialized, batch_deserialized) in
-        expected_serializations.into_iter().zip(batched_points.into_iter())
+    for (expected_serialized, batch_deserialized) in expected_serializations
+        .into_iter()
+        .zip(batched_points.into_iter())
     {
-        assert!(current_point.is_on_curve_vartime());
+        assert!(current_point.satisfies_extended_curve_equation_vartime());
         let affine_point = AffinePoint::from(current_point);
         let serialized_point = affine_point.to_bytes();
         let deserialized_point =
@@ -2066,13 +1746,11 @@ fn test_serialization_consistency() {
 #[test]
 fn test_zip_216() {
     const NON_CANONICAL_ENCODINGS: [[u8; 32]; 2] = [
-
         [
             0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
         ],
-
         [
             0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff, 0xfe, 0x5b, 0xfe,
             0xff, 0x02, 0xa4, 0xbd, 0x53, 0x05, 0xd8, 0xa1, 0x09, 0x08, 0xd8,
@@ -2084,12 +1762,9 @@ fn test_zip_216() {
         {
             let mut canonicalized_encoding = *non_canonical_encoding;
 
-
             assert!(bool::from(
                 AffinePoint::from_bytes(canonicalized_encoding).is_none()
             ));
-
-
 
             canonicalized_encoding[31] &= 0b0111_1111;
             assert!(bool::from(
@@ -2098,18 +1773,12 @@ fn test_zip_216() {
         }
 
         {
-
-
-
-            let parsed =
-                AffinePoint::from_bytes_pre_zip216_compatibility(
-                    *non_canonical_encoding,
-                )
-                .unwrap();
+            let parsed = AffinePoint::from_bytes_pre_zip216_compatibility(
+                *non_canonical_encoding,
+            )
+            .unwrap();
             let mut encoded = parsed.to_bytes();
             assert_ne!(non_canonical_encoding, &encoded);
-
-
 
             encoded[31] |= 0b1000_0000;
             assert_eq!(non_canonical_encoding, &encoded);

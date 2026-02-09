@@ -1,16 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/fft/domain.rs）。
 
 //
-
-
-
-
-
-
-
-
-
 
 use coset_bls12_381::BlsScalar;
 use coset_bytes::{DeserializableSlice, Serializable};
@@ -23,9 +13,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
-
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -34,7 +21,6 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct EvaluationDomain {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) size: u64,
 
@@ -117,10 +103,7 @@ pub(crate) mod alloc {
     use rayon::prelude::*;
 
     impl EvaluationDomain {
-
-
         pub(crate) fn new(num_coeffs: usize) -> Result<Self, Error> {
-
             let size = num_coeffs.next_power_of_two() as u64;
             let log_size_of_group = size.trailing_zeros();
 
@@ -130,9 +113,6 @@ pub(crate) mod alloc {
                     adacity: TWO_ADACITY,
                 });
             }
-
-
-
 
             let mut group_gen = ROOT_OF_UNITY;
             for _ in log_size_of_group..TWO_ADACITY {
@@ -152,11 +132,9 @@ pub(crate) mod alloc {
             })
         }
 
-
         pub(crate) fn size(&self) -> usize {
             self.size as usize
         }
-
 
         pub(crate) fn fft(&self, coeffs: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut coeffs = coeffs.to_vec();
@@ -164,19 +142,16 @@ pub(crate) mod alloc {
             coeffs
         }
 
-
         fn fft_in_place(&self, coeffs: &mut Vec<BlsScalar>) {
             coeffs.resize(self.size(), BlsScalar::zero());
             best_fft(coeffs, self.group_gen, self.log_size_of_group)
         }
-
 
         pub(crate) fn ifft(&self, evals: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut evals = evals.to_vec();
             self.ifft_in_place(&mut evals);
             evals
         }
-
 
         #[inline]
         pub(crate) fn ifft_in_place(&self, evals: &mut Vec<BlsScalar>) {
@@ -198,28 +173,22 @@ pub(crate) mod alloc {
             })
         }
 
-
         pub(crate) fn coset_fft(&self, coeffs: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut coeffs = coeffs.to_vec();
             self.coset_fft_in_place(&mut coeffs);
             coeffs
         }
 
-
-
         fn coset_fft_in_place(&self, coeffs: &mut Vec<BlsScalar>) {
             Self::distribute_powers(coeffs, GENERATOR);
             self.fft_in_place(coeffs);
         }
-
 
         pub(crate) fn coset_ifft(&self, evals: &[BlsScalar]) -> Vec<BlsScalar> {
             let mut evals = evals.to_vec();
             self.coset_ifft_in_place(&mut evals);
             evals
         }
-
-
 
         fn coset_ifft_in_place(&self, evals: &mut Vec<BlsScalar>) {
             self.ifft_in_place(evals);
@@ -228,12 +197,10 @@ pub(crate) mod alloc {
 
         #[allow(clippy::needless_range_loop)]
 
-
         pub(crate) fn evaluate_all_lagrange_coefficients(
             &self,
             tau: BlsScalar,
         ) -> Vec<BlsScalar> {
-
             let size = self.size as usize;
             let t_size = tau.pow(&[self.size, 0, 0, 0]);
             let one = BlsScalar::one();
@@ -278,8 +245,6 @@ pub(crate) mod alloc {
             }
         }
 
-
-
         /// - 1`.
         pub(crate) fn evaluate_vanishing_polynomial(
             &self,
@@ -287,9 +252,6 @@ pub(crate) mod alloc {
         ) -> BlsScalar {
             tau.pow(&[self.size, 0, 0, 0]) - BlsScalar::one()
         }
-
-
-
 
         pub(crate) fn compute_vanishing_poly_over_coset(
             &self,
@@ -311,7 +273,6 @@ pub(crate) mod alloc {
                 .collect();
             Evaluations::from_vec_and_domain(v_h, *self)
         }
-
 
         pub(crate) fn elements(&self) -> Elements {
             Elements {
@@ -377,7 +338,6 @@ pub(crate) mod alloc {
             butterfly_step *= 2;
         }
     }
-
 
     #[derive(Debug)]
     pub(crate) struct Elements {

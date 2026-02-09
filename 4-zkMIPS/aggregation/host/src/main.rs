@@ -1,6 +1,9 @@
 //! A simple example showing how to aggregate proofs of multiple programs with ZKM.
 
 use clap::Parser;
+use std::fs::File;
+use std::io::Write;
+use std::time::Instant;
 use zkm_sdk::{
     include_elf, HashableKey, ProverClient, ZKMProof, ZKMProofWithPublicValues, ZKMStdin,
     ZKMVerifyingKey,
@@ -23,6 +26,10 @@ struct Args {
     /// The algorithms to aggregate proofs for (e.g., fibonacci_add fibonacci_mul sha2 sha3)
     #[arg(value_name = "ALGORITHMS")]
     algorithms: Vec<String>,
+    
+    /// Output file path for the aggregated proof
+    #[arg(short, long, default_value = "aggregated_proof.bin")]
+    output: String,
 }
 
 /// A program that aggregates the proofs of the simple program.
@@ -197,7 +204,7 @@ fn main() {
     println!("✓ Aggregation inputs prepared, {} proof(s)", inputs.len());
 
     println!("\n=== Step 5: Aggregating Proofs ===");
-    let (aggregation_pk, _) = client.setup(AGGREGATION_ELF);
+    let (aggregation_pk, aggregation_vk) = client.setup(AGGREGATION_ELF);
     // Aggregate the proofs.
     tracing::info_span!("aggregate the proofs").in_scope(|| {
         let mut stdin = ZKMStdin::new();
@@ -238,6 +245,19 @@ fn main() {
             .run()
             .expect("aggregation plonk proving failed");
         println!("✓ Plonk bn254 proof generated successfully");
+        
+        // Verify the aggregated proof
+        println!("Verifying the aggregated proof...");
+        let start = Instant::now();
+        client.verify(&aggregation_proof, &aggregation_vk).expect("Proof verification failed");
+        let duration = start.elapsed();
+        println!("✓ Proof verification passed, elapsed time: {:?}", duration);
+        
+        // Save the aggregated proof to file
+        println!("Saving aggregated proof to file: {}", args.output);
+        let mut file = File::create(&args.output).expect("Failed to create output file");
+        file.write_all(&aggregation_proof.bytes()).expect("Failed to write proof to file");
+        println!("✓ Proof file saved successfully")
     });
     
     println!("\n=== Aggregation Complete ===");

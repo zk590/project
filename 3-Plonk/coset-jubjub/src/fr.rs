@@ -1,6 +1,4 @@
-
-
-
+//! JubJub 标量域 Fr 的实现（Montgomery 表示、域运算与序列化）。
 
 mod coset;
 
@@ -16,11 +14,6 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use ff::{FieldBits, PrimeFieldBits};
 
 use crate::util::{adc, mac, sbb};
-
-
-
-
-
 
 #[derive(Clone, Copy, Eq)]
 #[cfg_attr(
@@ -80,15 +73,12 @@ impl ConditionallySelectable for Fr {
     }
 }
 
-
-
 pub const MODULUS: Fr = Fr([
     0xd097_0e5e_d6f7_2cb7,
     0xa668_2093_ccc8_1082,
     0x0667_3b01_0134_3b00,
     0x0e7d_b4ea_6533_afa9,
 ]);
-
 
 #[cfg(not(target_pointer_width = "64"))]
 const MODULUS_LIMBS_32: [u32; 8] = [
@@ -102,7 +92,6 @@ const MODULUS_LIMBS_32: [u32; 8] = [
     0x0e7d_b4ea,
 ];
 
-
 const MODULUS_BITS: u32 = 252;
 
 /// 2^-1
@@ -113,8 +102,6 @@ const TWO_INV: Fr = Fr([
     0x0c12_58ac_d662_82b7,
 ]);
 
-
-
 const GENERATOR: Fr = Fr([
     0x720b_1b19_d49e_a8f1,
     0xbf4a_a361_01f1_3a58,
@@ -122,9 +109,7 @@ const GENERATOR: Fr = Fr([
     0x0e70_cbdc_7dcc_f3ac,
 ]);
 
-
 const S: u32 = 1;
-
 
 const ROOT_OF_UNITY: Fr = Fr([
     0xaa9f_02ab_1d61_24de,
@@ -133,10 +118,7 @@ const ROOT_OF_UNITY: Fr = Fr([
     0x04d6_b87b_1da2_59e2,
 ]);
 
-
 const ROOT_OF_UNITY_INV: Fr = ROOT_OF_UNITY;
-
-
 
 const DELTA: Fr = Fr([
     0x994f_5ac0_c8e4_1613,
@@ -186,8 +168,6 @@ impl<'a, 'b> Mul<&'b Fr> for &'a Fr {
 
     #[inline]
     fn mul(self, rhs: &'b Fr) -> Fr {
-
-
         self.mul(rhs)
     }
 }
@@ -219,9 +199,7 @@ where
     }
 }
 
-
 const INV: u64 = 0x1ba3_a358_ef78_8ef9;
-
 
 const R: Fr = Fr([
     0x25f8_0bb3_b996_07d9,
@@ -230,14 +208,12 @@ const R: Fr = Fr([
     0x09a6_fc6f_4791_55c6,
 ]);
 
-
 const R2: Fr = Fr([
     0x6771_9aa4_95e5_7731,
     0x51b0_cef0_9ce3_fc26,
     0x69da_b7fa_c026_e9a5,
     0x04f6_547b_8d12_7688,
 ]);
-
 
 const R3: Fr = Fr([
     0xe0d6_c656_3d83_0544,
@@ -253,13 +229,11 @@ impl Default for Fr {
 }
 
 impl Fr {
-
     #[inline]
     /// 返回标量域加法单位元。
     pub const fn zero() -> Fr {
         Fr([0, 0, 0, 0])
     }
-
 
     #[inline]
     /// 返回标量域乘法单位元（Montgomery 形式）。
@@ -267,14 +241,11 @@ impl Fr {
         R
     }
 
-
     #[inline]
     /// 计算当前标量的二倍值。
     pub const fn double(&self) -> Fr {
         self.add(self)
     }
-
-
 
     /// 从 32 字节小端编码反序列化标量，并检查是否小于模数。
     pub fn from_bytes(bytes: &[u8; 32]) -> CtOption<Fr> {
@@ -285,29 +256,20 @@ impl Fr {
         tmp.0[2] = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
         tmp.0[3] = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
 
-
         let (_, borrow) = sbb(tmp.0[0], MODULUS.0[0], 0);
         let (_, borrow) = sbb(tmp.0[1], MODULUS.0[1], borrow);
         let (_, borrow) = sbb(tmp.0[2], MODULUS.0[2], borrow);
         let (_, borrow) = sbb(tmp.0[3], MODULUS.0[3], borrow);
 
-
-
-
         let is_some = (borrow as u8) & 1;
-
-
 
         tmp *= &R2;
 
         CtOption::new(tmp, Choice::from(is_some))
     }
 
-
     /// 将标量序列化为 32 字节小端编码。
     pub fn to_bytes(&self) -> [u8; 32] {
-
-
         let tmp = Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
@@ -321,10 +283,9 @@ impl Fr {
         res
     }
 
-
     /// 从 64 字节宽输入构造标量，内部会执行模约简。
     pub fn from_bytes_wide(bytes: &[u8; 64]) -> Fr {
-        Fr::from_u512([
+        Fr::reduce_u512_words([
             u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
             u64::from_le_bytes(bytes[8..16].try_into().unwrap()),
             u64::from_le_bytes(bytes[16..24].try_into().unwrap()),
@@ -336,22 +297,10 @@ impl Fr {
         ])
     }
 
-    fn from_u512(limbs: [u64; 8]) -> Fr {
-
-
-
+    fn reduce_u512_words(limbs: [u64; 8]) -> Fr {
         //
 
-
         //
-
-
-
-
-
-
-
-
 
         let d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
         let d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
@@ -359,12 +308,10 @@ impl Fr {
         d0 * R2 + d1 * R3
     }
 
-
     /// 将普通整数表示转换为 Montgomery 域表示。
     pub const fn from_raw(val: [u64; 4]) -> Self {
         (&Fr(val)).mul(&R2)
     }
-
 
     #[inline]
     pub const fn square(&self) -> Fr {
@@ -399,9 +346,6 @@ impl Fr {
 
     /// 计算平方根；不存在时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
-
-
-
         let sqrt = self.pow_vartime(&[
             0xb425_c397_b5bd_cb2e,
             0x299a_0824_f332_0420,
@@ -409,12 +353,8 @@ impl Fr {
             0x039f_6d3a_994c_ebea,
         ]);
 
-        CtOption::new(
-            sqrt,
-            (sqrt * sqrt).ct_eq(self), 
-        )
+        CtOption::new(sqrt, (sqrt * sqrt).ct_eq(self))
     }
-
 
     /// 常时间幂运算实现。
     pub fn pow(&self, by: &[u64; 4]) -> Self {
@@ -430,11 +370,6 @@ impl Fr {
         res
     }
 
-
-
-    ///
-
-
     /// 变长时间幂运算，适用于公开指数。
     pub fn pow_vartime(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
@@ -449,7 +384,6 @@ impl Fr {
         }
         res
     }
-
 
     /// 计算乘法逆元；0 元素返回空值。
     pub fn invert(&self) -> CtOption<Self> {
@@ -568,10 +502,6 @@ impl Fr {
         r6: u64,
         r7: u64,
     ) -> Self {
-
-
-
-
         let k = r0.wrapping_mul(INV);
         let (_, carry) = mac(r0, k, MODULUS.0[0], 0);
         let (r1, carry) = mac(r1, k, MODULUS.0[1], carry);
@@ -600,15 +530,11 @@ impl Fr {
         let (r6, carry) = mac(r6, k, MODULUS.0[3], carry);
         let (r7, _) = adc(r7, carry2, carry);
 
-
         (&Fr([r4, r5, r6, r7])).sub(&MODULUS)
     }
 
-
     #[inline]
     pub const fn mul(&self, rhs: &Self) -> Self {
-
-
         let (r0, carry) = mac(0, self.0[0], rhs.0[0], 0);
         let (r1, carry) = mac(0, self.0[0], rhs.0[1], carry);
         let (r2, carry) = mac(0, self.0[0], rhs.0[2], carry);
@@ -632,16 +558,12 @@ impl Fr {
         Fr::montgomery_reduce(r0, r1, r2, r3, r4, r5, r6, r7)
     }
 
-
     #[inline]
     pub const fn sub(&self, rhs: &Self) -> Self {
         let (d0, borrow) = sbb(self.0[0], rhs.0[0], 0);
         let (d1, borrow) = sbb(self.0[1], rhs.0[1], borrow);
         let (d2, borrow) = sbb(self.0[2], rhs.0[2], borrow);
         let (d3, borrow) = sbb(self.0[3], rhs.0[3], borrow);
-
-
-
 
         let (d0, carry) = adc(d0, MODULUS.0[0] & borrow, 0);
         let (d1, carry) = adc(d1, MODULUS.0[1] & borrow, carry);
@@ -651,7 +573,6 @@ impl Fr {
         Fr([d0, d1, d2, d3])
     }
 
-
     #[inline]
     pub const fn add(&self, rhs: &Self) -> Self {
         let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
@@ -659,23 +580,15 @@ impl Fr {
         let (d2, carry) = adc(self.0[2], rhs.0[2], carry);
         let (d3, _) = adc(self.0[3], rhs.0[3], carry);
 
-
-
         (&Fr([d0, d1, d2, d3])).sub(&MODULUS)
     }
 
-
     #[inline]
     pub const fn neg(&self) -> Self {
-
-
-
         let (d0, borrow) = sbb(MODULUS.0[0], self.0[0], 0);
         let (d1, borrow) = sbb(MODULUS.0[1], self.0[1], borrow);
         let (d2, borrow) = sbb(MODULUS.0[2], self.0[2], borrow);
         let (d3, _) = sbb(MODULUS.0[3], self.0[3], borrow);
-
-
 
         let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3]) == 0)
             as u64)
@@ -813,9 +726,7 @@ fn test_constants() {
 
     assert_eq!(Fr::ROOT_OF_UNITY * Fr::ROOT_OF_UNITY_INV, Fr::ONE);
 
-
     assert_eq!(Fr::ROOT_OF_UNITY.pow(&[1u64 << Fr::S, 0, 0, 0]), Fr::ONE);
-
 
     assert_eq!(
         Fr::DELTA.pow(&[
@@ -830,9 +741,6 @@ fn test_constants() {
 
 #[test]
 fn test_inv() {
-
-
-
     let mut inv = 1u64;
     for _ in 0..63 {
         inv = inv.wrapping_mul(inv);
@@ -937,7 +845,6 @@ fn test_from_bytes() {
         R2
     );
 
-
     assert!(bool::from(
         Fr::from_bytes(&[
             182, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32,
@@ -947,7 +854,6 @@ fn test_from_bytes() {
         .is_some()
     ));
 
-
     assert!(bool::from(
         Fr::from_bytes(&[
             183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32,
@@ -956,7 +862,6 @@ fn test_from_bytes() {
         ])
         .is_none()
     ));
-
 
     assert!(bool::from(
         Fr::from_bytes(&[
@@ -990,7 +895,7 @@ fn test_from_bytes() {
 fn test_from_u512_zero() {
     assert_eq!(
         Fr::zero(),
-        Fr::from_u512([
+        Fr::reduce_u512_words([
             MODULUS.0[0],
             MODULUS.0[1],
             MODULUS.0[2],
@@ -1005,12 +910,12 @@ fn test_from_u512_zero() {
 
 #[test]
 fn test_from_u512_r() {
-    assert_eq!(R, Fr::from_u512([1, 0, 0, 0, 0, 0, 0, 0]));
+    assert_eq!(R, Fr::reduce_u512_words([1, 0, 0, 0, 0, 0, 0, 0]));
 }
 
 #[test]
 fn test_from_u512_r2() {
-    assert_eq!(R2, Fr::from_u512([0, 0, 0, 0, 1, 0, 0, 0]));
+    assert_eq!(R2, Fr::reduce_u512_words([0, 0, 0, 0, 1, 0, 0, 0]));
 }
 
 #[test]
@@ -1018,7 +923,7 @@ fn test_from_u512_max() {
     let max_u64 = 0xffff_ffff_ffff_ffff;
     assert_eq!(
         R3 - R,
-        Fr::from_u512([
+        Fr::reduce_u512_words([
             max_u64, max_u64, max_u64, max_u64, max_u64, max_u64, max_u64,
             max_u64
         ])
@@ -1229,7 +1134,6 @@ fn test_invert_is_pow() {
 #[test]
 fn test_sqrt() {
     let mut square = Fr([
-
         0xd097_0e5e_d6f7_2cb5,
         0xa668_2093_ccc8_1082,
         0x0667_3b01_0134_3b00,

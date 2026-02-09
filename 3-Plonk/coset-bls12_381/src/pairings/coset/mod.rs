@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use crate::fp::Fp;
 use crate::fp2::Fp2;
@@ -12,11 +8,7 @@ use super::G2Prepared;
 use alloc::vec::Vec;
 
 impl G2Prepared {
-
     ///
-
-
-
 
     pub fn to_raw_bytes(&self) -> Vec<u8> {
         let mut bytes = alloc::vec![0u8; 288 * self.coeffs.len()];
@@ -40,12 +32,7 @@ impl G2Prepared {
         bytes
     }
 
-
-
     ///
-
-
-
 
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let coeffs = bytes
@@ -102,16 +89,23 @@ mod serde_support {
     use crate::coset::choice::Choice;
 
     impl Serialize for G2Prepared {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-            let mut ser_struct = serializer.serialize_struct("G2Prepared", 2)?;
-            ser_struct.serialize_field("infinity", &self.infinity.unwrap_u8())?;
+        fn serialize<S: Serializer>(
+            &self,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
+            let mut ser_struct =
+                serializer.serialize_struct("G2Prepared", 2)?;
+            ser_struct
+                .serialize_field("infinity", &self.infinity.unwrap_u8())?;
             ser_struct.serialize_field("coeffs", &self.coeffs)?;
             ser_struct.end()
         }
     }
 
     impl<'de> Deserialize<'de> for G2Prepared {
-        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        fn deserialize<D: Deserializer<'de>>(
+            deserializer: D,
+        ) -> Result<Self, D::Error> {
             struct G2PreparedVisitor;
 
             const FIELDS: &[&str] = &["infinity", "coeffs"];
@@ -119,42 +113,63 @@ mod serde_support {
             impl<'de> Visitor<'de> for G2PreparedVisitor {
                 type Value = G2Prepared;
 
-                fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
-                    formatter.write_str("a struct a with fields infinity and coeffs")
+                fn expecting(
+                    &self,
+                    formatter: &mut ::core::fmt::Formatter,
+                ) -> ::core::fmt::Result {
+                    formatter
+                        .write_str("a struct a with fields infinity and coeffs")
                 }
 
-                fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                fn visit_map<A: MapAccess<'de>>(
+                    self,
+                    mut map: A,
+                ) -> Result<Self::Value, A::Error> {
                     let mut infinity: Option<u8> = None;
                     let mut coeffs = None;
                     while let Some(key) = map.next_key()? {
                         match key {
                             "infinity" => {
                                 if infinity.is_some() {
-                                    return Err(SerdeError::duplicate_field("infinity"));
+                                    return Err(SerdeError::duplicate_field(
+                                        "infinity",
+                                    ));
                                 } else {
                                     infinity = Some(map.next_value()?);
                                 }
                             }
                             "coeffs" => {
                                 if coeffs.is_some() {
-                                    return Err(SerdeError::duplicate_field("coeffs"));
+                                    return Err(SerdeError::duplicate_field(
+                                        "coeffs",
+                                    ));
                                 } else {
                                     coeffs = Some(map.next_value()?);
                                 }
                             }
-                            field => return Err(SerdeError::unknown_field(field, &FIELDS)),
+                            field => {
+                                return Err(SerdeError::unknown_field(
+                                    field, &FIELDS,
+                                ))
+                            }
                         }
                     }
                     Ok(G2Prepared {
-                        infinity: Choice::from(
-                            infinity.ok_or_else(|| SerdeError::missing_field("infinity"))?,
-                        ),
-                        coeffs: coeffs.ok_or_else(|| SerdeError::missing_field("coeffs"))?,
+                        infinity: Choice::from(infinity.ok_or_else(|| {
+                            SerdeError::missing_field("infinity")
+                        })?),
+                        coeffs: coeffs.ok_or_else(|| {
+                            SerdeError::missing_field("coeffs")
+                        })?,
                     })
                 }
             }
 
-            deserializer.deserialize_struct("G2Prepared", FIELDS, G2PreparedVisitor)
+            deserializer.deserialize_struct(
+                "G2Prepared",
+                FIELDS,
+                G2PreparedVisitor,
+            )
         }
     }
 
@@ -176,7 +191,10 @@ mod serde_support {
             let deser: G2Prepared = serde_json::from_str(&ser).unwrap();
 
             assert_eq!(g2_prepared.coeffs, deser.coeffs);
-            assert_eq!(g2_prepared.infinity.unwrap_u8(), deser.infinity.unwrap_u8());
+            assert_eq!(
+                g2_prepared.infinity.unwrap_u8(),
+                deser.infinity.unwrap_u8()
+            );
             Ok(())
         }
     }

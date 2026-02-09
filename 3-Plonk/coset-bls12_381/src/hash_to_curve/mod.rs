@@ -1,6 +1,3 @@
-
-
-
 use core::ops::Add;
 
 use subtle::Choice;
@@ -9,7 +6,8 @@ pub(crate) mod chain;
 
 mod expand_msg;
 pub use self::expand_msg::{
-    ExpandMessage, ExpandMessageState, ExpandMsgXmd, ExpandMsgXof, InitExpandMessage,
+    ExpandMessage, ExpandMessageState, ExpandMsgXmd, ExpandMsgXof,
+    InitExpandMessage,
 };
 
 mod map_g1;
@@ -18,30 +16,26 @@ mod map_scalar;
 
 use crate::generic_array::{typenum::Unsigned, ArrayLength, GenericArray};
 
-
 ///
 
 ///
 
 pub trait HashToField: Sized {
-
     ///
-
-
 
     type InputLength: ArrayLength<u8>;
 
-
-
     fn from_okm(okm: &GenericArray<u8, Self::InputLength>) -> Self;
 
-
-
     ///
 
     ///
 
-    fn hash_to_field<X: ExpandMessage>(message: &[u8], dst: &[u8], output: &mut [Self]) {
+    fn hash_to_field<X: ExpandMessage>(
+        message: &[u8],
+        dst: &[u8],
+        output: &mut [Self],
+    ) {
         let len_per_elm = Self::InputLength::to_usize();
         let len_in_bytes = output.len() * len_per_elm;
         let mut expander = X::init_expand(message, dst, len_in_bytes);
@@ -54,23 +48,18 @@ pub trait HashToField: Sized {
     }
 }
 
-
 pub trait MapToCurve: Sized {
-
     type Field: Copy + Default + HashToField;
 
-
     fn map_to_curve(elt: &Self::Field) -> Self;
-
 
     fn clear_h(&self) -> Self;
 }
 
-
-pub trait HashToCurve<X: ExpandMessage>: MapToCurve + for<'a> Add<&'a Self, Output = Self> {
-
+pub trait HashToCurve<X: ExpandMessage>:
+    MapToCurve + for<'a> Add<&'a Self, Output = Self>
+{
     ///
-
 
     fn hash_to_curve(message: impl AsRef<[u8]>, dst: &[u8]) -> Self {
         let mut u = [Self::Field::default(); 2];
@@ -80,12 +69,7 @@ pub trait HashToCurve<X: ExpandMessage>: MapToCurve + for<'a> Add<&'a Self, Outp
         (p1 + &p2).clear_h()
     }
 
-
     ///
-
-
-
-
 
     ///
 
@@ -105,9 +89,5 @@ where
 }
 
 pub(crate) trait Sgn0 {
-
-
-
-
     fn sgn0(&self) -> Choice;
 }

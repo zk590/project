@@ -1,7 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+//! JubJub 点运算性能基准：加法、减法、倍点与标量乘。
+
 use coset_jubjub::*;
-
-
+use criterion::{criterion_group, criterion_main, Criterion};
 
 fn bench_point_doubling(c: &mut Criterion) {
     let a = ExtendedPoint::identity();
@@ -25,8 +25,6 @@ fn bench_point_subtraction(c: &mut Criterion) {
         bencher.iter(move || a + b)
     });
 }
-
-
 
 fn bench_cached_point_addition(c: &mut Criterion) {
     let a = ExtendedPoint::identity();

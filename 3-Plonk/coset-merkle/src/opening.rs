@@ -1,5 +1,5 @@
 
-use crate::{init_array, Aggregate, Node, Tree};
+use crate::{init_fixed_array, Aggregate, Node, Tree};
 
 use alloc::vec::Vec;
 
@@ -32,14 +32,14 @@ where
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
         let opening_positions = [0; H];
         let opening_branch =
-            init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
+            init_fixed_array(|_| init_fixed_array(|_| T::EMPTY_SUBTREE));
 
         let mut opening = Self {
-            root: tree.root.item().clone(),
+            root: tree.root.aggregated_item().clone(),
             branch: opening_branch,
             positions: opening_positions,
         };
-        fill_opening(&mut opening, &tree.root, 0, position);
+        populate_opening_path(&mut opening, &tree.root, 0, position);
 
         opening
     }
@@ -155,7 +155,7 @@ where
 
 
         let mut branch: [[T; A]; H] =
-            init_array(|_| init_array(|_| T::EMPTY_SUBTREE));
+            init_fixed_array(|_| init_fixed_array(|_| T::EMPTY_SUBTREE));
         for level in &mut branch {
             for item in &mut *level {
                 *item = T::from_reader(&mut reader)?;
@@ -177,7 +177,7 @@ where
 }
 
 /// 递归填充 opening 的分支与路径信息。
-fn fill_opening<T, const H: usize, const A: usize>(
+fn populate_opening_path<T, const H: usize, const A: usize>(
     opening: &mut Opening<T, H, A>,
     node: &Node<T, H, A>,
     height: usize,
@@ -190,16 +190,17 @@ fn fill_opening<T, const H: usize, const A: usize>(
     }
 
     let (child_index, child_position) =
-        Node::<T, H, A>::child_location(height, position);
+        Node::<T, H, A>::child_index_and_offset(height, position);
     let child = node.children[child_index]
         .as_ref()
         .expect("There should be a child at this position");
 
-    fill_opening(opening, child, height + 1, child_position);
+    populate_opening_path(opening, child, height + 1, child_position);
 
     for child_index in 0..A {
         if let Some(child) = &node.children[child_index] {
-            opening.branch[height][child_index] = child.item().clone();
+            opening.branch[height][child_index] =
+                child.aggregated_item().clone();
         }
     }
     opening.positions[height] = child_index;

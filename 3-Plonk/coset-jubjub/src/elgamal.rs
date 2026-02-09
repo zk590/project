@@ -1,3 +1,5 @@
+//! 基于 JubJub 的 ElGamal 密文结构与加解密/同态运算接口。
+
 use crate::{JubJubAffine, JubJubExtended, JubJubScalar};
 
 use core::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
@@ -7,67 +9,6 @@ use coset_bytes::{DeserializableSlice, Error as BytesError, Serializable};
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize, Serialize};
-
-
-///
-
-///
-
-
-
-///
-
-
-
-
-
-///
-
-
-
-///
-
-
-
-
-
-///     );
-
-///
-
-/// }
-/// ```
-///
-
-
-
-///
-
-
-///
-
-
-
-
-
-///
-
-
-///
-
-///
-
-
-///
-
-
-///
-
-
-///
-
-///
-
 
 #[derive(Debug, Copy, Clone, PartialEq, Default)]
 #[cfg_attr(feature = "rkyv-impl", derive(Archive, Serialize, Deserialize))]
@@ -222,7 +163,7 @@ mod tests {
     use coset_bytes::Serializable;
     use rand_core::OsRng;
 
-    fn gen() -> (JubJubScalar, JubJubExtended, JubJubScalar, JubJubExtended) {
+    fn sample_keypairs() -> (JubJubScalar, JubJubExtended, JubJubScalar, JubJubExtended) {
         let a = JubJubScalar::random(&mut OsRng);
         let a_g = GENERATOR_EXTENDED * a;
 
@@ -234,7 +175,7 @@ mod tests {
 
     #[test]
     fn encrypt() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let m = JubJubScalar::random(&mut OsRng);
         let m = GENERATOR_EXTENDED * m;
@@ -247,7 +188,7 @@ mod tests {
 
     #[test]
     fn wrong_key() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let m = JubJubScalar::random(&mut OsRng);
         let m = GENERATOR_EXTENDED * m;
@@ -262,7 +203,7 @@ mod tests {
 
     #[test]
     fn homomorphic_add() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let mut m = [JubJubScalar::zero(); 4];
         m.iter_mut()
@@ -292,7 +233,7 @@ mod tests {
 
     #[test]
     fn homomorphic_sub() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let mut m = [JubJubScalar::zero(); 4];
         m.iter_mut()
@@ -322,7 +263,7 @@ mod tests {
 
     #[test]
     fn homomorphic_mul() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let mut m = [JubJubScalar::zero(); 4];
         m.iter_mut()
@@ -350,7 +291,7 @@ mod tests {
 
     #[test]
     fn to_bytes() {
-        let (a, _, b, b_g) = gen();
+        let (a, _, b, b_g) = sample_keypairs();
 
         let m = JubJubScalar::random(&mut OsRng);
         let m = GENERATOR_EXTENDED * m;

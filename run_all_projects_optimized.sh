@@ -32,7 +32,7 @@ cargo run --bin batch_merkle_proof
 
 
 ## 2-Receiver/plonk
-/opt/project/2-Receiver/Plonk
+cd /opt/project/2-Receiver/Plonk
 cargo run
 
 ## 2-Receiver/zkMIPS
@@ -73,6 +73,10 @@ cargo run -- --execute
 cargo run --release -- --core
 
 cargo run --release -- --system plonk
+
+##aggregation
+cd /opt/project/4-zkMIPS/aggregation/host && source /etc/profile && cargo run --release -- fibonacci_add sha2
+
 
 
 

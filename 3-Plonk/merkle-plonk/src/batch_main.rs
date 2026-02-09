@@ -100,7 +100,7 @@ impl Circuit for OpeningCircuit {
 }
 
 // 从文件读取并使用rkyv反序列化数据
-fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
+fn read_file_bytes_checked(file_path: &str) -> Result<Vec<u8>, IoError> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
         return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
@@ -115,7 +115,8 @@ fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
 }
 
 /// 加载缓存电路；若缓存不存在或容量不匹配则重新编译并写回。
-fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
+fn load_or_compile_opening_circuit(
+) -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
     if let (Ok(mut prover_file), Ok(mut verifier_file)) = (
         File::open("circuit_prove.bin"), 
@@ -168,11 +169,11 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
 }
 
 /// 批量校验叶子 opening，并为通过校验的条目生成并验证 PLONK 证明。
-fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
+fn process_batch_proofs() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 批量验证叶子节点并生成零知识证明 ======");
     
     // 从文件中加载MultipleLeavesData
-    let bytes = read_and_deserialize(MERKLE_SOME_FILE)?;
+    let bytes = read_file_bytes_checked(MERKLE_SOME_FILE)?;
     let all_leaves_data = unsafe {
         rkyv::archived_root::<MultipleLeavesData>(&bytes)
     };
@@ -185,7 +186,7 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
     println!("根哈希加载成功");
     let circuit_load_start = Instant::now();
     // 加载或编译电路
-    let (prover, verifier) = load_or_build_circuit()?;
+    let (prover, verifier) = load_or_compile_opening_circuit()?;
     let circuit_load_end = Instant::now();
     let circuit_load_duration = circuit_load_end.duration_since(circuit_load_start);
     println!("加载电路耗时: {:?}", circuit_load_duration);
@@ -307,7 +308,7 @@ fn verify_and_generate_proofs() -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     println!("===== 批量验证Merkle树叶子节点并生成零知识证明 ======");
     
-    match verify_and_generate_proofs() {
+    match process_batch_proofs() {
         Ok(()) => println!("\n Plonk 零知识证明生成完成"),
         Err(error) => {
             println!("\n错误：批量验证和零知识证明生成失败");

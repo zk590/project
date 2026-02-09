@@ -2,7 +2,7 @@
 use alloc::collections::BTreeSet;
 use core::cell::Ref;
 
-use crate::{capacity, Aggregate, Node, Opening, Walk};
+use crate::{level_capacity, Aggregate, Node, Opening, Walk};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -87,7 +87,7 @@ where
 
     /// 返回当前根节点聚合值。
     pub fn root(&self) -> Ref<'_, T> {
-        self.root.item()
+        self.root.aggregated_item()
     }
 
     /// 返回覆盖全部已插入元素的最小子树及其高度。
@@ -114,7 +114,7 @@ where
 
 
                     else {
-                        return (current_node.item(), current_height);
+                        return (current_node.aggregated_item(), current_height);
                     }
                 }
             }
@@ -142,7 +142,7 @@ where
     /// 返回该树在当前高度和分叉度下的容量。
     #[must_use]
     pub const fn capacity(&self) -> u64 {
-        capacity(A as u64, H)
+        level_capacity(A as u64, H)
     }
 }
 

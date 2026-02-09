@@ -1,11 +1,4 @@
-
-
-
 //
-
-
-
-
 
 use super::linearization_poly::ProofEvaluations;
 use crate::commitment_scheme::Commitment;
@@ -27,18 +20,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
-
-///
-
-
-
-
-
-///
-
-
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -46,7 +27,6 @@ use rkyv::{
     archive(bound(serialize = "__S: Serializer + ScratchSpace"))
 )]
 pub struct Proof {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) a_comm: Commitment,
 
@@ -59,10 +39,8 @@ pub struct Proof {
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) d_comm: Commitment,
 
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) z_comm: Commitment,
-
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) t_low_comm: Commitment,
@@ -75,7 +53,6 @@ pub struct Proof {
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) t_fourth_comm: Commitment,
-
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) w_z_chall_comm: Commitment,
@@ -114,7 +91,6 @@ impl<C> CheckBytes<C> for ArchivedProof {
         Ok(&*value)
     }
 }
-
 
 impl Serializable<{ 11 * Commitment::SIZE + ProofEvaluations::SIZE }>
     for Proof
@@ -198,7 +174,6 @@ pub(crate) mod alloc {
     use rayon::prelude::*;
 
     impl Proof {
-
         #[allow(non_snake_case)]
         /// 使用验证键、转录器与公开输入对证明执行完整验证。
         pub(crate) fn verify(
@@ -210,14 +185,6 @@ pub(crate) mod alloc {
         ) -> Result<(), Error> {
             let domain = EvaluationDomain::new(verifier_key.n)?;
 
-
-
-
-
-
-
-
-
             //
 
             transcript.append_commitment(b"a_comm", &self.a_comm);
@@ -225,14 +192,11 @@ pub(crate) mod alloc {
             transcript.append_commitment(b"c_comm", &self.c_comm);
             transcript.append_commitment(b"d_comm", &self.d_comm);
 
-
             let beta = transcript.challenge_scalar(b"beta");
             transcript.append_scalar(b"beta", &beta);
             let gamma = transcript.challenge_scalar(b"gamma");
 
-
             transcript.append_commitment(b"z_comm", &self.z_comm);
-
 
             let alpha = transcript.challenge_scalar(b"alpha");
             let range_sep_challenge =
@@ -244,15 +208,12 @@ pub(crate) mod alloc {
             let var_base_sep_challenge = transcript
                 .challenge_scalar(b"variable base separation challenge");
 
-
             transcript.append_commitment(b"t_low_comm", &self.t_low_comm);
             transcript.append_commitment(b"t_mid_comm", &self.t_mid_comm);
             transcript.append_commitment(b"t_high_comm", &self.t_high_comm);
             transcript.append_commitment(b"t_fourth_comm", &self.t_fourth_comm);
 
-
             let z_challenge = transcript.challenge_scalar(b"z_challenge");
-
 
             transcript.append_scalar(b"a_eval", &self.evaluations.a_eval);
             transcript.append_scalar(b"b_eval", &self.evaluations.b_eval);
@@ -274,7 +235,6 @@ pub(crate) mod alloc {
 
             transcript.append_scalar(b"z_eval", &self.evaluations.z_eval);
 
-
             transcript.append_scalar(b"a_w_eval", &self.evaluations.a_w_eval);
             transcript.append_scalar(b"b_w_eval", &self.evaluations.b_w_eval);
             transcript.append_scalar(b"d_w_eval", &self.evaluations.d_w_eval);
@@ -287,25 +247,20 @@ pub(crate) mod alloc {
             let v_challenge = transcript.challenge_scalar(b"v_challenge");
             let v_w_challenge = transcript.challenge_scalar(b"v_w_challenge");
 
-
             transcript
                 .append_commitment(b"w_z_chall_comm", &self.w_z_chall_comm);
             transcript
                 .append_commitment(b"w_z_chall_w_comm", &self.w_z_chall_w_comm);
 
-
             let u_challenge = transcript.challenge_scalar(b"u_challenge");
 
-
             let z_h_eval = domain.evaluate_vanishing_polynomial(&z_challenge);
-
 
             let l1_eval = compute_first_lagrange_evaluation(
                 &domain,
                 &z_h_eval,
                 &z_challenge,
             );
-
 
             let linearization_commitment = self
                 .compute_linearization_commitment(
@@ -326,10 +281,8 @@ pub(crate) mod alloc {
                 )
                 .0;
 
-
             let pi_eval =
                 compute_barycentric_eval(pub_inputs, &z_challenge, &domain);
-
 
             let r_0_eval = pi_eval
                 - l1_eval * alpha.square()
@@ -346,22 +299,18 @@ pub(crate) mod alloc {
                     * (self.evaluations.d_eval + gamma)
                     * self.evaluations.z_eval;
 
-
             let mut v_coefficients_for_e = vec![v_challenge];
-
 
             for i in 1..V_MAX_DEGREE {
                 v_coefficients_for_e
                     .push(v_coefficients_for_e[i - 1] * v_challenge);
             }
 
-
             v_coefficients_for_e.push(v_w_challenge * u_challenge);
             v_coefficients_for_e
                 .push(v_coefficients_for_e[V_MAX_DEGREE] * v_w_challenge);
             v_coefficients_for_e
                 .push(v_coefficients_for_e[V_MAX_DEGREE + 1] * v_w_challenge);
-
 
             let e_evaluations = vec![
                 self.evaluations.a_eval,
@@ -376,18 +325,12 @@ pub(crate) mod alloc {
                 self.evaluations.d_w_eval,
             ];
 
-
-
-
             let mut e_scalar: BlsScalar = e_evaluations
                 .iter()
                 .zip(v_coefficients_for_e.iter())
                 .map(|(eval, coeff)| eval * coeff)
                 .sum();
             e_scalar += -r_0_eval + (u_challenge * self.evaluations.z_eval);
-
-
-
 
             let msm_points = vec![
                 self.a_comm.0,
@@ -405,9 +348,6 @@ pub(crate) mod alloc {
 
             let mut msm_scalars = v_coefficients_for_e[..V_MAX_DEGREE].to_vec();
 
-
-
-
             msm_scalars[0] += v_coefficients_for_e[V_MAX_DEGREE];
             msm_scalars[1] += v_coefficients_for_e[V_MAX_DEGREE + 1];
             msm_scalars[3] += v_coefficients_for_e[V_MAX_DEGREE + 2];
@@ -415,9 +355,7 @@ pub(crate) mod alloc {
             msm_scalars.push(e_scalar);
             msm_scalars.push(u_challenge);
             msm_scalars.push(z_challenge);
-            msm_scalars
-                .push(u_challenge * z_challenge * domain.group_gen);
-
+            msm_scalars.push(u_challenge * z_challenge * domain.group_gen);
 
             #[cfg(not(feature = "std"))]
             let msm_results: Vec<G1Projective> = msm_points
@@ -426,7 +364,6 @@ pub(crate) mod alloc {
                 .map(|(point, scalar)| point * scalar)
                 .collect();
 
-
             #[cfg(feature = "std")]
             let msm_results: Vec<G1Projective> = msm_points
                 .par_iter()
@@ -434,26 +371,17 @@ pub(crate) mod alloc {
                 .map(|(point, scalar)| point * scalar)
                 .collect();
 
-
-
-
             let mut aggregated_commitment: G1Projective =
                 msm_results[..V_MAX_DEGREE].iter().sum();
             aggregated_commitment += linearization_commitment;
 
-
             let e_commitment = msm_results[V_MAX_DEGREE];
 
-
-
             //
-
 
             let left_pairing_point = G1Affine::from(
                 -(self.w_z_chall_comm.0 + msm_results[V_MAX_DEGREE + 1]),
             );
-
-
 
             let right_pairing_point = G1Affine::from(
                 msm_results[V_MAX_DEGREE + 2]
@@ -462,14 +390,11 @@ pub(crate) mod alloc {
                     - e_commitment,
             );
 
-
             let pairing = coset_bls12_381::multi_miller_loop(&[
                 (&left_pairing_point, &opening_key.prepared_x_h),
                 (&right_pairing_point, &opening_key.prepared_h),
             ])
             .final_exponentiation();
-
-
 
             if pairing != coset_bls12_381::Gt::identity() {
                 return Err(Error::ProofVerificationError);
@@ -592,7 +517,6 @@ pub(crate) mod alloc {
             - BlsScalar::one())
             * domain.size_inv;
 
-
         #[cfg(not(feature = "std"))]
         let evaluation_indices = (0..evaluations.len()).into_iter();
 
@@ -606,7 +530,6 @@ pub(crate) mod alloc {
             })
             .collect();
 
-
         #[cfg(not(feature = "std"))]
         let non_zero_index_positions = (0..non_zero_indices.len()).into_iter();
 
@@ -617,7 +540,6 @@ pub(crate) mod alloc {
         let mut denominators: Vec<BlsScalar> = non_zero_index_positions
             .clone()
             .map(|i| {
-
                 let index = non_zero_indices[i];
 
                 (domain.group_gen_inv.pow(&[index as u64, 0, 0, 0]) * point)

@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/composer/compress.rs）。
 
 //
-
 
 use coset_bytes::Serializable;
 use hashbrown::HashMap;
@@ -51,7 +49,6 @@ fn scalar_map(hades_optimization: bool) -> HashMap<BlsScalar, usize> {
             .collect()
     };
     if hades_optimization {
-
         for constant in hades::constants() {
             let len = scalars.len();
             scalars.entry(constant).or_insert(len);
@@ -150,9 +147,8 @@ impl CompressedCircuit {
                     };
 
                     let len = polynomial_index_map.len();
-                    let polynomial = *polynomial_index_map
-                        .entry(polynomial)
-                        .or_insert(len);
+                    let polynomial =
+                        *polynomial_index_map.entry(polynomial).or_insert(len);
 
                     CompressedConstraint {
                         polynomial,
@@ -170,8 +166,6 @@ impl CompressedCircuit {
         scalar_index_map
             .into_iter()
             .for_each(|(scalar, index)| scalars[index] = scalar.to_bytes());
-
-
 
         let scalars = scalars.split_off(base_scalars_len);
 
@@ -223,14 +217,12 @@ impl CompressedCircuit {
         for serialized_scalar in scalars {
             let scalar: BlsScalar =
                 match BlsScalar::from_bytes(&serialized_scalar).into() {
-                Some(scalar) => scalar,
-                None => return Err(Error::BlsScalarMalformed),
-            };
+                    Some(scalar) => scalar,
+                    None => return Err(Error::BlsScalarMalformed),
+                };
             all_scalars.push(scalar);
         }
         let scalars = all_scalars;
-
-
 
         let mut composer = Composer::uninitialized();
 

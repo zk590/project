@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use coset_bls12_381::BlsScalar;
 
@@ -20,11 +16,9 @@ mod verifier;
 pub use prover::Prover;
 pub use verifier::Verifier;
 
-
 pub struct Compiler;
 
 impl Compiler {
-
     /// 使用 `Circuit::default()` 构建电路并完成预处理，返回 prover/verifier。
     pub fn compile<C>(
         pp: &PublicParameters,
@@ -38,7 +32,6 @@ impl Compiler {
 
         Self::compile_with_composer(pp, label, &composer)
     }
-
 
     /// 使用给定电路实例进行编译，适合外部传入已配置好的电路参数。
     pub fn compile_with_circuit<C>(
@@ -55,7 +48,6 @@ impl Compiler {
         Self::compile_with_composer(pp, label, &composer)
     }
 
-
     /// 从压缩电路描述恢复 `Composer` 并执行编译。
     pub fn compile_with_compressed(
         pp: &PublicParameters,
@@ -66,7 +58,6 @@ impl Compiler {
 
         Self::compile_with_composer(pp, label, &composer)
     }
-
 
     /// 基于 `Composer` 进行统一编译入口：确定规模、裁剪参数并预处理键。
     fn compile_with_composer(
@@ -97,9 +88,7 @@ impl Compiler {
 
         let domain = EvaluationDomain::new(size - 1)?;
 
-
         //
-
 
         let mut q_m = vec![BlsScalar::zero(); size];
         let mut q_l = vec![BlsScalar::zero(); size];
@@ -157,7 +146,6 @@ impl Compiler {
         let q_variable_group_add_poly =
             Polynomial::from_coefficients_vec(q_variable_group_add_poly);
 
-
         let [s_sigma_1_poly, s_sigma_2_poly, s_sigma_3_poly, s_sigma_4_poly] =
             perm.compute_sigma_polynomials(size, &domain);
 
@@ -182,7 +170,6 @@ impl Compiler {
         let s_sigma_3_comm = commit_key.commit(&s_sigma_3_poly)?;
         let s_sigma_4_comm = commit_key.commit(&s_sigma_4_poly)?;
 
-
         let arithmetic_verifier_key = widget::arithmetic::VerifierKey {
             q_m: q_m_comm,
             q_l: q_l_comm,
@@ -193,17 +180,14 @@ impl Compiler {
             q_arith: q_arith_comm,
         };
 
-
         let range_verifier_key = widget::range::VerifierKey {
             q_range: q_range_comm,
         };
-
 
         let logic_verifier_key = widget::logic::VerifierKey {
             q_c: q_c_comm,
             q_logic: q_logic_comm,
         };
-
 
         let ecc_verifier_key =
             widget::ecc::scalar_mul::fixed_base::VerifierKey {
@@ -212,12 +196,10 @@ impl Compiler {
                 q_fixed_group_add: q_fixed_group_add_comm,
             };
 
-
         let curve_addition_verifier_key =
             widget::ecc::curve_addition::VerifierKey {
                 q_variable_group_add: q_variable_group_add_comm,
             };
-
 
         let permutation_verifier_key = widget::permutation::VerifierKey {
             s_sigma_1: s_sigma_1_comm,
@@ -253,10 +235,6 @@ impl Compiler {
             s_sigma_3: s_sigma_3_poly,
             s_sigma_4: s_sigma_4_poly,
         };
-
-
-
-
 
         let domain_8n = EvaluationDomain::new(8 * domain.size())?;
 

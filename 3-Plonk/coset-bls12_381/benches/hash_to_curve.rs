@@ -8,7 +8,6 @@ use coset_bls12_381::*;
 use criterion::{black_box, Criterion};
 
 fn criterion_benchmark(c: &mut Criterion) {
-
     {
         let name = "G1Projective";
 

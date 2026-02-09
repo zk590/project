@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/util.rs）。
 
 //
-
 
 use alloc::vec::Vec;
 use coset_bls12_381::{
@@ -30,7 +28,6 @@ where
     Ok(())
 }
 
-
 pub(crate) fn powers_of(
     scalar: &BlsScalar,
     max_degree: usize,
@@ -42,7 +39,6 @@ pub(crate) fn powers_of(
     }
     powers
 }
-
 
 pub(crate) fn random_g1_point<R: RngCore + CryptoRng>(
     rng: &mut R,
@@ -56,9 +52,6 @@ pub(crate) fn random_g2_point<R: RngCore + CryptoRng>(
     G2Affine::generator() * BlsScalar::random(rng)
 }
 
-
-
-
 pub(crate) fn slow_multiscalar_mul_single_base(
     scalars: &[BlsScalar],
     base: G1Projective,
@@ -66,33 +59,25 @@ pub(crate) fn slow_multiscalar_mul_single_base(
     scalars.iter().map(|s| base * *s).collect()
 }
 
-
 use core::ops::MulAssign;
 
 pub fn batch_inversion(scalars: &mut [BlsScalar]) {
-
-
-
-
-
     let mut prefix_products = Vec::with_capacity(scalars.len());
     let mut running_product = BlsScalar::one();
-    for scalar in scalars.iter().filter(|scalar| scalar != &&BlsScalar::zero()) {
+    for scalar in scalars
+        .iter()
+        .filter(|scalar| scalar != &&BlsScalar::zero())
+    {
         running_product.mul_assign(scalar);
         prefix_products.push(running_product);
     }
 
-
     running_product = running_product.invert().unwrap();
-
 
     for (scalar, prefix_product) in scalars
         .iter_mut()
-
         .rev()
-
         .filter(|scalar| scalar != &&BlsScalar::zero())
-
         .zip(
             prefix_products
                 .into_iter()
@@ -101,7 +86,6 @@ pub fn batch_inversion(scalars: &mut [BlsScalar]) {
                 .chain(Some(BlsScalar::one())),
         )
     {
-
         let next_running_product = running_product * *scalar;
         *scalar = running_product * prefix_product;
         running_product = next_running_product;

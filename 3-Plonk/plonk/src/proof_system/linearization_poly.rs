@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/proof_system/linearization_poly.rs）。
 
 //
-
 
 #[cfg(feature = "alloc")]
 use crate::{
@@ -21,8 +19,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
 #[derive(Debug, Eq, PartialEq, Clone, Default)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -31,7 +27,6 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct ProofEvaluations {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) a_eval: BlsScalar,
 
@@ -50,7 +45,6 @@ pub(crate) struct ProofEvaluations {
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) b_w_eval: BlsScalar,
 
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) d_w_eval: BlsScalar,
 
@@ -66,7 +60,6 @@ pub(crate) struct ProofEvaluations {
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_r_eval: BlsScalar,
     //
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_1_eval: BlsScalar,
 
@@ -76,12 +69,9 @@ pub(crate) struct ProofEvaluations {
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_3_eval: BlsScalar,
 
-
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) z_eval: BlsScalar,
 }
-
 
 impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
     type Error = coset_bytes::Error;
@@ -152,11 +142,8 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
 }
 
 #[cfg(feature = "alloc")]
-
-
-
 #[allow(clippy::type_complexity)]
-pub(crate) fn compute(
+pub(crate) fn build_linearization_polynomial(
     prover_key: &ProverKey,
     (
         alpha,
@@ -186,7 +173,7 @@ pub(crate) fn compute(
     t_fourth_poly: &Polynomial,
     pub_inputs: &[BlsScalar],
 ) -> Polynomial {
-    let circuit_linearization = compute_circuit_satisfiability(
+    let circuit_linearization = build_circuit_linearization_terms(
         (
             range_separation_challenge,
             logic_separation_challenge,
@@ -202,23 +189,24 @@ pub(crate) fn compute(
 
     let circuit_linearization = &circuit_linearization + &pi_eval;
 
-    let permutation_linearization = prover_key.permutation.compute_linearization(
-        z_challenge,
-        (alpha, beta, gamma),
-        (
-            &evaluations.a_eval,
-            &evaluations.b_eval,
-            &evaluations.c_eval,
-            &evaluations.d_eval,
-        ),
-        (
-            &evaluations.s_sigma_1_eval,
-            &evaluations.s_sigma_2_eval,
-            &evaluations.s_sigma_3_eval,
-        ),
-        &evaluations.z_eval,
-        z_poly,
-    );
+    let permutation_linearization =
+        prover_key.permutation.compute_linearization(
+            z_challenge,
+            (alpha, beta, gamma),
+            (
+                &evaluations.a_eval,
+                &evaluations.b_eval,
+                &evaluations.c_eval,
+                &evaluations.d_eval,
+            ),
+            (
+                &evaluations.s_sigma_1_eval,
+                &evaluations.s_sigma_2_eval,
+                &evaluations.s_sigma_3_eval,
+            ),
+            &evaluations.z_eval,
+            z_poly,
+        );
 
     let domain_size = domain.size();
 
@@ -242,12 +230,11 @@ pub(crate) fn compute(
     let linearized_identity =
         &circuit_linearization + &permutation_linearization;
 
-
     &linearized_identity + &quotient_polynomial
 }
 
 #[cfg(feature = "alloc")]
-fn compute_circuit_satisfiability(
+fn build_circuit_linearization_terms(
     (
         range_separation_challenge,
         logic_separation_challenge,
@@ -276,8 +263,7 @@ fn compute_circuit_satisfiability(
         .variable_base
         .compute_linearization(var_base_separation_challenge, evaluations);
 
-    let mut linearization_poly =
-        &arithmetic_component + &range_component;
+    let mut linearization_poly = &arithmetic_component + &range_component;
     linearization_poly += &logic_component;
     linearization_poly += &fixed_base_component;
     linearization_poly += &variable_base_component;

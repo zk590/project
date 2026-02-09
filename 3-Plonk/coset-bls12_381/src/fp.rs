@@ -1,6 +1,3 @@
-
-
-
 mod coset;
 
 use core::fmt;
@@ -13,10 +10,9 @@ use crate::util::{adc, mac, sbb};
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
-
-
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 #[derive(Copy, Clone)]
 #[cfg_attr(
@@ -78,7 +74,6 @@ impl ConditionallySelectable for Fp {
     }
 }
 
-
 const MODULUS: [u64; 6] = [
     0xb9fe_ffff_ffff_aaab,
     0x1eab_fffe_b153_ffff,
@@ -88,9 +83,7 @@ const MODULUS: [u64; 6] = [
     0x1a01_11ea_397f_e69a,
 ];
 
-
 const INV: u64 = 0x89f3_fffc_fffc_fffd;
-
 
 const R: Fp = Fp([
     0x7609_0000_0002_fffd,
@@ -101,7 +94,6 @@ const R: Fp = Fp([
     0x15f6_5ec3_fa80_e493,
 ]);
 
-
 const R2: Fp = Fp([
     0xf4df_1f34_1c34_1746,
     0x0a76_e6a6_09d1_04f1,
@@ -110,7 +102,6 @@ const R2: Fp = Fp([
     0x9a79_3e85_b519_952d,
     0x1198_8fe5_92ca_e3aa,
 ]);
-
 
 const R3: Fp = Fp([
     0xed48_ac6b_d94c_a1e0,
@@ -170,13 +161,11 @@ impl_binops_additive!(Fp, Fp);
 impl_binops_multiplicative!(Fp, Fp);
 
 impl Fp {
-
     #[inline]
     /// 返回 Fp 加法单位元。
     pub const fn zero() -> Fp {
         Fp([0, 0, 0, 0, 0, 0])
     }
-
 
     #[inline]
     /// 返回 Fp 乘法单位元（Montgomery 形式）。
@@ -189,19 +178,22 @@ impl Fp {
         self.ct_eq(&Fp::zero())
     }
 
-
-
     /// 从 48 字节大端编码反序列化，并校验是否在模域范围内。
     pub fn from_bytes(bytes: &[u8; 48]) -> CtOption<Fp> {
         let mut tmp = Fp([0, 0, 0, 0, 0, 0]);
 
-        tmp.0[5] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap());
-        tmp.0[4] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap());
-        tmp.0[3] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap());
-        tmp.0[2] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap());
-        tmp.0[1] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap());
-        tmp.0[0] = u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap());
-
+        tmp.0[5] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap());
+        tmp.0[4] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap());
+        tmp.0[3] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap());
+        tmp.0[2] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap());
+        tmp.0[1] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap());
+        tmp.0[0] =
+            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap());
 
         let (_, borrow) = sbb(tmp.0[0], MODULUS[0], 0);
         let (_, borrow) = sbb(tmp.0[1], MODULUS[1], borrow);
@@ -210,26 +202,18 @@ impl Fp {
         let (_, borrow) = sbb(tmp.0[4], MODULUS[4], borrow);
         let (_, borrow) = sbb(tmp.0[5], MODULUS[5], borrow);
 
-
-
-
         let is_some = (borrow as u8) & 1;
-
-
 
         tmp *= &R2;
 
         CtOption::new(tmp, Choice::from(is_some))
     }
 
-
-
     /// 将域元素序列化为 48 字节大端编码。
     pub fn to_bytes(self) -> [u8; 48] {
-
-
         let tmp = Fp::montgomery_reduce(
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5],
+            0, 0, 0, 0, 0, 0,
         );
 
         let mut res = [0; 48];
@@ -247,8 +231,7 @@ impl Fp {
         let mut bytes = [0u8; 96];
         rng.fill_bytes(&mut bytes);
 
-
-        Fp::from_u768([
+        Fp::reduce_u768_words([
             u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
             u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
             u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
@@ -264,39 +247,24 @@ impl Fp {
         ])
     }
 
-
-    fn from_u768(limbs: [u64; 12]) -> Fp {
-
+    fn reduce_u768_words(limbs: [u64; 12]) -> Fp {
+        //
 
         //
 
-
-        //
-
-
-
-
-
-
-
-        let d1 = Fp([limbs[11], limbs[10], limbs[9], limbs[8], limbs[7], limbs[6]]);
-        let d0 = Fp([limbs[5], limbs[4], limbs[3], limbs[2], limbs[1], limbs[0]]);
+        let d1 =
+            Fp([limbs[11], limbs[10], limbs[9], limbs[8], limbs[7], limbs[6]]);
+        let d0 =
+            Fp([limbs[5], limbs[4], limbs[3], limbs[2], limbs[1], limbs[0]]);
 
         d0 * R2 + d1 * R3
     }
 
-
-
     /// 判断当前元素是否位于字典序较大半区，用于点压缩符号位。
     pub fn lexicographically_largest(&self) -> Choice {
-
-
-
-
-
-
         let tmp = Fp::montgomery_reduce(
-            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5], 0, 0, 0, 0, 0, 0,
+            self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5],
+            0, 0, 0, 0, 0, 0,
         );
 
         let (_, borrow) = sbb(tmp.0[0], 0xdcff_7fff_ffff_d556, 0);
@@ -306,24 +274,13 @@ impl Fp {
         let (_, borrow) = sbb(tmp.0[4], 0x258d_d3db_21a5_d66b, borrow);
         let (_, borrow) = sbb(tmp.0[5], 0x0d00_88f5_1cbf_f34d, borrow);
 
-
-
-
-
-
-
         !Choice::from((borrow as u8) & 1)
     }
-
-
 
     /// 从原始 limbs 直接构造元素，不执行范围检查。
     pub const fn from_raw_unchecked(v: [u64; 6]) -> Fp {
         Fp(v)
     }
-
-
-
 
     /// 变长时间幂运算，适用于公开指数。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
@@ -343,11 +300,6 @@ impl Fp {
     #[inline]
     /// 计算平方根；非二次剩余时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
-
-
-
-
-
         let sqrt = self.pow_vartime(&[
             0xee7f_bfff_ffff_eaab,
             0x07aa_ffff_ac54_ffff,
@@ -362,11 +314,8 @@ impl Fp {
 
     #[inline]
 
-
-
     /// 计算乘法逆元；0 元素返回空值。
     pub fn invert(&self) -> CtOption<Self> {
-
         let t = self.pow_vartime(&[
             0xb9fe_ffff_ffff_aaa9,
             0x1eab_fffe_b153_ffff,
@@ -388,8 +337,6 @@ impl Fp {
         let (r4, borrow) = sbb(self.0[4], MODULUS[4], borrow);
         let (r5, borrow) = sbb(self.0[5], MODULUS[5], borrow);
 
-
-
         let r0 = (self.0[0] & borrow) | (r0 & !borrow);
         let r1 = (self.0[1] & borrow) | (r1 & !borrow);
         let r2 = (self.0[2] & borrow) | (r2 & !borrow);
@@ -409,8 +356,6 @@ impl Fp {
         let (d4, carry) = adc(self.0[4], rhs.0[4], carry);
         let (d5, _) = adc(self.0[5], rhs.0[5], carry);
 
-
-
         (&Fp([d0, d1, d2, d3, d4, d5])).subtract_p()
     }
 
@@ -423,10 +368,13 @@ impl Fp {
         let (d4, borrow) = sbb(MODULUS[4], self.0[4], borrow);
         let (d5, _) = sbb(MODULUS[5], self.0[5], borrow);
 
-
-
-        let mask = (((self.0[0] | self.0[1] | self.0[2] | self.0[3] | self.0[4] | self.0[5]) == 0)
-            as u64)
+        let mask = (((self.0[0]
+            | self.0[1]
+            | self.0[2]
+            | self.0[3]
+            | self.0[4]
+            | self.0[5])
+            == 0) as u64)
             .wrapping_sub(1);
 
         Fp([
@@ -444,36 +392,20 @@ impl Fp {
         (&rhs.neg()).add(self)
     }
 
-
     ///
 
-
     #[inline]
-    pub(crate) fn sum_of_products<const T: usize>(a: [Fp; T], b: [Fp; T]) -> Fp {
-
-
-
-
-
+    pub(crate) fn sum_of_products<const T: usize>(
+        a: [Fp; T],
+        b: [Fp; T],
+    ) -> Fp {
         //
-
-
-
-
-
-
-
-
-
 
         let (u0, u1, u2, u3, u4, u5) =
             (0..6).fold((0, 0, 0, 0, 0, 0), |(u0, u1, u2, u3, u4, u5), j| {
-
-
                 let (t0, t1, t2, t3, t4, t5, t6) = (0..T).fold(
                     (u0, u1, u2, u3, u4, u5, 0),
                     |(t0, t1, t2, t3, t4, t5, t6), i| {
-
                         let (t0, carry) = mac(t0, a[i].0[j], b[i].0[0], 0);
                         let (t1, carry) = mac(t1, a[i].0[j], b[i].0[1], carry);
                         let (t2, carry) = mac(t2, a[i].0[j], b[i].0[2], carry);
@@ -486,8 +418,6 @@ impl Fp {
                     },
                 );
 
-
-
                 let k = t0.wrapping_mul(INV);
                 let (_, carry) = mac(t0, k, MODULUS[0], 0);
                 let (r1, carry) = mac(t1, k, MODULUS[1], carry);
@@ -499,8 +429,6 @@ impl Fp {
 
                 (r1, r2, r3, r4, r5, r6)
             });
-
-
 
         (&Fp([u0, u1, u2, u3, u4, u5])).subtract_p()
     }
@@ -520,10 +448,6 @@ impl Fp {
         t10: u64,
         t11: u64,
     ) -> Self {
-
-
-
-
         let k = t0.wrapping_mul(INV);
         let (_, carry) = mac(t0, k, MODULUS[0], 0);
         let (r1, carry) = mac(t1, k, MODULUS[1], carry);
@@ -578,8 +502,6 @@ impl Fp {
         let (r10, carry) = mac(r10, k, MODULUS[5], carry);
         let (r11, _) = adc(t11, r11, carry);
 
-
-
         (&Fp([r6, r7, r8, r9, r10, r11])).subtract_p()
     }
 
@@ -627,9 +549,10 @@ impl Fp {
         let (t9, carry) = mac(t9, self.0[5], rhs.0[4], carry);
         let (t10, t11) = mac(t10, self.0[5], rhs.0[5], carry);
 
-        Self::montgomery_reduce(t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
+        Self::montgomery_reduce(
+            t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11,
+        )
     }
-
 
     #[inline]
     pub const fn square(&self) -> Self {
@@ -678,7 +601,9 @@ impl Fp {
         let (t10, carry) = mac(t10, self.0[5], self.0[5], carry);
         let (t11, _) = adc(t11, 0, carry);
 
-        Self::montgomery_reduce(t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11)
+        Self::montgomery_reduce(
+            t0, t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11,
+        )
     }
 }
 
@@ -892,18 +817,20 @@ fn test_from_bytes() {
     assert_eq!(
         -Fp::one(),
         Fp::from_bytes(&[
-            26, 1, 17, 234, 57, 127, 230, 154, 75, 27, 167, 182, 67, 75, 172, 215, 100, 119, 75,
-            132, 243, 133, 18, 191, 103, 48, 210, 160, 246, 176, 246, 36, 30, 171, 255, 254, 177,
-            83, 255, 255, 185, 254, 255, 255, 255, 255, 170, 170
+            26, 1, 17, 234, 57, 127, 230, 154, 75, 27, 167, 182, 67, 75, 172,
+            215, 100, 119, 75, 132, 243, 133, 18, 191, 103, 48, 210, 160, 246,
+            176, 246, 36, 30, 171, 255, 254, 177, 83, 255, 255, 185, 254, 255,
+            255, 255, 255, 170, 170
         ])
         .unwrap()
     );
 
     assert!(bool::from(
         Fp::from_bytes(&[
-            27, 1, 17, 234, 57, 127, 230, 154, 75, 27, 167, 182, 67, 75, 172, 215, 100, 119, 75,
-            132, 243, 133, 18, 191, 103, 48, 210, 160, 246, 176, 246, 36, 30, 171, 255, 254, 177,
-            83, 255, 255, 185, 254, 255, 255, 255, 255, 170, 170
+            27, 1, 17, 234, 57, 127, 230, 154, 75, 27, 167, 182, 67, 75, 172,
+            215, 100, 119, 75, 132, 243, 133, 18, 191, 103, 48, 210, 160, 246,
+            176, 246, 36, 30, 171, 255, 254, 177, 83, 255, 255, 185, 254, 255,
+            255, 255, 255, 170, 170
         ])
         .is_none()
     ));
@@ -913,7 +840,6 @@ fn test_from_bytes() {
 
 #[test]
 fn test_sqrt() {
-
     let a = Fp::from_raw_unchecked([
         0xaa27_0000_000c_fff3,
         0x53cc_0032_fc34_000a,
@@ -924,7 +850,6 @@ fn test_sqrt() {
     ]);
 
     assert_eq!(
-
         -a.sqrt().unwrap(),
         // 2
         Fp::from_raw_unchecked([

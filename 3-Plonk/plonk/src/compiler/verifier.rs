@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use alloc::vec::Vec;
 
@@ -16,7 +12,6 @@ use crate::proof_system::{Proof, VerifierKey};
 use crate::transcript::TranscriptProtocol;
 
 use super::Composer;
-
 
 pub struct Verifier {
     label: Vec<u8>,

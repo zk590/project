@@ -1,23 +1,4 @@
-
-
-
 //
-
-
-
-
-//!
-
-//!
-
-
-
-
-
-
-
-
-
 
 mod mds_matrix;
 mod permutation;
@@ -30,7 +11,6 @@ const FULL_ROUNDS: usize = 8;
 
 const PARTIAL_ROUNDS: usize = 60;
 
-
 pub const WIDTH: usize = 5;
 
 #[cfg(feature = "zk")]
@@ -38,21 +18,21 @@ pub(crate) use permutation::gadget::GadgetPermutation;
 pub(crate) use permutation::scalar::ScalarPermutation;
 
 /// 从字节缓冲区按小端读取一个 `u64`。
-const fn u64_from_buffer<const N: usize>(buf: &[u8; N], i: usize) -> u64 {
+const fn read_u64_le_from_bytes<const N: usize>(
+    buf: &[u8; N],
+    byte_offset: usize,
+) -> u64 {
     u64::from_le_bytes([
-        buf[i],
-        buf[i + 1],
-        buf[i + 2],
-        buf[i + 3],
-        buf[i + 4],
-        buf[i + 5],
-        buf[i + 6],
-        buf[i + 7],
+        buf[byte_offset],
+        buf[byte_offset + 1],
+        buf[byte_offset + 2],
+        buf[byte_offset + 3],
+        buf[byte_offset + 4],
+        buf[byte_offset + 5],
+        buf[byte_offset + 6],
+        buf[byte_offset + 7],
     ])
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -62,7 +42,7 @@ mod tests {
 
     use coset_bls12_381::BlsScalar;
     use coset_bytes::ParseHexStr;
-    use dusk_safe::{Call, Safe, Sponge};
+    use coset_safe::{Call, Safe, Sponge};
 
     use crate::hades::{ScalarPermutation, WIDTH};
 
@@ -70,12 +50,9 @@ mod tests {
     struct Test();
 
     impl Safe<BlsScalar, WIDTH> for Test {
-
         fn permute(&mut self, state: &mut [BlsScalar; WIDTH]) {
             ScalarPermutation::new().permute(state);
         }
-
-
 
         fn tag(&mut self, input: &[u8]) -> BlsScalar {
             let _ = input;
@@ -106,7 +83,7 @@ mod tests {
         "cfc108673c93df305e31c283b9c767b7097ae4e174a223e0c24b15a67b701a3a",
     ];
 
-    fn create_poseidon_hash(input: &[BlsScalar]) -> BlsScalar {
+    fn compute_poseidon_hash_for_test(input: &[BlsScalar]) -> BlsScalar {
         let iopattern =
             vec![Call::Absorb(input.len()), Call::Absorb(1), Call::Squeeze(1)];
 
@@ -135,32 +112,32 @@ mod tests {
 
         assert_eq!(
         "0x26abf2d0476f154e69bf19740092fe36265680c294462b8e759ad73a99567dd5",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..3]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..3]))
     );
 
         assert_eq!(
         "0x1cc40219c7ec92919d6db7a41cd41953333a2ed544606daca182e4eaa6c7db2d",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..4]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..4]))
     );
 
         assert_eq!(
         "0x707c98a0e9a6e4832ac33ee08811bce122017a58dbbbf66a2f6fcdc69d45462d",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..5]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..5]))
     );
 
         assert_eq!(
         "0x26905a794d3d2fb0c3ed2276abc696c27a5bfdea7f106e596cbeedd86891c461",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..6]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..6]))
     );
 
         assert_eq!(
         "0x1b98a2c5f1fe54d21b5ce9bf0dcc99ea8784a64f3c544fa06d3f73569741006e",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..8]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..8]))
     );
 
         assert_eq!(
         "0x211b7ea21c9afca93dabdfbda8b2d5275b2dd802fed87bb431e98557c61667d2",
-        format!("{:?}", create_poseidon_hash(&test_inputs[..10]))
+        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..10]))
     );
     }
 }

@@ -1,16 +1,13 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/composer/constraint_system/constraint.rs）。
 
 //
-
 
 use crate::prelude::{Composer, Witness};
 use coset_bls12_381::BlsScalar;
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Selector {
-
     Multiplication = 0x00,
 
     Left = 0x01,
@@ -25,7 +22,6 @@ pub(crate) enum Selector {
 
     PublicInput = 0x06,
 
-
     Arithmetic = 0x07,
 
     Range = 0x08,
@@ -37,10 +33,8 @@ pub(crate) enum Selector {
     GroupAddVariableBase = 0x0b,
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WiredWitness {
-
     A = 0x00,
 
     B = 0x01,
@@ -50,32 +44,20 @@ pub(crate) enum WiredWitness {
     D = 0x03,
 }
 
-
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Constraint {
     coefficients: [BlsScalar; Self::COEFFICIENTS],
     witnesses: [Witness; Self::WITNESSES],
 
-
+    //
 
     //
 
+    //
 
     //
 
-
-
     //
-
-
-
-    //
-
-
-
-    //
-
     has_public_input: bool,
 }
 
@@ -92,12 +74,9 @@ impl AsRef<[BlsScalar]> for Constraint {
 }
 
 impl Constraint {
-
     pub const COEFFICIENTS: usize = 12;
 
-
     pub const WITNESSES: usize = 4;
-
 
     pub const fn new() -> Self {
         Self {
@@ -123,58 +102,47 @@ impl Constraint {
         s
     }
 
-
     pub(crate) fn set<T: Into<BlsScalar>>(mut self, r: Selector, s: T) -> Self {
         self.coefficients[r as usize] = s.into();
 
         self
     }
 
-
     pub(crate) fn set_witness(&mut self, index: WiredWitness, w: Witness) {
         self.witnesses[index as usize] = w;
     }
-
 
     pub(crate) const fn coeff(&self, r: Selector) -> &BlsScalar {
         &self.coefficients[r as usize]
     }
 
-
     pub(crate) const fn witness(&self, w: WiredWitness) -> Witness {
         self.witnesses[w as usize]
     }
-
 
     pub fn mult<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Multiplication, s)
     }
 
-
     pub fn left<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Left, s)
     }
-
 
     pub fn right<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Right, s)
     }
 
-
     pub fn output<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Output, s)
     }
-
 
     pub fn fourth<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Fourth, s)
     }
 
-
     pub fn constant<T: Into<BlsScalar>>(self, s: T) -> Self {
         self.set(Selector::Constant, s)
     }
-
 
     pub fn public<T: Into<BlsScalar>>(mut self, s: T) -> Self {
         self.has_public_input = true;
@@ -182,13 +150,11 @@ impl Constraint {
         self.set(Selector::PublicInput, s)
     }
 
-
     pub fn a(mut self, w: Witness) -> Self {
         self.set_witness(WiredWitness::A, w);
 
         self
     }
-
 
     pub fn b(mut self, w: Witness) -> Self {
         self.set_witness(WiredWitness::B, w);
@@ -196,13 +162,11 @@ impl Constraint {
         self
     }
 
-
     pub fn c(mut self, w: Witness) -> Self {
         self.set_witness(WiredWitness::C, w);
 
         self
     }
-
 
     pub fn d(mut self, w: Witness) -> Self {
         self.set_witness(WiredWitness::D, w);
@@ -220,13 +184,11 @@ impl Constraint {
 
     #[allow(dead_code)]
 
-
     pub(crate) fn range(s: &Self) -> Self {
         Self::from_external(s).set(Selector::Range, 1)
     }
 
     #[allow(dead_code)]
-
 
     pub(crate) fn logic(s: &Self) -> Self {
         Self::from_external(s)
@@ -236,7 +198,6 @@ impl Constraint {
 
     #[allow(dead_code)]
 
-
     pub(crate) fn logic_xor(s: &Self) -> Self {
         Self::from_external(s)
             .set(Selector::Constant, -BlsScalar::one())
@@ -245,13 +206,11 @@ impl Constraint {
 
     #[allow(dead_code)]
 
-
     pub(crate) fn group_add_fixed_base(s: &Self) -> Self {
         Self::from_external(s).set(Selector::GroupAddFixedBase, 1)
     }
 
     #[allow(dead_code)]
-
 
     pub(crate) fn group_add_variable_base(s: &Self) -> Self {
         Self::from_external(s).set(Selector::GroupAddVariableBase, 1)

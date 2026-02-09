@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/logic/proverkey.rs）。
 
 //
-
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -91,13 +90,16 @@ impl ProverKey {
         let kappa_cu = kappa_sq * kappa;
         let kappa_qu = kappa_cu * kappa;
 
-        let a_shift_delta_input = evaluations.a_w_eval - four * evaluations.a_eval;
+        let a_shift_delta_input =
+            evaluations.a_w_eval - four * evaluations.a_eval;
         let c_0 = delta(a_shift_delta_input);
 
-        let b_shift_delta_input = evaluations.b_w_eval - four * evaluations.b_eval;
+        let b_shift_delta_input =
+            evaluations.b_w_eval - four * evaluations.b_eval;
         let c_1 = delta(b_shift_delta_input) * kappa;
 
-        let d_shift_delta_input = evaluations.d_w_eval - four * evaluations.d_eval;
+        let d_shift_delta_input =
+            evaluations.d_w_eval - four * evaluations.d_eval;
         let c_2 = delta(d_shift_delta_input) * kappa_sq;
 
         let wire_w_eval = evaluations.c_eval;
@@ -119,18 +121,12 @@ impl ProverKey {
     }
 }
 
-
 pub(crate) fn delta(f: BlsScalar) -> BlsScalar {
     let f_1 = f - BlsScalar::one();
     let f_2 = f - BlsScalar::from(2);
     let f_3 = f - BlsScalar::from(3);
     f * f_1 * f_2 * f_3
 }
-
-
-
-
-
 
 #[allow(non_snake_case)]
 pub(crate) fn delta_xor_and(

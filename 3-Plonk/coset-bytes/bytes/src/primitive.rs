@@ -1,7 +1,7 @@
 use crate::{Error, Serializable};
 
 /// 为基础整数类型批量实现 `Serializable`（小端编码）。
-macro_rules! impl_serializable {
+macro_rules! impl_primitive_serializable {
     ($ty:ty) => {
         impl Serializable<{ core::mem::size_of::<$ty>() }> for $ty {
             type Error = Error;
@@ -17,14 +17,14 @@ macro_rules! impl_serializable {
     };
 }
 
-impl_serializable!(u8);
-impl_serializable!(u16);
-impl_serializable!(u32);
-impl_serializable!(u64);
-impl_serializable!(u128);
+impl_primitive_serializable!(u8);
+impl_primitive_serializable!(u16);
+impl_primitive_serializable!(u32);
+impl_primitive_serializable!(u64);
+impl_primitive_serializable!(u128);
 
-impl_serializable!(i8);
-impl_serializable!(i16);
-impl_serializable!(i32);
-impl_serializable!(i64);
-impl_serializable!(i128);
+impl_primitive_serializable!(i8);
+impl_primitive_serializable!(i16);
+impl_primitive_serializable!(i32);
+impl_primitive_serializable!(i64);
+impl_primitive_serializable!(i128);

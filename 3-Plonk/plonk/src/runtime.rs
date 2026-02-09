@@ -1,10 +1,4 @@
-
-
-
 //
-
-
-
 
 use coset_bls12_381::BlsScalar;
 
@@ -13,28 +7,15 @@ use crate::prelude::{Constraint, Witness};
 #[cfg(feature = "debug")]
 use crate::debugger::Debugger;
 
-
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
 pub enum RuntimeEvent {
+    WitnessAppended { w: Witness, v: BlsScalar },
 
-    WitnessAppended {
-
-        w: Witness,
-
-        v: BlsScalar,
-    },
-
-
-    ConstraintAppended {
-
-        c: Constraint,
-    },
-
+    ConstraintAppended { c: Constraint },
 
     ProofFinished,
 }
-
 
 #[derive(Debug, Clone)]
 pub struct Runtime {
@@ -49,7 +30,6 @@ impl Default for Runtime {
 }
 
 impl Runtime {
-
     #[allow(unused_variables)]
     /// 创建运行时事件收集器（在 `debug` 特性下启用调试器）。
     pub fn new() -> Self {

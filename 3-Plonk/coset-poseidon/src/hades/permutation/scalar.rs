@@ -1,15 +1,10 @@
-
-
-
 //
 
-
 use coset_bls12_381::BlsScalar;
-use dusk_safe::Safe;
+use coset_safe::Safe;
 
 use super::Hades;
 use crate::hades::{MDS_MATRIX, ROUND_CONSTANTS, WIDTH};
-
 
 #[derive(Default)]
 pub(crate) struct ScalarPermutation();
@@ -23,7 +18,7 @@ impl ScalarPermutation {
 
 impl Safe<BlsScalar, WIDTH> for ScalarPermutation {
     fn permute(&mut self, state: &mut [BlsScalar; WIDTH]) {
-        self.perm(state);
+        self.apply_permutation(state);
     }
 
     fn tag(&mut self, input: &[u8]) -> BlsScalar {
@@ -53,7 +48,7 @@ impl Hades<BlsScalar> for ScalarPermutation {
         *value = value.square().square() * *value;
     }
 
-    fn mul_matrix(
+    fn apply_mds_matrix(
         &mut self,
         _round_index: usize,
         state: &mut [BlsScalar; WIDTH],
@@ -72,7 +67,7 @@ impl Hades<BlsScalar> for ScalarPermutation {
 }
 
 #[cfg(feature = "encryption")]
-impl dusk_safe::Encryption<BlsScalar, WIDTH> for ScalarPermutation {
+impl coset_safe::Encryption<BlsScalar, WIDTH> for ScalarPermutation {
     fn subtract(
         &mut self,
         minuend: &BlsScalar,

@@ -1,11 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/fft/polynomial.rs）。
 
 //
-
-
-
-
 
 use super::{EvaluationDomain, Evaluations};
 use crate::error::Error;
@@ -23,7 +18,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -32,7 +26,6 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct Polynomial {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     coeffs: Vec<BlsScalar>,
 }
@@ -61,26 +54,19 @@ impl IntoIterator for Polynomial {
 }
 
 impl Polynomial {
-
     pub(crate) const fn zero() -> Self {
         Self { coeffs: Vec::new() }
     }
-
 
     pub(crate) fn is_zero(&self) -> bool {
         self.coeffs.is_empty()
             || self.coeffs.iter().all(|coeff| coeff == &BlsScalar::zero())
     }
 
-
-    ///
-
-
     pub(crate) fn from_coefficients_vec(coeffs: Vec<BlsScalar>) -> Self {
         let mut result = Self { coeffs };
 
         result.truncate_leading_zeros();
-
 
         assert!(result
             .coeffs
@@ -89,8 +75,6 @@ impl Polynomial {
 
         result
     }
-
-
 
     pub(crate) fn degree(&self) -> usize {
         match self.is_zero() {
@@ -118,18 +102,14 @@ impl Polynomial {
         }
     }
 
-
     pub(crate) fn evaluate(&self, value: &BlsScalar) -> BlsScalar {
         if self.is_zero() {
             return BlsScalar::zero();
         }
 
-
         let powers = util::powers_of(value, self.len());
 
-
         let mul_coeff = self.iter().zip(powers).map(|(c, p)| p * c);
-
 
         let mut sum = BlsScalar::zero();
         for value in mul_coeff {
@@ -137,8 +117,6 @@ impl Polynomial {
         }
         sum
     }
-
-
 
     pub fn to_var_bytes(&self) -> Vec<u8> {
         let degree = self.degree();
@@ -149,7 +127,6 @@ impl Polynomial {
             .flat_map(|(_, item)| item.to_bytes().to_vec())
             .collect()
     }
-
 
     pub fn from_slice(bytes: &[u8]) -> Result<Polynomial, Error> {
         let coeffs = bytes
@@ -163,7 +140,6 @@ impl Polynomial {
 
         Ok(polynomial)
     }
-
 
     fn iter(&self) -> impl Iterator<Item = &BlsScalar> {
         self.coeffs.iter()
@@ -229,7 +205,6 @@ impl<'a> AddAssign<&'a Polynomial> for Polynomial {
                 *self_coefficient += other_coefficient
             }
         } else {
-
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
             for (self_coefficient, other_coefficient) in
                 self.coeffs.iter_mut().zip(&other.coeffs)
@@ -243,10 +218,7 @@ impl<'a> AddAssign<&'a Polynomial> for Polynomial {
 }
 
 impl<'a> AddAssign<(BlsScalar, &'a Polynomial)> for Polynomial {
-    fn add_assign(
-        &mut self,
-        (factor, other): (BlsScalar, &'a Polynomial),
-    ) {
+    fn add_assign(&mut self, (factor, other): (BlsScalar, &'a Polynomial)) {
         if self.is_zero() {
             self.coeffs.truncate(0);
             self.coeffs.extend_from_slice(&other.coeffs);
@@ -261,7 +233,6 @@ impl<'a> AddAssign<(BlsScalar, &'a Polynomial)> for Polynomial {
                 *self_coefficient += &(factor * other_coefficient);
             }
         } else {
-
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
             for (self_coefficient, other_coefficient) in
                 self.coeffs.iter_mut().zip(&other.coeffs)
@@ -341,7 +312,6 @@ impl<'a> SubAssign<&'a Polynomial> for Polynomial {
                 *self_coefficient -= other_coefficient
             }
         } else {
-
             self.coeffs.resize(other.coeffs.len(), BlsScalar::zero());
             for (self_coefficient, other_coefficient) in
                 self.coeffs.iter_mut().zip(&other.coeffs)
@@ -370,15 +340,9 @@ impl Polynomial {
         self.iter().cloned().enumerate().collect()
     }
 
-
     pub fn ruffini(&self, divisor_root: BlsScalar) -> Polynomial {
         let mut quotient: Vec<BlsScalar> = Vec::with_capacity(self.degree());
         let mut running_term = BlsScalar::zero();
-
-
-
-
-
 
         for coeff in self.coeffs.iter().rev() {
             let updated_coefficient = coeff + running_term;
@@ -386,16 +350,12 @@ impl Polynomial {
             running_term = divisor_root * updated_coefficient;
         }
 
-
-
         quotient.pop();
-
 
         quotient.reverse();
         Polynomial::from_coefficients_vec(quotient)
     }
 }
-
 
 impl<'a, 'b> Mul<&'a Polynomial> for &'b Polynomial {
     type Output = Polynomial;
@@ -473,11 +433,6 @@ mod test {
     use rand_core::{CryptoRng, RngCore, SeedableRng};
 
     impl Polynomial {
-
-
-
-
-
         pub(crate) fn rand<R: RngCore + CryptoRng>(
             d: usize,
             mut rng: &mut R,
@@ -496,7 +451,6 @@ mod test {
 
     #[test]
     fn test_ruffini() {
-
         let quadratic = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(4),
             BlsScalar::from(4),
@@ -514,12 +468,6 @@ mod test {
 
     #[test]
     fn test_ruffini_zero() {
-
-
-
-
-
-
         // (1)
 
         let zero = Polynomial::zero();
@@ -578,13 +526,11 @@ mod test {
         let degree = 5;
         let mut polynomial = Polynomial::rand(degree, &mut rng);
 
-
         assert_eq!(
             polynomial,
             Polynomial::from_slice(&polynomial.to_var_bytes()[..])
                 .expect("(De-)Serialization should succeed")
         );
-
 
         polynomial.add_zero_coefficient();
         assert_eq!(polynomial.coeffs[degree + 1], BlsScalar::zero());
@@ -593,12 +539,12 @@ mod test {
         let mut polynomial_bytes = polynomial.to_var_bytes();
         assert_eq!(polynomial_bytes.len(), (degree + 1) * BlsScalar::SIZE,);
 
-
         for _ in 0..BlsScalar::SIZE {
             polynomial_bytes.push(0);
         }
-        let deserialized_polynomial = Polynomial::from_slice(&polynomial_bytes[..])
-            .expect("Deserialization should succeed");
+        let deserialized_polynomial =
+            Polynomial::from_slice(&polynomial_bytes[..])
+                .expect("Deserialization should succeed");
         polynomial.truncate_leading_zeros();
         assert_eq!(polynomial, deserialized_polynomial);
     }

@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/logic/verifierkey.rs）。
 
 //
-
 
 use crate::commitment_scheme::Commitment;
 
@@ -65,9 +64,8 @@ mod alloc {
             let c_2 = delta(d_shift_delta_input) * kappa_sq;
 
             let wire_w_eval = evaluations.c_eval;
-            let c_3 =
-                (wire_w_eval - a_shift_delta_input * b_shift_delta_input)
-                    * kappa_cu;
+            let c_3 = (wire_w_eval - a_shift_delta_input * b_shift_delta_input)
+                * kappa_cu;
 
             let c_4 = delta_xor_and(
                 &a_shift_delta_input,

@@ -1,9 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/commitment_scheme/kzg10/commitment.rs）。
 
 //
-
-
 
 use coset_bls12_381::{G1Affine, G1Projective};
 use coset_bytes::{DeserializableSlice, Serializable};
@@ -16,8 +14,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -26,9 +22,7 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub(crate) struct Commitment(
-
-    #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
-    pub(crate) G1Affine,
+    #[cfg_attr(feature = "rkyv-impl", omit_bounds)] pub(crate) G1Affine,
 );
 
 impl From<G1Affine> for Commitment {
@@ -57,8 +51,6 @@ impl Serializable<{ G1Affine::SIZE }> for Commitment {
 }
 
 impl Commitment {
-
-
     fn identity() -> Commitment {
         Commitment(G1Affine::identity())
     }

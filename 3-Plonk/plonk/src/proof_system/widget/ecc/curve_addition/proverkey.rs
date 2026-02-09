@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/ecc/curve_addition/proverkey.rs）。
 
 //
-
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -54,7 +53,6 @@ impl ProverKey {
         let point_y_right = d_i;
         let x_left_mul_y_right = d_i_w;
 
-
         //
 
         let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
@@ -63,14 +61,20 @@ impl ProverKey {
         let y_left_mul_y_right = point_y_left * point_y_right;
         let x_left_mul_x_right = point_x_left * point_x_right;
 
-
         let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
-        let x3_rhs = point_x_output + (point_x_output * EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right);
+        let x3_rhs = point_x_output
+            + (point_x_output
+                * EDWARDS_D
+                * x_left_mul_y_right
+                * y_left_mul_x_right);
         let x3_consistency = (x3_lhs - x3_rhs) * kappa;
 
-
         let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
-        let y3_rhs = point_y_output - point_y_output * EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right;
+        let y3_rhs = point_y_output
+            - point_y_output
+                * EDWARDS_D
+                * x_left_mul_y_right
+                * y_left_mul_x_right;
         let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
 
         let identity = xy_consistency + x3_consistency + y3_consistency;
@@ -95,7 +99,6 @@ impl ProverKey {
         let point_y_right = evaluations.d_eval;
         let x_left_mul_y_right = evaluations.d_w_eval;
 
-
         //
 
         let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
@@ -104,14 +107,18 @@ impl ProverKey {
         let y_left_mul_y_right = point_y_left * point_y_right;
         let x_left_mul_x_right = point_x_left * point_x_right;
 
-
         let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
-        let x3_rhs = point_x_output + (point_x_output * (EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right));
+        let x3_rhs = point_x_output
+            + (point_x_output
+                * (EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right));
         let x3_consistency = (x3_lhs - x3_rhs) * kappa;
 
-
         let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
-        let y3_rhs = point_y_output - point_y_output * EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right;
+        let y3_rhs = point_y_output
+            - point_y_output
+                * EDWARDS_D
+                * x_left_mul_y_right
+                * y_left_mul_x_right;
         let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
 
         let identity = xy_consistency + x3_consistency + y3_consistency;

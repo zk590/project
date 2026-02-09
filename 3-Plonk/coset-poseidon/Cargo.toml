@@ -7,7 +7,7 @@ edition = "2021"
 coset-bls12_381 = { path = "../coset-bls12_381", package = "coset-bls12_381", default-features = false, features = ["zeroize"] }
 coset-jubjub = { path = "../coset-jubjub", package = "coset-jubjub", default-features = false }
 plonk = {path="../plonk", package="plonk", default-features = false, features = ["alloc", "zeroize"], optional = true }
-dusk-safe = "0.3"
+coset_safe = { package = "dusk-safe", version = "0.3" }
 
 [dev-dependencies]
 criterion = "0.5"
@@ -20,7 +20,7 @@ coset-bytes = { path = "../coset-bytes/bytes", package = "coset-bytes"}
 zk = [
     "plonk",
 ]
-encryption = ["dusk-safe/encryption"]
+encryption = ["coset_safe/encryption"]
 
 [profile.dev]
 opt-level = 3

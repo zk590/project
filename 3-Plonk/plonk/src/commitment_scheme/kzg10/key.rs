@@ -1,11 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/key.rs）。
 
 //
-
-
-
-
 
 use super::{proof::Proof, Commitment};
 use crate::{
@@ -27,8 +22,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -37,25 +30,11 @@ use rkyv::{
     archive_attr(derive(CheckBytes))
 )]
 pub struct CommitKey {
-
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) powers_of_g: Vec<G1Affine>,
 }
 
 impl CommitKey {
-
-    ///
-
-
-
-
-    ///
-
-
-
-
-
     pub fn to_raw_var_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(
             u64::SIZE + self.powers_of_g.len() * G1Affine::RAW_SIZE,
@@ -72,17 +51,6 @@ impl CommitKey {
         bytes
     }
 
-
-
-    ///
-
-
-    ///
-
-
-
-
-
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let mut len = [0u8; u64::SIZE];
         len.copy_from_slice(&bytes[..u64::SIZE]);
@@ -97,22 +65,12 @@ impl CommitKey {
         Self { powers_of_g }
     }
 
-
     pub fn to_var_bytes(&self) -> Vec<u8> {
         self.powers_of_g
             .iter()
             .flat_map(|item| item.to_bytes().to_vec())
             .collect()
     }
-
-
-
-
-    ///
-
-
-
-
 
     pub fn from_slice(bytes: &[u8]) -> Result<CommitKey, Error> {
         let powers_of_g = bytes
@@ -123,20 +81,15 @@ impl CommitKey {
         Ok(CommitKey { powers_of_g })
     }
 
-
     pub(crate) fn max_degree(&self) -> usize {
         self.powers_of_g.len() - 1
     }
-
-
-
 
     pub(crate) fn truncate(
         &self,
         mut truncated_degree: usize,
     ) -> Result<CommitKey, Error> {
         match truncated_degree {
-
             0 => Err(Error::TruncatedDegreeIsZero),
 
             i if i > self.max_degree() => Err(Error::TruncatedDegreeTooLarge),
@@ -152,11 +105,6 @@ impl CommitKey {
         }
     }
 
-
-
-
-    ///
-
     fn check_commit_degree_is_within_bounds(
         &self,
         poly_degree: usize,
@@ -168,27 +116,17 @@ impl CommitKey {
         }
     }
 
-
-    ///
-
-
     pub(crate) fn commit(
         &self,
         polynomial: &Polynomial,
     ) -> Result<Commitment, Error> {
-
         self.check_commit_degree_is_within_bounds(polynomial.degree())?;
-
 
         Ok(Commitment::from(msm_variable_base(
             &self.powers_of_g,
             polynomial,
         )))
     }
-
-
-
-
 
     pub(crate) fn compute_aggregate_witness(
         polynomials: &[Polynomial],
@@ -208,8 +146,6 @@ impl CommitKey {
     }
 }
 
-
-
 #[derive(Clone, Debug)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -219,7 +155,6 @@ impl CommitKey {
 )]
 
 pub struct OpeningKey {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) g: G1Affine,
 
@@ -276,8 +211,6 @@ impl OpeningKey {
         }
     }
 
-
-
     #[allow(dead_code)]
     pub(crate) fn batch_check(
         &self,
@@ -290,8 +223,6 @@ impl OpeningKey {
 
         let u_challenge = transcript.challenge_scalar(b"batch");
         let powers = util::powers_of(&u_challenge, proofs.len() - 1);
-
-
 
         let mut g_multiplier = BlsScalar::zero();
 
@@ -335,8 +266,6 @@ mod test {
     use merlin::Transcript;
     use rand_core::OsRng;
 
-
-
     fn check(op_key: &OpeningKey, point: BlsScalar, proof: Proof) -> bool {
         let inner_a: G1Affine = (proof.commitment_to_polynomial.0
             - (op_key.g * proof.evaluated_point))
@@ -354,9 +283,6 @@ mod test {
         pairing == coset_bls12_381::Gt::identity()
     }
 
-
-
-
     fn open_single(
         ck: &CommitKey,
         polynomial: &Polynomial,
@@ -371,10 +297,6 @@ mod test {
         })
     }
 
-
-
-
-
     fn open_multiple(
         ck: &CommitKey,
         polynomials: &[Polynomial],
@@ -382,7 +304,6 @@ mod test {
         point: &BlsScalar,
         transcript: &mut Transcript,
     ) -> Result<AggregateProof, Error> {
-
         let mut polynomial_commitments = Vec::with_capacity(polynomials.len());
         for poly in polynomials.iter() {
             polynomial_commitments.push(ck.commit(poly)?)
@@ -390,13 +311,11 @@ mod test {
 
         let v_challenge = transcript.challenge_scalar(b"v_challenge");
 
-
         let witness_poly = CommitKey::compute_aggregate_witness(
             polynomials,
             point,
             &v_challenge,
         );
-
 
         let witness_commitment = ck.commit(&witness_poly)?;
 
@@ -408,21 +327,12 @@ mod test {
         Ok(aggregate_proof)
     }
 
-
-
-
-
-
-
-
     fn compute_single_witness(
         polynomial: &Polynomial,
         point: &BlsScalar,
     ) -> Polynomial {
-
         polynomial.ruffini(*point)
     }
-
 
     fn setup_test(degree: usize) -> Result<(CommitKey, OpeningKey), Error> {
         let srs = PublicParameters::setup(degree, &mut OsRng)?;
@@ -451,12 +361,10 @@ mod test {
         let point_a = BlsScalar::from(10);
         let point_b = BlsScalar::from(11);
 
-
         let poly_a = Polynomial::rand(degree, &mut OsRng);
         let value_a = poly_a.evaluate(&point_a);
         let proof_a = open_single(&ck, &poly_a, &value_a, &point_a)?;
         assert!(check(&vk, point_a, proof_a));
-
 
         let poly_b = Polynomial::rand(degree, &mut OsRng);
         let value_b = poly_b.evaluate(&point_b);
@@ -475,9 +383,7 @@ mod test {
         let (ck, opening_key) = setup_test(max_degree)?;
         let point = BlsScalar::from(10);
 
-
         let aggregated_proof = {
-
             let poly_a = Polynomial::rand(25, &mut OsRng);
             let poly_a_eval = poly_a.evaluate(&point);
 
@@ -495,7 +401,6 @@ mod test {
                 &mut Transcript::new(b"agg_flatten"),
             )?
         };
-
 
         let ok = {
             let transcript = &mut Transcript::new(b"agg_flatten");
@@ -515,9 +420,7 @@ mod test {
         let point_a = BlsScalar::from(10);
         let point_b = BlsScalar::from(11);
 
-
         let (aggregated_proof, single_proof) = {
-
             let poly_a = Polynomial::rand(25, &mut OsRng);
             let poly_a_eval = poly_a.evaluate(&point_a);
 
@@ -543,8 +446,6 @@ mod test {
 
             (aggregated_proof, single_proof)
         };
-
-
 
         let mut transcript = Transcript::new(b"agg_batch");
         let v_challenge = transcript.challenge_scalar(b"v_challenge");

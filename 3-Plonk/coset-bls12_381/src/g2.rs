@@ -1,5 +1,3 @@
-
-
 mod coset;
 
 use core::borrow::Borrow;
@@ -25,13 +23,11 @@ use crate::BlsScalar;
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
-
-
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 ///
-
 
 #[cfg_attr(docsrs, doc(cfg(feature = "groups")))]
 #[derive(Copy, Clone, Debug)]
@@ -89,15 +85,14 @@ impl From<G2Projective> for G2Affine {
 
 impl ConstantTimeEq for G2Affine {
     fn ct_eq(&self, other: &Self) -> Choice {
-
-
-
-
         let infinity = Choice::from(self.infinity);
         let other_infinity = Choice::from(other.infinity);
 
         (infinity & other_infinity)
-            | ((!infinity) & (!other_infinity) & self.x.ct_eq(&other.x) & self.y.ct_eq(&other.y))
+            | ((!infinity)
+                & (!other_infinity)
+                & self.x.ct_eq(&other.x)
+                & self.y.ct_eq(&other.y))
     }
 }
 
@@ -106,7 +101,11 @@ impl ConditionallySelectable for G2Affine {
         G2Affine {
             x: Fp2::conditional_select(&a.x, &b.x, choice),
             y: Fp2::conditional_select(&a.y, &b.y, choice),
-            infinity: ConditionallySelectable::conditional_select(&a.infinity, &b.infinity, choice),
+            infinity: ConditionallySelectable::conditional_select(
+                &a.infinity,
+                &b.infinity,
+                choice,
+            ),
         }
     }
 }
@@ -126,7 +125,11 @@ impl<'a> Neg for &'a G2Affine {
     fn neg(self) -> G2Affine {
         G2Affine {
             x: self.x,
-            y: Fp2::conditional_select(&-self.y, &Fp2::one(), self.infinity.into()),
+            y: Fp2::conditional_select(
+                &-self.y,
+                &Fp2::one(),
+                self.infinity.into(),
+            ),
             infinity: self.infinity,
         }
     }
@@ -214,9 +217,7 @@ const B: Fp2 = Fp2 {
 const B3: Fp2 = Fp2::add(&Fp2::add(&B, &B), &B);
 
 impl G2Affine {
-
     pub const RAW_SIZE: usize = 193;
-
 
     /// 返回 G2 仿射无穷远点。
     pub fn identity() -> G2Affine {
@@ -226,7 +227,6 @@ impl G2Affine {
             infinity: 1u8.into(),
         }
     }
-
 
     /// 返回 G2 仿射生成元。
     pub fn generator() -> G2Affine {
@@ -271,28 +271,25 @@ impl G2Affine {
         }
     }
 
-
     /// 将 G2 仿射点压缩为 96 字节编码。
     pub fn to_compressed(&self) -> [u8; 96] {
-
-
-        let selected_x =
-            Fp2::conditional_select(&self.x, &Fp2::zero(), self.infinity.into());
+        let selected_x = Fp2::conditional_select(
+            &self.x,
+            &Fp2::zero(),
+            self.infinity.into(),
+        );
 
         let mut compressed_bytes = [0; 96];
 
-        (&mut compressed_bytes[0..48]).copy_from_slice(&selected_x.c1.to_bytes()[..]);
-        (&mut compressed_bytes[48..96]).copy_from_slice(&selected_x.c0.to_bytes()[..]);
-
+        (&mut compressed_bytes[0..48])
+            .copy_from_slice(&selected_x.c1.to_bytes()[..]);
+        (&mut compressed_bytes[48..96])
+            .copy_from_slice(&selected_x.c0.to_bytes()[..]);
 
         compressed_bytes[0] |= 1u8 << 7;
 
-
         compressed_bytes[0] |=
             u8::conditional_select(&0u8, &(1u8 << 6), self.infinity.into());
-
-
-
 
         compressed_bytes[0] |= u8::conditional_select(
             &0u8,
@@ -303,21 +300,29 @@ impl G2Affine {
         compressed_bytes
     }
 
-
     /// 将 G2 仿射点编码为 192 字节非压缩格式。
     pub fn to_uncompressed(&self) -> [u8; 192] {
         let mut uncompressed_bytes = [0; 192];
 
-        let selected_x =
-            Fp2::conditional_select(&self.x, &Fp2::zero(), self.infinity.into());
-        let selected_y =
-            Fp2::conditional_select(&self.y, &Fp2::zero(), self.infinity.into());
+        let selected_x = Fp2::conditional_select(
+            &self.x,
+            &Fp2::zero(),
+            self.infinity.into(),
+        );
+        let selected_y = Fp2::conditional_select(
+            &self.y,
+            &Fp2::zero(),
+            self.infinity.into(),
+        );
 
-        uncompressed_bytes[0..48].copy_from_slice(&selected_x.c1.to_bytes()[..]);
-        uncompressed_bytes[48..96].copy_from_slice(&selected_x.c0.to_bytes()[..]);
-        uncompressed_bytes[96..144].copy_from_slice(&selected_y.c1.to_bytes()[..]);
-        uncompressed_bytes[144..192].copy_from_slice(&selected_y.c0.to_bytes()[..]);
-
+        uncompressed_bytes[0..48]
+            .copy_from_slice(&selected_x.c1.to_bytes()[..]);
+        uncompressed_bytes[48..96]
+            .copy_from_slice(&selected_x.c0.to_bytes()[..]);
+        uncompressed_bytes[96..144]
+            .copy_from_slice(&selected_y.c1.to_bytes()[..]);
+        uncompressed_bytes[144..192]
+            .copy_from_slice(&selected_y.c0.to_bytes()[..]);
 
         uncompressed_bytes[0] |=
             u8::conditional_select(&0u8, &(1u8 << 6), self.infinity.into());
@@ -325,28 +330,21 @@ impl G2Affine {
         uncompressed_bytes
     }
 
-
     /// 从非压缩编码反序列化，并校验曲线方程与子群约束。
     pub fn from_uncompressed(bytes: &[u8; 192]) -> CtOption<Self> {
-        Self::from_uncompressed_unchecked(bytes)
-            .and_then(|p| CtOption::new(p, p.is_on_curve() & p.is_torsion_free()))
+        Self::from_uncompressed_unchecked(bytes).and_then(|p| {
+            CtOption::new(p, p.is_on_curve() & p.is_torsion_free())
+        })
     }
 
-
-
-
-
     pub fn from_uncompressed_unchecked(bytes: &[u8; 192]) -> CtOption<Self> {
-
         let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
         let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
         let sort_flag_set = Choice::from((bytes[0] >> 5) & 1);
 
-
         let xc1 = {
             let mut x_c1_bytes = [0; 48];
             x_c1_bytes.copy_from_slice(&bytes[0..48]);
-
 
             x_c1_bytes[0] &= 0b0001_1111;
 
@@ -358,7 +356,6 @@ impl G2Affine {
 
             Fp::from_bytes(&x_c0_bytes)
         };
-
 
         let yc1 = {
             let mut y_c1_bytes = [0; 48];
@@ -377,15 +374,8 @@ impl G2Affine {
             xc0.and_then(|xc0| {
                 yc1.and_then(|yc1| {
                     yc0.and_then(|yc0| {
-                        let x_coordinate = Fp2 {
-                            c0: xc0,
-                            c1: xc1
-                        };
-                        let y_coordinate = Fp2 {
-                            c0: yc0,
-                            c1: yc1
-                        };
-
+                        let x_coordinate = Fp2 { c0: xc0, c1: xc1 };
+                        let y_coordinate = Fp2 { c0: yc0, c1: yc1 };
 
                         let candidate_point = G2Affine::conditional_select(
                             &G2Affine {
@@ -399,15 +389,12 @@ impl G2Affine {
 
                         CtOption::new(
                             candidate_point,
-
                             ((!infinity_flag_set)
                                 | (infinity_flag_set
                                     & x_coordinate.is_zero()
-                                    & y_coordinate.is_zero())) &
-
-                                (!compression_flag_set) &
-
-                                (!sort_flag_set),
+                                    & y_coordinate.is_zero()))
+                                & (!compression_flag_set)
+                                & (!sort_flag_set),
                         )
                     })
                 })
@@ -415,30 +402,20 @@ impl G2Affine {
         })
     }
 
-
     /// 从压缩编码反序列化，并校验子群约束。
     pub fn from_compressed(bytes: &[u8; 96]) -> CtOption<Self> {
-
-
-
-        Self::from_compressed_unchecked(bytes).and_then(|p| CtOption::new(p, p.is_torsion_free()))
+        Self::from_compressed_unchecked(bytes)
+            .and_then(|p| CtOption::new(p, p.is_torsion_free()))
     }
 
-
-
-
-
     pub fn from_compressed_unchecked(bytes: &[u8; 96]) -> CtOption<Self> {
-
         let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
         let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
         let sort_flag_set = Choice::from((bytes[0] >> 5) & 1);
 
-
         let xc1 = {
             let mut x_c1_bytes = [0; 48];
             x_c1_bytes.copy_from_slice(&bytes[0..48]);
-
 
             x_c1_bytes[0] &= 0b0001_1111;
 
@@ -455,77 +432,56 @@ impl G2Affine {
             xc0.and_then(|xc0| {
                 let x_coordinate = Fp2 { c0: xc0, c1: xc1 };
 
-
-
                 //
-
-
 
                 CtOption::new(
                     G2Affine::identity(),
-                    infinity_flag_set &
-                        compression_flag_set &
-                        (!sort_flag_set) &
-                        x_coordinate.is_zero(),
+                    infinity_flag_set
+                        & compression_flag_set
+                        & (!sort_flag_set)
+                        & x_coordinate.is_zero(),
                 )
                 .or_else(|| {
-
                     ((x_coordinate.square() * x_coordinate) + B)
                         .sqrt()
                         .and_then(|y| {
+                            let y_coordinate = Fp2::conditional_select(
+                                &y,
+                                &-y,
+                                y.lexicographically_largest() ^ sort_flag_set,
+                            );
 
-                        let y_coordinate = Fp2::conditional_select(
-                            &y,
-                            &-y,
-                            y.lexicographically_largest() ^ sort_flag_set,
-                        );
-
-                        CtOption::new(
-                            G2Affine {
-                                x: x_coordinate,
-                                y: y_coordinate,
-                                infinity: infinity_flag_set.into(),
-                            },
-                            (!infinity_flag_set) &
-                                    compression_flag_set,
-                        )
-                    })
+                            CtOption::new(
+                                G2Affine {
+                                    x: x_coordinate,
+                                    y: y_coordinate,
+                                    infinity: infinity_flag_set.into(),
+                                },
+                                (!infinity_flag_set) & compression_flag_set,
+                            )
+                        })
                 })
             })
         })
     }
-
 
     #[inline]
     pub fn is_identity(&self) -> Choice {
         self.infinity.into()
     }
 
-
-
-
     /// 判断点是否位于目标素数阶子群（无扭点）。
     pub fn is_torsion_free(&self) -> Choice {
-
-
-
-
         let projective_point = G2Projective::from(self);
-        projective_point
-            .psi()
-            .ct_eq(&projective_point.mul_by_x())
+        projective_point.psi().ct_eq(&projective_point.mul_by_x())
     }
-
-
 
     /// 判断仿射点是否满足曲线方程。
     pub fn is_on_curve(&self) -> Choice {
-
         let infinity = Choice::from(self.infinity);
         (self.y.square() - (self.x.square() * self.x)).ct_eq(&B) | infinity
     }
 }
-
 
 #[cfg_attr(docsrs, doc(cfg(feature = "groups")))]
 #[derive(Copy, Clone, Debug)]
@@ -560,7 +516,11 @@ impl<'a> From<&'a G2Affine> for G2Projective {
         G2Projective {
             x: p.x,
             y: p.y,
-            z: Fp2::conditional_select(&Fp2::one(), &Fp2::zero(), p.infinity.into()),
+            z: Fp2::conditional_select(
+                &Fp2::one(),
+                &Fp2::zero(),
+                p.infinity.into(),
+            ),
         }
     }
 }
@@ -573,8 +533,6 @@ impl From<G2Affine> for G2Projective {
 
 impl ConstantTimeEq for G2Projective {
     fn ct_eq(&self, other: &Self) -> Choice {
-
-
         let x1 = self.x * other.z;
         let x2 = other.x * self.z;
 
@@ -585,8 +543,10 @@ impl ConstantTimeEq for G2Projective {
         let other_is_zero = other.z.is_zero();
 
         (self_is_zero & other_is_zero)
-            | ((!self_is_zero) & (!other_is_zero) & x1.ct_eq(&x2) & y1.ct_eq(&y2))
-
+            | ((!self_is_zero)
+                & (!other_is_zero)
+                & x1.ct_eq(&x2)
+                & y1.ct_eq(&y2))
     }
 }
 
@@ -689,12 +649,11 @@ impl_binops_multiplicative_mixed!(BlsScalar, G2Affine, G2Projective);
 impl_binops_multiplicative_mixed!(BlsScalar, G2Projective, G2Projective);
 
 #[inline(always)]
-fn mul_by_3b(x: Fp2) -> Fp2 {
+fn mul_by_curve_b3(x: Fp2) -> Fp2 {
     x * B3
 }
 
 impl G2Projective {
-
     /// 返回 G2 射影无穷远点。
     pub fn identity() -> G2Projective {
         G2Projective {
@@ -703,7 +662,6 @@ impl G2Projective {
             z: Fp2::zero(),
         }
     }
-
 
     /// 返回 G2 射影生成元。
     pub fn generator() -> G2Projective {
@@ -748,18 +706,15 @@ impl G2Projective {
         }
     }
 
-
     /// 射影坐标点倍加（point doubling）。
     pub fn double(&self) -> G2Projective {
-
-
         let t0 = self.y.square();
         let z3 = t0 + t0;
         let z3 = z3 + z3;
         let z3 = z3 + z3;
         let t1 = self.y * self.z;
         let t2 = self.z.square();
-        let t2 = mul_by_3b(t2);
+        let t2 = mul_by_curve_b3(t2);
         let x3 = t2 * z3;
         let y3 = t0 + t2;
         let z3 = t1 * z3;
@@ -785,11 +740,8 @@ impl G2Projective {
         )
     }
 
-
     /// 射影坐标点加法（projective + projective）。
     pub fn add(&self, rhs: &G2Projective) -> G2Projective {
-
-
         let t0 = self.x * rhs.x;
         let t1 = self.y * rhs.y;
         let t2 = self.z * rhs.z;
@@ -810,10 +762,10 @@ impl G2Projective {
         let y3 = x3 - y3;
         let x3 = t0 + t0;
         let t0 = x3 + t0;
-        let t2 = mul_by_3b(t2);
+        let t2 = mul_by_curve_b3(t2);
         let z3 = t1 + t2;
         let t1 = t1 - t2;
-        let y3 = mul_by_3b(y3);
+        let y3 = mul_by_curve_b3(y3);
         let x3 = t4 * y3;
         let t2 = t3 * t1;
         let x3 = t2 - x3;
@@ -831,11 +783,8 @@ impl G2Projective {
         }
     }
 
-
     /// 混合点加法（projective + affine）。
     pub fn add_mixed(&self, rhs: &G2Affine) -> G2Projective {
-
-
         let t0 = self.x * rhs.x;
         let t1 = self.y * rhs.y;
         let t3 = rhs.x + rhs.y;
@@ -849,10 +798,10 @@ impl G2Projective {
         let y3 = y3 + self.x;
         let x3 = t0 + t0;
         let t0 = x3 + t0;
-        let t2 = mul_by_3b(self.z);
+        let t2 = mul_by_curve_b3(self.z);
         let z3 = t1 + t2;
         let t1 = t1 - t2;
-        let y3 = mul_by_3b(y3);
+        let y3 = mul_by_curve_b3(y3);
         let x3 = t4 * y3;
         let t2 = t3 * t1;
         let x3 = t2 - x3;
@@ -875,16 +824,14 @@ impl G2Projective {
     fn multiply(&self, by: &[u8]) -> G2Projective {
         let mut accumulated_point = G2Projective::identity();
 
-
-
-
         //
-
 
         for bit in by
             .iter()
             .rev()
-            .flat_map(|byte| (0..8).rev().map(move |i| Choice::from((byte >> i) & 1u8)))
+            .flat_map(|byte| {
+                (0..8).rev().map(move |i| Choice::from((byte >> i) & 1u8))
+            })
             .skip(1)
         {
             accumulated_point = accumulated_point.double();
@@ -899,7 +846,6 @@ impl G2Projective {
     }
 
     fn psi(&self) -> G2Projective {
-
         let psi_coeff_x = Fp2 {
             c0: Fp::zero(),
             c1: Fp::from_raw_unchecked([
@@ -932,7 +878,6 @@ impl G2Projective {
         };
 
         G2Projective {
-
             x: self.x.frobenius_map() * psi_coeff_x,
 
             y: self.y.frobenius_map() * psi_coeff_y,
@@ -942,7 +887,6 @@ impl G2Projective {
     }
 
     fn psi2(&self) -> G2Projective {
-
         let psi2_coeff_x = Fp2 {
             c0: Fp::from_raw_unchecked([
                 0xcd03c9e48671f071,
@@ -956,7 +900,6 @@ impl G2Projective {
         };
 
         G2Projective {
-
             x: self.x * psi2_coeff_x,
 
             y: self.y.neg(),
@@ -964,7 +907,6 @@ impl G2Projective {
             z: self.z,
         }
     }
-
 
     fn mul_by_x(&self) -> G2Projective {
         let mut scaled_point = G2Projective::identity();
@@ -985,36 +927,26 @@ impl G2Projective {
         scaled_point
     }
 
-
-
-
-
     /// 清除协因子，将点映射到 r 阶子群。
     pub fn clear_cofactor(&self) -> G2Projective {
         let t1 = self.mul_by_x();
         let t2 = self.psi();
 
-        self.double().psi2()
-            + (t1 + t2).mul_by_x()
-            - t1
-            - t2
-            - self
+        self.double().psi2() + (t1 + t2).mul_by_x() - t1 - t2 - self
     }
 
-
-
     /// 批量将射影点归一化为仿射点，复用一次逆元计算。
-    pub fn batch_normalize(projective_points: &[Self], affine_points: &mut [G2Affine]) {
+    pub fn batch_normalize(
+        projective_points: &[Self],
+        affine_points: &mut [G2Affine],
+    ) {
         assert_eq!(projective_points.len(), affine_points.len());
 
         let mut accumulated_inverse = Fp2::one();
         for (projective_point, affine_point) in
             projective_points.iter().zip(affine_points.iter_mut())
         {
-
-
             affine_point.x = accumulated_inverse;
-
 
             accumulated_inverse = Fp2::conditional_select(
                 &(accumulated_inverse * projective_point.z),
@@ -1022,8 +954,6 @@ impl G2Projective {
                 projective_point.is_identity(),
             );
         }
-
-
 
         accumulated_inverse = accumulated_inverse.invert().unwrap();
 
@@ -1034,16 +964,13 @@ impl G2Projective {
         {
             let should_skip = projective_point.is_identity();
 
-
             let z_inverse = affine_point.x * accumulated_inverse;
-
 
             accumulated_inverse = Fp2::conditional_select(
                 &(accumulated_inverse * projective_point.z),
                 &accumulated_inverse,
                 should_skip,
             );
-
 
             affine_point.x = projective_point.x * z_inverse;
             affine_point.y = projective_point.y * z_inverse;
@@ -1057,18 +984,14 @@ impl G2Projective {
         }
     }
 
-
     #[inline]
     pub fn is_identity(&self) -> Choice {
         self.z.is_zero()
     }
 
-
-
     pub fn is_on_curve(&self) -> Choice {
-
-
-        (self.y.square() * self.z).ct_eq(&(self.x.square() * self.x + self.z.square() * self.z * B))
+        (self.y.square() * self.z)
+            .ct_eq(&(self.x.square() * self.x + self.z.square() * self.z * B))
             | self.z.is_zero()
     }
 }
@@ -1179,17 +1102,17 @@ impl Group for G2Projective {
             let random_x = Fp2::random(&mut rng);
             let flip_sign = rng.next_u32() % 2 != 0;
 
-
             let candidate_point = ((random_x.square() * random_x) + B)
                 .sqrt()
                 .map(|y| G2Affine {
-                x: random_x,
-                y: if flip_sign { -y } else { y },
-                infinity: 0.into(),
-            });
+                    x: random_x,
+                    y: if flip_sign { -y } else { y },
+                    infinity: 0.into(),
+                });
 
             if candidate_point.is_some().into() {
-                let subgroup_point = candidate_point.unwrap().to_curve().clear_cofactor();
+                let subgroup_point =
+                    candidate_point.unwrap().to_curve().clear_cofactor();
 
                 if bool::from(!subgroup_point.is_identity()) {
                     return subgroup_point;
@@ -1218,7 +1141,8 @@ impl Group for G2Projective {
 #[cfg(feature = "alloc")]
 impl WnafGroup for G2Projective {
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize {
-        const RECOMMENDATIONS: [usize; 11] = [1, 3, 8, 20, 47, 126, 260, 826, 1501, 4555, 84071];
+        const RECOMMENDATIONS: [usize; 11] =
+            [1, 3, 8, 20, 47, 126, 260, 826, 1501, 4555, 84071];
 
         let mut ret = 4;
         for r in &RECOMMENDATIONS {
@@ -1311,7 +1235,9 @@ impl UncompressedEncoding for G2Affine {
         Self::from_uncompressed(&bytes.0)
     }
 
-    fn from_uncompressed_unchecked(bytes: &Self::Uncompressed) -> CtOption<Self> {
+    fn from_uncompressed_unchecked(
+        bytes: &Self::Uncompressed,
+    ) -> CtOption<Self> {
         Self::from_uncompressed_unchecked(&bytes.0)
     }
 
@@ -1480,10 +1406,18 @@ fn test_projective_to_affine() {
     let generator_projective = G2Projective::generator();
     let identity_projective = G2Projective::identity();
 
-    assert!(bool::from(G2Affine::from(generator_projective).is_on_curve()));
-    assert!(!bool::from(G2Affine::from(generator_projective).is_identity()));
-    assert!(bool::from(G2Affine::from(identity_projective).is_on_curve()));
-    assert!(bool::from(G2Affine::from(identity_projective).is_identity()));
+    assert!(bool::from(
+        G2Affine::from(generator_projective).is_on_curve()
+    ));
+    assert!(!bool::from(
+        G2Affine::from(generator_projective).is_identity()
+    ));
+    assert!(bool::from(
+        G2Affine::from(identity_projective).is_on_curve()
+    ));
+    assert!(bool::from(
+        G2Affine::from(identity_projective).is_identity()
+    ));
 
     let scale_factor = Fp2 {
         c0: Fp::from_raw_unchecked([
@@ -1518,10 +1452,18 @@ fn test_affine_to_projective() {
     let generator_affine = G2Affine::generator();
     let identity_affine = G2Affine::identity();
 
-    assert!(bool::from(G2Projective::from(generator_affine).is_on_curve()));
-    assert!(!bool::from(G2Projective::from(generator_affine).is_identity()));
-    assert!(bool::from(G2Projective::from(identity_affine).is_on_curve()));
-    assert!(bool::from(G2Projective::from(identity_affine).is_identity()));
+    assert!(bool::from(
+        G2Projective::from(generator_affine).is_on_curve()
+    ));
+    assert!(!bool::from(
+        G2Projective::from(generator_affine).is_identity()
+    ));
+    assert!(bool::from(
+        G2Projective::from(identity_affine).is_on_curve()
+    ));
+    assert!(bool::from(
+        G2Projective::from(identity_affine).is_identity()
+    ));
 }
 
 #[test]
@@ -1673,7 +1615,6 @@ fn test_projective_addition() {
         assert!(bool::from(repeated_sum.is_on_curve()));
         assert_eq!(sum, repeated_sum);
     }
-
 
     {
         let beta = Fp2 {
@@ -1837,7 +1778,6 @@ fn test_mixed_addition() {
         assert!(bool::from(repeated_sum.is_on_curve()));
         assert_eq!(sum, repeated_sum);
     }
-
 
     {
         let beta = Fp2 {
@@ -2032,8 +1972,6 @@ fn test_is_torsion_free() {
 
 #[test]
 fn test_mul_by_x() {
-
-
     let generator = G2Projective::generator();
     let bls_x_scalar = if crate::BLS_X_IS_NEGATIVE {
         -BlsScalar::from(crate::BLS_X)
@@ -2068,7 +2006,6 @@ fn test_psi() {
             0x0d42a083a75bd6f3,
         ]),
     };
-
 
     let point = G2Projective {
         x: Fp2 {
@@ -2111,7 +2048,6 @@ fn test_psi() {
     };
     assert!(bool::from(point.is_on_curve()));
 
-
     assert_eq!(generator.psi2(), generator.psi().psi());
     assert_eq!(point.psi2(), point.psi().psi());
 
@@ -2145,7 +2081,6 @@ fn test_clear_cofactor() {
             0x0d42a083a75bd6f3,
         ]),
     };
-
 
     let point = G2Projective {
         x: Fp2 {
@@ -2194,19 +2129,17 @@ fn test_clear_cofactor() {
     assert!(bool::from(cleared_point.is_on_curve()));
     assert!(bool::from(G2Affine::from(cleared_point).is_torsion_free()));
 
-
-
     let generator = G2Projective::generator();
     assert!(bool::from(generator.clear_cofactor().is_on_curve()));
     let identity_projective = G2Projective::identity();
-    assert!(bool::from(identity_projective.clear_cofactor().is_on_curve()));
-
-
+    assert!(bool::from(
+        identity_projective.clear_cofactor().is_on_curve()
+    ));
 
     let h_eff_modq: [u8; 32] = [
-        0xff, 0xff, 0x01, 0x00, 0x04, 0x00, 0x02, 0xa4, 0x09, 0x90, 0x06, 0x00, 0x04, 0x90, 0x16,
-        0xb1, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x00, 0x00,
+        0xff, 0xff, 0x01, 0x00, 0x04, 0x00, 0x02, 0xa4, 0x09, 0x90, 0x06, 0x00,
+        0x04, 0x90, 0x16, 0xb1, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     ];
     assert_eq!(generator.clear_cofactor(), generator.multiply(&h_eff_modq));
     assert_eq!(
@@ -2292,16 +2225,13 @@ fn test_commutative_scalar_subgroup_multiplication() {
     let g2_a = G2Affine::generator();
     let g2_p = G2Projective::generator();
 
-
     assert_eq!(&g2_a * &scalar, &scalar * &g2_a);
     assert_eq!(&g2_p * &scalar, &scalar * &g2_p);
-
 
     assert_eq!(&g2_a * scalar.clone(), scalar.clone() * &g2_a);
     assert_eq!(&g2_p * scalar.clone(), scalar.clone() * &g2_p);
     assert_eq!(g2_a.clone() * &scalar, &scalar * g2_a.clone());
     assert_eq!(g2_p.clone() * &scalar, &scalar * g2_p.clone());
-
 
     assert_eq!(g2_p * scalar.clone(), scalar.clone() * g2_p);
     assert_eq!(g2_a * scalar.clone(), scalar * g2_a);

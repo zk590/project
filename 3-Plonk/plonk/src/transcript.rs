@@ -1,11 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/transcript.rs）。
 
 //
-
-
-
-
 
 use core::mem;
 
@@ -16,21 +11,14 @@ use merlin::Transcript;
 use crate::commitment_scheme::Commitment;
 use crate::proof_system::VerifierKey;
 
-
-
 pub(crate) trait TranscriptProtocol {
-
     fn append_commitment(&mut self, label: &'static [u8], comm: &Commitment);
-
 
     fn append_scalar(&mut self, label: &'static [u8], s: &BlsScalar);
 
-
     fn challenge_scalar(&mut self, label: &'static [u8]) -> BlsScalar;
 
-
     fn circuit_domain_sep(&mut self, n: u64);
-
 
     fn base(
         label: &[u8],
@@ -65,14 +53,6 @@ impl TranscriptProtocol for Transcript {
         verifier_key: &VerifierKey,
         constraints: usize,
     ) -> Self {
-
-
-
-
-
-
-
-
         let label = unsafe { mem::transmute(label) };
 
         let mut transcript = Transcript::new(label);

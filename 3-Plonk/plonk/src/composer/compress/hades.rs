@@ -1,15 +1,9 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/composer/compress/hades.rs）。
 
 //
 
-
-
-
-
 use super::BlsScalar;
 use sha2::{Digest, Sha512};
-
 
 const WIDTH: usize = 5;
 
@@ -41,13 +35,6 @@ pub fn mds() -> [[BlsScalar; WIDTH]; WIDTH] {
     let mut x_values = [BlsScalar::zero(); WIDTH];
     let mut y_values = [BlsScalar::zero(); WIDTH];
 
-
-
-
-
-
-
-
     (0..WIDTH).for_each(|i| {
         x_values[i] = BlsScalar::from(i as u64);
         y_values[i] = BlsScalar::from((i + WIDTH) as u64);
@@ -56,7 +43,8 @@ pub fn mds() -> [[BlsScalar; WIDTH]; WIDTH] {
     let mut row_index = 0;
     (0..WIDTH).for_each(|i| {
         (0..WIDTH).for_each(|j| {
-            matrix[row_index][j] = (x_values[i] + y_values[j]).invert().unwrap();
+            matrix[row_index][j] =
+                (x_values[i] + y_values[j]).invert().unwrap();
         });
         row_index += 1;
     });

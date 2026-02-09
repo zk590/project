@@ -2,11 +2,6 @@
 use super::errors::{BadLength, InvalidChar};
 use super::serialize::Serializable;
 
-
-
-
-
-
 /// 从十六进制字符串解析为定长字节结构。
 pub trait ParseHexStr<const N: usize>: Serializable<N> {
 
@@ -26,8 +21,8 @@ pub trait ParseHexStr<const N: usize>: Serializable<N> {
 
         for hex_index in (0..expected).step_by(2) {
             let parsed_byte: u8 = match (
-                val(hex_bytes[hex_index]),
-                val(hex_bytes[hex_index + 1]),
+                parse_hex_nibble(hex_bytes[hex_index]),
+                parse_hex_nibble(hex_bytes[hex_index + 1]),
             ) {
                 (Some(high_nibble), Some(low_nibble)) => {
                     (high_nibble << 4) + low_nibble
@@ -52,11 +47,6 @@ pub trait ParseHexStr<const N: usize>: Serializable<N> {
     }
 }
 
-
-
-
-
-
 /// 将 ASCII 十六进制字节数组转换为原始二进制字节数组。
 
 pub const fn hex<const N: usize, const M: usize>(bytes: &[u8; N]) -> [u8; M] {
@@ -66,8 +56,8 @@ pub const fn hex<const N: usize, const M: usize>(bytes: &[u8; N]) -> [u8; M] {
     let mut destination_index = 0;
     while source_index < N && destination_index < M {
         let parsed_byte = match (
-            val(bytes[source_index]),
-            val(bytes[source_index + 1]),
+            parse_hex_nibble(bytes[source_index]),
+            parse_hex_nibble(bytes[source_index + 1]),
         ) {
             (Some(high_nibble), Some(low_nibble)) => {
                 (high_nibble << 4) + low_nibble
@@ -82,7 +72,7 @@ pub const fn hex<const N: usize, const M: usize>(bytes: &[u8; N]) -> [u8; M] {
     buffer
 }
 
-const fn val(c: u8) -> Option<u8> {
+const fn parse_hex_nibble(c: u8) -> Option<u8> {
     match c {
         b'A'..=b'F' => Some(c - b'A' + 10),
         b'a'..=b'f' => Some(c - b'a' + 10),

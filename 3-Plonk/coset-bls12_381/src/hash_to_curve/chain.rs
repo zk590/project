@@ -1,7 +1,3 @@
-
-
-
-
 use core::ops::MulAssign;
 
 use crate::{fp::Fp, fp2::Fp2};
@@ -15,8 +11,6 @@ macro_rules! square {
 }
 
 #[allow(clippy::cognitive_complexity)]
-
-
 
 pub fn chain_pm3div4(var0: &Fp) -> Fp {
     let mut var1 = var0.square();
@@ -322,8 +316,6 @@ pub fn chain_pm3div4(var0: &Fp) -> Fp {
 }
 
 #[allow(clippy::cognitive_complexity)]
-
-
 
 pub fn chain_p2m9div16(var0: &Fp2) -> Fp2 {
     let mut var1 = var0.square();
@@ -862,15 +854,14 @@ pub fn chain_p2m9div16(var0: &Fp2) -> Fp2 {
     var1 * var2
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use rand_core::SeedableRng;
 
     const SEED: [u8; 16] = [
-        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
-        0xe5,
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32,
+        0x54, 0x06, 0xbc, 0xe5,
     ];
 
     #[test]

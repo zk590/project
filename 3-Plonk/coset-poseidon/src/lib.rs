@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 Poseidon 组件（src/lib.rs）。
 
 //
-
 
 #![no_std]
 

@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/range/verifierkey.rs）。
 
 //
-
 
 use crate::commitment_scheme::Commitment;
 

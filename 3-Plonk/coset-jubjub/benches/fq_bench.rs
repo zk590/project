@@ -1,5 +1,7 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+//! Fq 基域运算性能基准：加减乘、平方、求逆与字节编解码。
+
 use coset_jubjub::*;
+use criterion::{criterion_group, criterion_main, Criterion};
 use ff::Field;
 
 fn bench_add_assign(c: &mut Criterion) {

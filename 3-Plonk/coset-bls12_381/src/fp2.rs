@@ -1,5 +1,3 @@
-
-
 #[cfg(feature = "serde")]
 mod coset;
 
@@ -12,7 +10,9 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 use crate::fp::Fp;
 
@@ -153,12 +153,9 @@ impl Fp2 {
         }
     }
 
-
     #[inline(always)]
     /// 在 Fp2 上应用 Frobenius 自同构。
     pub fn frobenius_map(&self) -> Self {
-
-
         self.conjugate()
     }
 
@@ -174,45 +171,26 @@ impl Fp2 {
     #[inline(always)]
     /// 乘以二次扩域的非二次剩余元 u + 1。
     pub fn mul_by_nonresidue(&self) -> Fp2 {
-
-
-
-
-
         Fp2 {
             c0: self.c0 - self.c1,
             c1: self.c0 + self.c1,
         }
     }
 
-
-
     #[inline]
     /// 判断扩域元素是否在字典序较大半区，用于压缩编码。
     pub fn lexicographically_largest(&self) -> Choice {
-
-
-
-
-
-
         self.c1.lexicographically_largest()
             | (self.c1.is_zero() & self.c0.lexicographically_largest())
     }
 
     /// 计算 Fp2 平方，使用 Karatsuba 形式减少乘法次数。
     pub const fn square(&self) -> Fp2 {
+        //
 
         //
 
-
-
         //
-
-
-        //
-
-
 
         let a = (&self.c0).add(&self.c1);
         let b = (&self.c0).sub(&self.c1);
@@ -226,17 +204,13 @@ impl Fp2 {
 
     /// 计算 Fp2 乘法，内部用 `sum_of_products` 降低中间开销。
     pub fn mul(&self, rhs: &Fp2) -> Fp2 {
-
-
         //
 
         //
 
         //
 
-
         //
-
 
         Fp2 {
             c0: Fp::sum_of_products([self.c0, -self.c1], [rhs.c0, rhs.c1]),
@@ -267,11 +241,7 @@ impl Fp2 {
 
     /// 计算 Fp2 平方根；不存在时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
-
-
-
         CtOption::new(Fp2::zero(), self.is_zero()).or_else(|| {
-
             let a1 = self.pow_vartime(&[
                 0xee7f_bfff_ffff_eaaa,
                 0x07aa_ffff_ac54_ffff,
@@ -281,15 +251,9 @@ impl Fp2 {
                 0x0680_447a_8e5f_f9a6,
             ]);
 
-
             let alpha = a1.square() * self;
 
-
             let x0 = a1 * self;
-
-
-
-
 
             CtOption::new(
                 Fp2 {
@@ -298,7 +262,6 @@ impl Fp2 {
                 },
                 alpha.ct_eq(&(&Fp2::one()).neg()),
             )
-
             .or_else(|| {
                 CtOption::new(
                     (alpha + Fp2::one()).pow_vartime(&[
@@ -312,19 +275,12 @@ impl Fp2 {
                     Choice::from(1),
                 )
             })
-
-
             .and_then(|sqrt| CtOption::new(sqrt, sqrt.square().ct_eq(self)))
         })
     }
 
-
-
-
     /// 计算 Fp2 乘法逆元。
     pub fn invert(&self) -> CtOption<Self> {
-
-
         //
 
         //
@@ -332,19 +288,12 @@ impl Fp2 {
         //
 
         //
-
-
-
-
 
         (self.c0.square() + self.c1.square()).invert().map(|t| Fp2 {
             c0: self.c0 * t,
             c1: self.c1 * -t,
         })
     }
-
-
-
 
     /// 变长时间幂运算，适用于公开指数场景。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
@@ -360,8 +309,6 @@ impl Fp2 {
         }
         res
     }
-
-
 
     #[cfg(all(test, feature = "experimental"))]
     pub(crate) fn pow_vartime_extended(&self, by: &[u64]) -> Self {
@@ -711,7 +658,6 @@ fn test_negation() {
 
 #[test]
 fn test_sqrt() {
-
     let a = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x2bee_d146_27d7_f9e9,
@@ -733,8 +679,6 @@ fn test_sqrt() {
 
     assert_eq!(a.sqrt().unwrap().square(), a);
 
-
-
     let b = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x6631_0000_0010_5545,
@@ -749,8 +693,6 @@ fn test_sqrt() {
 
     assert_eq!(b.sqrt().unwrap().square(), b);
 
-
-
     let c = Fp2 {
         c0: Fp::from_raw_unchecked([
             0x44f6_0000_0051_ffae,
@@ -764,8 +706,6 @@ fn test_sqrt() {
     };
 
     assert_eq!(c.sqrt().unwrap().square(), c);
-
-
 
     assert!(bool::from(
         Fp2 {

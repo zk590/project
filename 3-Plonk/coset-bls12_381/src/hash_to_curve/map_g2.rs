@@ -1,6 +1,6 @@
-
-
-use subtle::{Choice, ConditionallyNegatable, ConditionallySelectable, ConstantTimeEq};
+use subtle::{
+    Choice, ConditionallyNegatable, ConditionallySelectable, ConstantTimeEq,
+};
 
 use super::chain::chain_p2m9div16;
 use super::{HashToField, MapToCurve, Sgn0};
@@ -9,7 +9,6 @@ use crate::generic_array::{
     GenericArray,
 };
 use crate::{fp::Fp, fp2::Fp2, g2::G2Projective};
-
 
 const ISO3_XNUM: [Fp2; 4] = [
     Fp2 {
@@ -72,7 +71,6 @@ const ISO3_XNUM: [Fp2; 4] = [
     },
 ];
 
-
 const ISO3_XDEN: [Fp2; 3] = [
     Fp2 {
         c0: Fp::zero(),
@@ -105,7 +103,6 @@ const ISO3_XDEN: [Fp2; 3] = [
     },
     Fp2::one(),
 ];
-
 
 const ISO3_YNUM: [Fp2; 4] = [
     Fp2 {
@@ -167,7 +164,6 @@ const ISO3_YNUM: [Fp2; 4] = [
         c1: Fp::zero(),
     },
 ];
-
 
 const ISO3_YDEN: [Fp2; 4] = [
     Fp2 {
@@ -365,12 +361,15 @@ const SSWU_RV1: Fp2 = Fp2 {
 };
 
 impl HashToField for Fp2 {
-
     type InputLength = U128;
 
     fn from_okm(okm: &GenericArray<u8, U128>) -> Fp2 {
-        let c0 = <Fp as HashToField>::from_okm(GenericArray::<u8, U64>::from_slice(&okm[..64]));
-        let c1 = <Fp as HashToField>::from_okm(GenericArray::<u8, U64>::from_slice(&okm[64..]));
+        let c0 = <Fp as HashToField>::from_okm(
+            GenericArray::<u8, U64>::from_slice(&okm[..64]),
+        );
+        let c1 = <Fp as HashToField>::from_okm(
+            GenericArray::<u8, U64>::from_slice(&okm[64..]),
+        );
         Fp2 { c0, c1 }
     }
 }
@@ -384,21 +383,20 @@ impl Sgn0 for Fp2 {
     }
 }
 
-
 fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
     let usq = u.square();
     let xi_usq = SSWU_XI * usq;
     let xisq_u4 = xi_usq.square();
     let nd_common = xisq_u4 + xi_usq;
-    let x_den = SSWU_ELLP_A * Fp2::conditional_select(&(-nd_common), &SSWU_XI, nd_common.is_zero());
+    let x_den = SSWU_ELLP_A
+        * Fp2::conditional_select(&(-nd_common), &SSWU_XI, nd_common.is_zero());
     let x0_num = SSWU_ELLP_B * (Fp2::one() + nd_common);
-
 
     let x_densq = x_den.square();
     let gx_den = x_densq * x_den;
 
-    let gx0_num = (x0_num.square() + SSWU_ELLP_A * x_densq) * x0_num + SSWU_ELLP_B * gx_den;
-
+    let gx0_num = (x0_num.square() + SSWU_ELLP_A * x_densq) * x0_num
+        + SSWU_ELLP_B * gx_den;
 
     let sqrt_candidate = {
         let vsq = gx_den.square();
@@ -408,7 +406,6 @@ fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
         let uv_15 = uv_7 * v_4.square();
         uv_7 * chain_p2m9div16(&uv_15)
     };
-
 
     let mut y = sqrt_candidate;
 
@@ -426,7 +423,6 @@ fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
         c1: -tmp.c0,
     };
     y.conditional_assign(&tmp, (tmp.square() * gx_den).ct_eq(&gx0_num));
-
 
     let gx1_num = gx0_num * xi_usq * xisq_u4;
 
@@ -450,33 +446,28 @@ fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
     }
 }
 
-
 fn iso_map(u: &G2Projective) -> G2Projective {
-    const COEFFS: [&[Fp2]; 4] = [&ISO3_XNUM, &ISO3_XDEN, &ISO3_YNUM, &ISO3_YDEN];
-
+    const COEFFS: [&[Fp2]; 4] =
+        [&ISO3_XNUM, &ISO3_XDEN, &ISO3_YNUM, &ISO3_YDEN];
 
     let G2Projective { x, y, z } = *u;
 
-
     let mut mapvals = [Fp2::zero(); 4];
-
 
     let zsq = z.square();
     let zpows = [z, zsq, zsq * z];
-
 
     for idx in 0..4 {
         let coeff = COEFFS[idx];
         let clast = coeff.len() - 1;
         mapvals[idx] = coeff[clast];
         for jdx in 0..clast {
-            mapvals[idx] = mapvals[idx] * x + zpows[jdx] * coeff[clast - 1 - jdx];
+            mapvals[idx] =
+                mapvals[idx] * x + zpows[jdx] * coeff[clast - 1 - jdx];
         }
     }
 
-
     mapvals[1] *= z;
-
 
     mapvals[2] *= y;
     mapvals[3] *= z;
@@ -503,19 +494,19 @@ impl MapToCurve for G2Projective {
 
 #[cfg(test)]
 fn check_g2_prime(pt: &G2Projective) -> bool {
-
-
     let zsq = pt.z.square();
     (pt.y.square() * pt.z)
-        == (pt.x.square() * pt.x + SSWU_ELLP_A * pt.x * zsq + SSWU_ELLP_B * zsq * pt.z)
+        == (pt.x.square() * pt.x
+            + SSWU_ELLP_A * pt.x * zsq
+            + SSWU_ELLP_B * zsq * pt.z)
 }
 
 #[test]
 fn test_osswu_semirandom() {
     use rand_core::SeedableRng;
     let mut rng = rand_xorshift::XorShiftRng::from_seed([
-        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32, 0x54, 0x06, 0xbc,
-        0xe5,
+        0x59, 0x62, 0xbe, 0x5d, 0x76, 0x3d, 0x31, 0x8d, 0x17, 0xdb, 0x37, 0x32,
+        0x54, 0x06, 0xbc, 0xe5,
     ]);
     for _ in 0..32 {
         let input = Fp2::random(&mut rng);
@@ -526,7 +517,6 @@ fn test_osswu_semirandom() {
         assert!(bool::from(p_iso.is_on_curve()));
     }
 }
-
 
 #[test]
 fn test_encode_to_curve_10() {
@@ -542,7 +532,10 @@ fn test_encode_to_curve_10() {
     }
     impl TestCase {
         fn expected(&self) -> String {
-            self.expected[0].to_string() + self.expected[1] + self.expected[2] + self.expected[3]
+            self.expected[0].to_string()
+                + self.expected[1]
+                + self.expected[2]
+                + self.expected[3]
         }
     }
 
@@ -617,7 +610,6 @@ fn test_encode_to_curve_10() {
     }
 }
 
-
 #[test]
 fn test_hash_to_curve_10() {
     use crate::{
@@ -632,7 +624,10 @@ fn test_hash_to_curve_10() {
     }
     impl TestCase {
         fn expected(&self) -> String {
-            self.expected[0].to_string() + self.expected[1] + self.expected[2] + self.expected[3]
+            self.expected[0].to_string()
+                + self.expected[1]
+                + self.expected[2]
+                + self.expected[3]
         }
     }
 

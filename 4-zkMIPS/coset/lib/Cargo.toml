@@ -6,10 +6,12 @@ edition = "2021"
 [dependencies]
 coset-bls12_381 = { workspace = true }
 coset-poseidon = { workspace = true }
+coset-bytes = { workspace = true }
 plonk = { workspace = true , features = ["std"] }
 poseidon-merkle = {  workspace = true , features = ["zk"] }
 alloy-sol-types = { workspace = true }
 rand = "0.8.5"
+rkyv = { version = "0.7.45", features = ["std", "validation", "alloc"] }
 bincode = { version = "1.3.3", optional = true }
 zkm-sdk = { git = "https://github.com/zkMIPS/zkMIPS.git", optional = true }
 

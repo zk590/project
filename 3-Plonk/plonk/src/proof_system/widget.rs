@@ -1,8 +1,6 @@
-
-
+// 模块说明：本文件实现 PLONK 组件（src/proof_system/widget.rs）。
 
 //
-
 
 use crate::commitment_scheme::Commitment;
 use coset_bytes::{DeserializableSlice, Serializable};
@@ -23,10 +21,6 @@ use rkyv::{
     Archive, Deserialize, Serialize,
 };
 
-
-///
-
-
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -34,7 +28,6 @@ use rkyv::{
     archive(bound(serialize = "__S: Serializer + ScratchSpace"))
 )]
 pub struct VerifierKey {
-
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) n: usize,
 
@@ -131,9 +124,6 @@ impl Serializable<{ 20 * Commitment::SIZE + u64::SIZE }> for VerifierKey {
 }
 
 impl VerifierKey {
-
-
-
     pub(crate) fn from_polynomial_commitments(
         n: usize,
         q_m: Commitment,
@@ -206,7 +196,6 @@ pub(crate) mod alloc {
     use merlin::Transcript;
 
     impl VerifierKey {
-
         pub(crate) fn seed_transcript(&self, transcript: &mut Transcript) {
             transcript.append_commitment(b"q_m", &self.arithmetic.q_m);
             transcript.append_commitment(b"q_l", &self.arithmetic.q_l);
@@ -235,14 +224,9 @@ pub(crate) mod alloc {
             transcript
                 .append_commitment(b"s_sigma_4", &self.permutation.s_sigma_1);
 
-
             transcript.circuit_domain_sep(self.n as u64);
         }
     }
-
-
-    ///
-
 
     #[derive(Debug, PartialEq, Eq, Clone)]
     #[cfg_attr(
@@ -252,7 +236,6 @@ pub(crate) mod alloc {
         archive_attr(derive(CheckBytes))
     )]
     pub struct ProverKey {
-
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) n: usize,
 
@@ -274,44 +257,25 @@ pub(crate) mod alloc {
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) permutation: permutation::ProverKey,
 
-
-
-
-
         #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
         pub(crate) v_h_coset_8n: Evaluations,
     }
 
     impl ProverKey {
-
-        ///
-
-
-
         fn serialization_size(&self) -> usize {
-
             let poly_size = self.arithmetic.q_m.0.len() * BlsScalar::SIZE;
 
             let eval_size = self.arithmetic.q_m.1.evals.len() * BlsScalar::SIZE
                 + EvaluationDomain::SIZE;
 
-
-
-
             let poly_num = 15;
-
-
 
             let eval_num = poly_num + 2;
 
-
-
             let i64_num = poly_num + 2;
-
 
             poly_size * poly_num + eval_size * eval_num + u64::SIZE * i64_num
         }
-
 
         #[allow(unused_must_use)]
         pub fn to_var_bytes(&self) -> Vec<u8> {
@@ -326,7 +290,6 @@ pub(crate) mod alloc {
             writer.write(&(self.n as u64).to_bytes());
 
             writer.write(&(eval_size as u64).to_bytes());
-
 
             writer.write(&(self.arithmetic.q_m.0.len() as u64).to_bytes());
             writer.write(&self.arithmetic.q_m.0.to_var_bytes());
@@ -356,23 +319,19 @@ pub(crate) mod alloc {
             writer.write(&self.arithmetic.q_arith.0.to_var_bytes());
             writer.write(&self.arithmetic.q_arith.1.to_var_bytes());
 
-
             writer.write(&(self.logic.q_logic.0.len() as u64).to_bytes());
             writer.write(&self.logic.q_logic.0.to_var_bytes());
             writer.write(&self.logic.q_logic.1.to_var_bytes());
 
-
             writer.write(&(self.range.q_range.0.len() as u64).to_bytes());
             writer.write(&self.range.q_range.0.to_var_bytes());
             writer.write(&self.range.q_range.1.to_var_bytes());
-
 
             writer.write(
                 &(self.fixed_base.q_fixed_group_add.0.len() as u64).to_bytes(),
             );
             writer.write(&self.fixed_base.q_fixed_group_add.0.to_var_bytes());
             writer.write(&self.fixed_base.q_fixed_group_add.1.to_var_bytes());
-
 
             writer.write(
                 &(self.variable_base.q_variable_group_add.0.len() as u64)
@@ -384,7 +343,6 @@ pub(crate) mod alloc {
             writer.write(
                 &self.variable_base.q_variable_group_add.1.to_var_bytes(),
             );
-
 
             writer
                 .write(&(self.permutation.s_sigma_1.0.len() as u64).to_bytes());
@@ -413,21 +371,15 @@ pub(crate) mod alloc {
             bytes
         }
 
-
         pub fn from_slice(bytes: &[u8]) -> Result<ProverKey, Error> {
             let mut buffer = bytes;
             let circuit_size = u64::from_reader(&mut buffer)? as usize;
             let evaluations_size = u64::from_reader(&mut buffer)? as usize;
 
-
-
-
-
             let poly_from_reader =
                 |reader: &mut &[u8]| -> Result<Polynomial, Error> {
                     let serialized_poly_len =
                         u64::from_reader(reader)? as usize * BlsScalar::SIZE;
-
 
                     if serialized_poly_len == 0 {
                         return Ok(Polynomial::zero());
@@ -591,8 +543,9 @@ mod test {
 
     fn rand_evaluations(circuit_size: usize) -> Evaluations {
         let domain = EvaluationDomain::new(4 * circuit_size).unwrap();
-        let values: Vec<_> =
-            (0..4 * circuit_size).map(|_| BlsScalar::random(&mut OsRng)).collect();
+        let values: Vec<_> = (0..4 * circuit_size)
+            .map(|_| BlsScalar::random(&mut OsRng))
+            .collect();
 
         Evaluations::from_vec_and_domain(values, domain)
     }

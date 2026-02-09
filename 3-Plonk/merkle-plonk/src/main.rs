@@ -93,7 +93,7 @@ struct ZKProofData {
 }
 
 // 从文件读取并使用rkyv反序列化
-fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
+fn read_file_bytes_checked(file_path: &str) -> Result<Vec<u8>, IoError> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
         return Err(IoError::new(ErrorKind::NotFound, "文件不存在"));
@@ -108,9 +108,10 @@ fn read_and_deserialize(file_path: &str) -> Result<Vec<u8>, IoError> {
 }
 
 /// 使用rkyv从文件中加载Merkle树的证明数据
-fn load_proof_data() -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HEIGHT }>), IoError> {
+fn load_merkle_opening_from_file(
+) -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HEIGHT }>), IoError> {
     // 使用rkyv反序列化MerkleProofData
-    let bytes = read_and_deserialize(MERKLE_FILE)?;
+    let bytes = read_file_bytes_checked(MERKLE_FILE)?;
     
     // 使用rkyv反序列化
     let proof_data = unsafe {
@@ -150,7 +151,8 @@ fn load_proof_data() -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HE
 }
 
 /// 加载或编译 prover/verifier
-fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
+fn load_or_compile_opening_circuit(
+) -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
     if let (Ok(mut prover_file), Ok(mut verifier_file),) = (
         File::open(CIRCUIT_PROVE_FILE), 
@@ -203,11 +205,12 @@ fn load_or_build_circuit() -> Result<(Prover, Verifier), Box<dyn std::error::Err
 
 
 /// 读取 Merkle opening 并生成单条 PLONK 证明，随后落盘证明与公开输入。
-fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
+fn generate_and_store_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n===== 生成零知识证明 ======");
     
     // 从文件中加载证明数据
-    let (_leaf_position, leaf_hash, _root_hash, opening) = load_proof_data()?;
+    let (_leaf_position, leaf_hash, _root_hash, opening) =
+        load_merkle_opening_from_file()?;
     println!("1. 加载证明数据成功");
     println!("   - 叶子节点哈希: {:?}", leaf_hash);
     
@@ -220,7 +223,7 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
     }
     println!("2. 常规验证通过，可以生成零知识证明");
 
-    let (prover, _cached_verifier) = load_or_build_circuit()?;
+    let (prover, _cached_verifier) = load_or_compile_opening_circuit()?;
 
     // 创建电路实例
     let circuit = OpeningCircuit::new(opening, leaf);
@@ -267,7 +270,8 @@ fn generate_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
 /// 验证零知识证明
 pub fn verify_proof() -> Result<(), IoError> {
     // 加载证明数据
-    let (_leaf_position, leaf_hash, _root_hash, opening) = load_proof_data()?;
+    let (_leaf_position, leaf_hash, _root_hash, opening) =
+        load_merkle_opening_from_file()?;
     
     // 加载验证器
     let verifier_bytes = std::fs::read(VERIFIER_FILE)?;
@@ -276,7 +280,7 @@ pub fn verify_proof() -> Result<(), IoError> {
     })?;
     
     // 使用rkyv读取证明数据
-    let bytes = read_and_deserialize(PLONK_PROOF_FILE)?;
+    let bytes = read_file_bytes_checked(PLONK_PROOF_FILE)?;
     let proof_data = unsafe {
         rkyv::archived_root::<ZKProofData>(&bytes)
     };
@@ -285,7 +289,8 @@ pub fn verify_proof() -> Result<(), IoError> {
     })?;
     
     // 使用rkyv读取公开输入数据
-    let public_inputs_bytes = read_and_deserialize(PLONK_PUBLICINPUTS_FILE)?;
+    let public_inputs_bytes =
+        read_file_bytes_checked(PLONK_PUBLICINPUTS_FILE)?;
     let public_inputs_data = unsafe {
         rkyv::archived_root::<ZKProofData>(&public_inputs_bytes)
     };
@@ -342,7 +347,7 @@ pub fn verify_proof() -> Result<(), IoError> {
 fn main() {
     println!("===== 验证基于Poseidon Hash的Merkle树叶子节点 ======");
     // 从文件中加载证明数据
-    match load_proof_data() {
+    match load_merkle_opening_from_file() {
         Ok((position, leaf_hash, root_hash, opening)) => {
             println!("1. 成功加载证明数据");
             println!("├── 叶子节点位置: {}", position);
@@ -378,7 +383,7 @@ fn main() {
     println!("===== merkle验证流程完成 ======");
     println!("===== 生成plonk证明 ======");
 
-    match generate_zk_proof() {
+    match generate_and_store_zk_proof() {
         Ok(()) => {
             println!("零知识证明已成功生成并保存到{}", PLONK_PROOF_FILE);
             println!("===== 验证plonk证明 ======");

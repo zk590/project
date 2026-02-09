@@ -1,18 +1,20 @@
+//! 多精度算术底层原语与运算符宏，供 Fr/Fq/点运算共享。
 
+/// 64 位加法带进位，返回 `(低 64 位结果, 进位)`。
 #[inline(always)]
 pub const fn adc(a: u64, b: u64, carry: u64) -> (u64, u64) {
     let ret = (a as u128) + (b as u128) + (carry as u128);
     (ret as u64, (ret >> 64) as u64)
 }
 
-
+/// 64 位减法带借位，返回 `(低 64 位结果, 借位掩码)`。
 #[inline(always)]
 pub const fn sbb(a: u64, b: u64, borrow: u64) -> (u64, u64) {
     let ret = (a as u128).wrapping_sub((b as u128) + ((borrow >> 63) as u128));
     (ret as u64, (ret >> 64) as u64)
 }
 
-
+/// 乘加原语：计算 `a + b*c + carry` 并返回分离的低位与进位。
 #[inline(always)]
 pub const fn mac(a: u64, b: u64, c: u64, carry: u64) -> (u64, u64) {
     let ret = (a as u128) + ((b as u128) * (c as u128)) + (carry as u128);

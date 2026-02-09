@@ -1,10 +1,4 @@
-
-
-
 //
-
-
-
 
 use alloc::vec::Vec;
 use core::{cmp, ops};
@@ -31,21 +25,15 @@ pub use gate::Gate;
 pub(crate) use constraint_system::{Selector, WireData, WiredWitness};
 pub(crate) use permutation::Permutation;
 
-
 #[derive(Debug, Clone)]
 pub struct Composer {
-
     pub(crate) constraints: Vec<Gate>,
-
 
     pub(crate) public_inputs: HashMap<usize, BlsScalar>,
 
-
     pub(crate) witnesses: Vec<BlsScalar>,
 
-
     pub(crate) perm: Permutation,
-
 
     pub(crate) runtime: Runtime,
 }
@@ -58,17 +46,12 @@ impl ops::Index<Witness> for Composer {
     }
 }
 
-
-
 impl Composer {
-
     /// 常量 0 对应的 witness。
     pub const ZERO: Witness = Witness::ZERO;
 
-
     /// 常量 1 对应的 witness。
     pub const ONE: Witness = Witness::ONE;
-
 
     pub const IDENTITY: WitnessPoint = WitnessPoint::new(Self::ZERO, Self::ONE);
 
@@ -77,24 +60,19 @@ impl Composer {
         self.constraints.len()
     }
 
-
     pub(crate) fn from_bytes(compressed: &[u8]) -> Result<Self, Error> {
         compress::CompressedCircuit::from_bytes(compressed)
     }
 
-
     fn append_witness_internal(&mut self, witness: BlsScalar) -> Witness {
         let witness_index = self.witnesses.len();
 
-
         self.perm.new_witness();
-
 
         self.witnesses.push(witness);
 
         Witness::new(witness_index)
     }
-
 
     fn append_custom_gate_internal(&mut self, constraint: Constraint) {
         let gate_index = self.constraints.len();
@@ -153,7 +131,6 @@ impl Composer {
         );
     }
 
-
     pub(crate) fn runtime(&mut self) -> &mut Runtime {
         &mut self.runtime
     }
@@ -184,14 +161,11 @@ impl Composer {
         }
     }
 
-
-
     fn append_dummy_gates(&mut self) {
         let six = self.append_witness(BlsScalar::from(6));
         let one = self.append_witness(BlsScalar::from(1));
         let seven = self.append_witness(BlsScalar::from(7));
         let min_twenty = self.append_witness(-BlsScalar::from(20));
-
 
         let constraint = Constraint::new()
             .mult(1)
@@ -206,8 +180,6 @@ impl Composer {
             .c(min_twenty);
 
         self.append_gate(constraint);
-
-
 
         let constraint = Constraint::new()
             .mult(1)
@@ -232,11 +204,10 @@ impl Composer {
         let witness = self.append_witness_internal(witness);
 
         let witness_value = self[witness];
-        self.runtime()
-            .event(RuntimeEvent::WitnessAppended {
-                w: witness,
-                v: witness_value,
-            });
+        self.runtime().event(RuntimeEvent::WitnessAppended {
+            w: witness,
+            v: witness_value,
+        });
 
         witness
     }
@@ -249,7 +220,6 @@ impl Composer {
         self.append_custom_gate_internal(constraint)
     }
 
-
     /// 追加逻辑组件约束，支持按位 `AND/XOR` 聚合。
     pub fn append_logic_component<const BIT_PAIRS: usize>(
         &mut self,
@@ -257,8 +227,6 @@ impl Composer {
         b: Witness,
         is_component_xor: bool,
     ) -> Witness {
-
-
         let num_bits = cmp::min(BIT_PAIRS * 2, 256);
         let num_quads = num_bits >> 1;
 
@@ -266,7 +234,6 @@ impl Composer {
         let mut left_acc = BlsScalar::zero();
         let mut right_acc = BlsScalar::zero();
         let mut out_acc = BlsScalar::zero();
-
 
         let a_bit_iter = BitIterator8::new(self[a].to_bytes());
         let a_bits: Vec<_> = a_bit_iter.skip(256 - num_bits).collect();
@@ -278,17 +245,13 @@ impl Composer {
 
         // * +-----+-----+-----+-----+
 
-
-
         // * |  :  |  :  |  :  |  :  |
 
         // * +-----+-----+-----+-----+
 
         //
 
-
         //
-
 
         let mut constraint = if is_component_xor {
             Constraint::logic_xor(&Constraint::new())
@@ -297,7 +260,6 @@ impl Composer {
         };
 
         for i in 0..num_quads {
-
             let idx = i * 2;
 
             let left_most_bit = (a_bits[idx] as u8) << 1;
@@ -317,17 +279,8 @@ impl Composer {
             } as u64;
             let out_quad_bls = BlsScalar::from(out_quad_bls);
 
-
             let prod_quad_bls = (left_quad * right_quad) as u64;
             let prod_quad_bls = BlsScalar::from(prod_quad_bls);
-
-
-
-
-
-
-
-
 
             left_acc = left_acc * bls_four + left_quad_bls;
             right_acc = right_acc * bls_four + right_quad_bls;
@@ -345,8 +298,6 @@ impl Composer {
             constraint = constraint.a(wit_a).b(wit_b).d(wit_d);
         }
 
-
-
         let left_witness = constraint.witness(WiredWitness::A);
         let right_witness = constraint.witness(WiredWitness::B);
         let fourth_witness = constraint.witness(WiredWitness::D);
@@ -361,12 +312,6 @@ impl Composer {
         fourth_witness
     }
 
-
-    ///
-
-    ///
-
-
     pub fn component_mul_generator<P: Into<JubJubExtended>>(
         &mut self,
         jubjub: Witness,
@@ -374,13 +319,7 @@ impl Composer {
     ) -> Result<WitnessPoint, Error> {
         let generator = generator.into();
 
-
-
-
-
-
         let bits: usize = 256;
-
 
         let mut wnaf_point_multiples: Vec<_> = {
             let mut multiples = vec![JubJubExtended::default(); bits];
@@ -396,9 +335,6 @@ impl Composer {
 
         wnaf_point_multiples.reverse();
 
-
-
-
         let scalar: JubJubScalar =
             match JubJubScalar::from_bytes(&self[jubjub].to_bytes()).into() {
                 Some(s) => s,
@@ -408,18 +344,14 @@ impl Composer {
         let width = 2;
         let wnaf_entries = scalar.compute_windowed_naf(width);
 
-
-
         debug_assert_eq!(
             wnaf_entries.len(),
             bits,
             "the wnaf_entries array is expected to be 256 elements long"
         );
 
-
         let mut scalar_acc = vec![BlsScalar::zero()];
         let mut point_acc = vec![JubJubAffine::identity()];
-
 
         let two = BlsScalar::from(2u64);
         let xy_alphas: Vec<_> = wnaf_entries
@@ -454,8 +386,6 @@ impl Composer {
             let acc_x = self.append_witness(point_acc[i].get_u());
             let acc_y = self.append_witness(point_acc[i].get_v());
             let accumulated_bit = self.append_witness(scalar_acc[i]);
-
-
 
             if i == 0 {
                 self.assert_equal_constant(acc_x, BlsScalar::zero(), None);
@@ -496,43 +426,27 @@ impl Composer {
             self.append_custom_gate(constraint)
         }
 
-
         let acc_x = self.append_witness(point_acc[bits].get_u());
         let acc_y = self.append_witness(point_acc[bits].get_v());
 
-
-
         //
 
-
-
-
         let last_accumulated_bit = self.append_witness(scalar_acc[bits]);
-
 
         let constraint =
             Constraint::new().a(acc_x).b(acc_y).d(last_accumulated_bit);
         self.append_gate(constraint);
-
-
 
         self.assert_equal(last_accumulated_bit, jubjub);
 
         Ok(WitnessPoint::new(acc_x, acc_y))
     }
 
-
-    ///
-
-
     pub fn append_gate(&mut self, constraint: Constraint) {
         let constraint = Constraint::arithmetic(&constraint);
 
         self.append_custom_gate(constraint)
     }
-
-
-    ///
 
     pub fn append_evaluated_output(
         &mut self,
@@ -562,8 +476,6 @@ impl Composer {
 
         let output_selector = s.coeff(Selector::Output);
 
-
-
         #[allow(dead_code)]
         let output_value = {
             const ONE: BlsScalar = BlsScalar::one();
@@ -574,23 +486,19 @@ impl Composer {
                 0x5bc8f5f97cd877d8,
             ]);
 
-
-
             if output_selector == &ONE {
                 Some(-polynomial_value)
             } else if output_selector == &MINUS_ONE {
                 Some(polynomial_value)
             } else {
-                output_selector
-                    .invert()
-                    .map(|inverse_selector| polynomial_value * (-inverse_selector))
+                output_selector.invert().map(|inverse_selector| {
+                    polynomial_value * (-inverse_selector)
+                })
             }
         };
 
         output_value.map(|value| self.append_witness(value))
     }
-
-
 
     pub fn append_constant<C: Into<BlsScalar>>(
         &mut self,
@@ -604,7 +512,6 @@ impl Composer {
         witness
     }
 
-
     pub fn append_point<P: Into<JubJubAffine>>(
         &mut self,
         affine: P,
@@ -617,8 +524,6 @@ impl Composer {
         WitnessPoint::new(point_u_witness, point_v_witness)
     }
 
-
-
     pub fn append_constant_point<P: Into<JubJubAffine>>(
         &mut self,
         affine: P,
@@ -630,9 +535,6 @@ impl Composer {
 
         WitnessPoint::new(point_u_witness, point_v_witness)
     }
-
-
-    ///
 
     pub fn append_public_point<P: Into<JubJubAffine>>(
         &mut self,
@@ -656,9 +558,6 @@ impl Composer {
         point
     }
 
-
-    ///
-
     pub fn append_public<P: Into<BlsScalar>>(&mut self, public: P) -> Witness {
         let public = public.into();
         let witness = self.append_witness(public);
@@ -672,20 +571,19 @@ impl Composer {
         witness
     }
 
-
-    pub fn assert_equal(&mut self, left_witness: Witness, right_witness: Witness) {
-        let constraint =
-            Constraint::new()
-                .left(1)
-                .right(-BlsScalar::one())
-                .a(left_witness)
-                .b(right_witness);
+    pub fn assert_equal(
+        &mut self,
+        left_witness: Witness,
+        right_witness: Witness,
+    ) {
+        let constraint = Constraint::new()
+            .left(1)
+            .right(-BlsScalar::one())
+            .a(left_witness)
+            .b(right_witness);
 
         self.append_gate(constraint);
     }
-
-
-
 
     pub fn append_logic_and<const BIT_PAIRS: usize>(
         &mut self,
@@ -695,9 +593,6 @@ impl Composer {
         self.append_logic_component::<BIT_PAIRS>(a, b, false)
     }
 
-
-
-
     pub fn append_logic_xor<const BIT_PAIRS: usize>(
         &mut self,
         a: Witness,
@@ -705,9 +600,6 @@ impl Composer {
     ) -> Witness {
         self.append_logic_component::<BIT_PAIRS>(a, b, true)
     }
-
-
-    ///
 
     pub fn assert_equal_constant<C: Into<BlsScalar>>(
         &mut self,
@@ -720,15 +612,12 @@ impl Composer {
             .left(-BlsScalar::one())
             .a(witness)
             .constant(constant);
-        let constraint =
-            public
-                .map(|public_input| constraint.public(public_input))
-                .unwrap_or(constraint);
+        let constraint = public
+            .map(|public_input| constraint.public(public_input))
+            .unwrap_or(constraint);
 
         self.append_gate(constraint);
     }
-
-
 
     pub fn assert_equal_point(
         &mut self,
@@ -738,9 +627,6 @@ impl Composer {
         self.assert_equal(*left_point.x(), *right_point.x());
         self.assert_equal(*left_point.y(), *right_point.y());
     }
-
-
-    ///
 
     pub fn assert_equal_public_point<P: Into<JubJubAffine>>(
         &mut self,
@@ -762,13 +648,7 @@ impl Composer {
         );
     }
 
-
-    pub fn component_neg_point(
-        &mut self,
-        point: WitnessPoint,
-    ) -> WitnessPoint {
-
-
+    pub fn component_neg_point(&mut self, point: WitnessPoint) -> WitnessPoint {
         let constraint =
             Constraint::new().left(-BlsScalar::one()).a(*point.x());
         let neg_p_x = self.gate_mul(constraint);
@@ -776,30 +656,21 @@ impl Composer {
         WitnessPoint::new(neg_p_x, *point.y())
     }
 
-
     pub fn component_sub_point(
         &mut self,
         a: WitnessPoint,
         b: WitnessPoint,
     ) -> WitnessPoint {
-
         let neg_b = self.component_neg_point(b);
-
 
         self.component_add_point(a, neg_b)
     }
-
 
     pub fn component_add_point(
         &mut self,
         a: WitnessPoint,
         b: WitnessPoint,
     ) -> WitnessPoint {
-
-
-
-
-
         let x_1 = *a.x();
         let y_1 = *a.y();
         let x_2 = *b.x();
@@ -819,7 +690,6 @@ impl Composer {
         let x_3 = self.append_witness(x_3);
         let y_3 = self.append_witness(y_3);
 
-
         let constraint = Constraint::new().a(x_1).b(y_1).c(x_2).d(y_2);
         let constraint = Constraint::group_add_variable_base(&constraint);
 
@@ -831,13 +701,6 @@ impl Composer {
 
         WitnessPoint::new(x_3, y_3)
     }
-
-
-
-
-    ///
-
-
 
     pub fn component_boolean(&mut self, witness: Witness) {
         let zero = Self::ZERO;
@@ -852,21 +715,10 @@ impl Composer {
         self.append_gate(constraint);
     }
 
-
-
-
-
-    ///
-
-
-
-    ///
-
     pub fn component_decomposition<const N: usize>(
         &mut self,
         scalar: Witness,
     ) -> [Witness; N] {
-
         assert!(0 < N && N <= 256);
 
         let mut decomposition = [Self::ZERO; N];
@@ -896,14 +748,6 @@ impl Composer {
         decomposition
     }
 
-
-
-    ///
-
-
-    ///
-
-
     pub fn component_select_identity(
         &mut self,
         bit: Witness,
@@ -915,13 +759,11 @@ impl Composer {
         WitnessPoint::new(selected_x, selected_y)
     }
 
-
     pub fn component_mul_point(
         &mut self,
         jubjub: Witness,
         point: WitnessPoint,
     ) -> WitnessPoint {
-
         let scalar_bits = self.component_decomposition::<252>(jubjub);
 
         let mut result = Self::IDENTITY;
@@ -936,32 +778,21 @@ impl Composer {
         result
     }
 
-
-    ///
-
-
-    ///
-
-
     pub fn component_select(
         &mut self,
         bit: Witness,
         a: Witness,
         b: Witness,
     ) -> Witness {
-
         let constraint = Constraint::new().mult(1).a(bit).b(a);
         let bit_times_a = self.gate_mul(constraint);
-
 
         let constraint =
             Constraint::new().left(-BlsScalar::one()).constant(1).a(bit);
         let one_min_bit = self.gate_add(constraint);
 
-
         let constraint = Constraint::new().mult(1).a(one_min_bit).b(b);
         let one_min_bit_b = self.gate_mul(constraint);
-
 
         let constraint = Constraint::new()
             .left(1)
@@ -970,13 +801,6 @@ impl Composer {
             .b(bit_times_a);
         self.gate_add(constraint)
     }
-
-
-    ///
-
-
-    ///
-
 
     pub fn component_select_one(
         &mut self,
@@ -1004,31 +828,19 @@ impl Composer {
         output_witness
     }
 
-
-    ///
-
-
-    ///
-
-
     pub fn component_select_point(
         &mut self,
         bit: Witness,
         left_point: WitnessPoint,
         right_point: WitnessPoint,
     ) -> WitnessPoint {
-        let selected_x = self.component_select(bit, *left_point.x(), *right_point.x());
-        let selected_y = self.component_select(bit, *left_point.y(), *right_point.y());
+        let selected_x =
+            self.component_select(bit, *left_point.x(), *right_point.x());
+        let selected_y =
+            self.component_select(bit, *left_point.y(), *right_point.y());
 
         WitnessPoint::new(selected_x, selected_y)
     }
-
-
-    ///
-
-
-    ///
-
 
     pub fn component_select_zero(
         &mut self,
@@ -1040,23 +852,11 @@ impl Composer {
         self.gate_mul(constraint)
     }
 
-
-
-
-
-    ///
-
-
-
-
     pub fn component_range<const BIT_PAIRS: usize>(
         &mut self,
         witness: Witness,
     ) {
-
-
         let num_bits = cmp::min(BIT_PAIRS * 2, 256);
-
 
         if num_bits == 0 {
             let constraint = Constraint::new().left(1).a(witness);
@@ -1064,30 +864,20 @@ impl Composer {
             return;
         }
 
-
         let bits = self[witness];
         let bit_iter = BitIterator8::new(bits.to_bytes());
         let mut bits: Vec<_> = bit_iter.collect();
         bits.reverse();
 
-
-
-
-
         let mut num_gates = num_bits >> 3;
-
 
         if num_bits % 8 != 0 {
             num_gates += 1;
         }
 
-
         let num_quads = num_gates * 4;
 
-
-
         let pad = 1 + (((num_quads << 1) - num_bits) >> 1);
-
 
         let used_gates = num_gates + 1;
 
@@ -1095,14 +885,11 @@ impl Composer {
         let base = Constraint::range(&base);
         let mut constraints = vec![base; used_gates];
 
-
-
         let mut accumulators: Vec<Witness> = Vec::new();
         let mut accumulator = BlsScalar::zero();
         let four = BlsScalar::from(4);
 
         for i in pad..=num_quads {
-
             let bit_index = (num_quads - i) << 1;
             let q_0 = bits[bit_index] as u64;
             let q_1 = bits[bit_index + 1] as u64;
@@ -1127,15 +914,9 @@ impl Composer {
             constraints[idx].set_witness(witness, accumulator_var);
         }
 
-
-
         if let Some(last_constraint) = constraints.last_mut() {
             *last_constraint = Constraint::new();
         }
-
-
-
-
 
         if let Some(accumulator) = accumulators.last() {
             if let Some(last_constraint) = constraints.last_mut() {
@@ -1147,18 +928,10 @@ impl Composer {
             .into_iter()
             .for_each(|constraint| self.append_custom_gate(constraint));
 
-
-
-
-
         if let Some(accumulator) = accumulators.last() {
             self.assert_equal(*accumulator, witness);
         }
     }
-
-
-    ///
-
 
     pub fn gate_add(&mut self, constraint: Constraint) -> Witness {
         let arithmetic_constraint =
@@ -1167,17 +940,12 @@ impl Composer {
         let output_witness = self
             .append_evaluated_output(arithmetic_constraint)
             .expect("output selector is -1");
-        let arithmetic_constraint =
-            arithmetic_constraint.c(output_witness);
+        let arithmetic_constraint = arithmetic_constraint.c(output_witness);
 
         self.append_gate(arithmetic_constraint);
 
         output_witness
     }
-
-
-    ///
-
 
     pub fn gate_mul(&mut self, constraint: Constraint) -> Witness {
         let arithmetic_constraint =
@@ -1186,14 +954,12 @@ impl Composer {
         let output_witness = self
             .append_evaluated_output(arithmetic_constraint)
             .expect("output selector is -1");
-        let arithmetic_constraint =
-            arithmetic_constraint.c(output_witness);
+        let arithmetic_constraint = arithmetic_constraint.c(output_witness);
 
         self.append_gate(arithmetic_constraint);
 
         output_witness
     }
-
 
     pub fn prove<C>(constraints: usize, circuit: &C) -> Result<Self, Error>
     where
@@ -1202,8 +968,6 @@ impl Composer {
         let mut composer = Self::initialized();
 
         circuit.circuit(&mut composer)?;
-
-
 
         let description_size = composer.constraints();
         if description_size != constraints {

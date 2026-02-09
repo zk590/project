@@ -15,7 +15,8 @@ macro_rules! test_vectors {
 
                 let mut decoded = encoded;
                 let len_of_encoding = decoded.len();
-                (&mut decoded[..]).copy_from_slice(&expected[0..len_of_encoding]);
+                (&mut decoded[..])
+                    .copy_from_slice(&expected[0..len_of_encoding]);
                 expected = &expected[len_of_encoding..];
                 let decoded = $affine::$deserialize(&decoded).unwrap();
                 assert_eq!(e_affine, decoded);
@@ -30,21 +31,21 @@ macro_rules! test_vectors {
 
 #[test]
 fn g1_compressed_valid_test_vectors() {
-    let bytes: &'static [u8] = include_bytes!("g1_compressed_valid_test_vectors.dat");
+    let bytes: &'static [u8] =
+        include_bytes!("g1_compressed_valid_test_vectors.dat");
     test_vectors!(G1Projective, G1Affine, to_bytes, from_bytes, bytes);
 }
 
 #[test]
 fn g2_compressed_valid_test_vectors() {
-    let bytes: &'static [u8] = include_bytes!("g2_compressed_valid_test_vectors.dat");
+    let bytes: &'static [u8] =
+        include_bytes!("g2_compressed_valid_test_vectors.dat");
     test_vectors!(G2Projective, G2Affine, to_bytes, from_bytes, bytes);
 }
 
 #[test]
 #[cfg(all(feature = "alloc", feature = "pairing"))]
 fn test_pairing_result_against_relic() {
-    
-
     let a = G1Affine::generator();
     let b = G2Affine::generator();
 

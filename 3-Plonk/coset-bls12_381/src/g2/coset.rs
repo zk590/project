@@ -1,8 +1,4 @@
-
-
-
 //
-
 
 use coset_bytes::{Error as BytesError, Serializable};
 use subtle::{Choice, ConditionallySelectable, CtOption};
@@ -12,9 +8,7 @@ use crate::fp::Fp;
 use crate::fp2::Fp2;
 
 impl G2Affine {
-
     ///
-
 
     ///
 
@@ -37,14 +31,7 @@ impl G2Affine {
         bytes
     }
 
-
     ///
-
-
-
-
-
-
 
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let mut xc0 = [0u64; 6];
@@ -84,12 +71,8 @@ impl G2Affine {
 impl Serializable<96> for G2Affine {
     type Error = BytesError;
 
-
-
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         let infinity = self.infinity.into();
-
-
 
         let x = Fp2::conditional_select(&self.x, &Fp2::zero(), infinity);
 
@@ -98,14 +81,9 @@ impl Serializable<96> for G2Affine {
         (res[0..48]).copy_from_slice(&x.c1.to_bytes()[..]);
         (res[48..96]).copy_from_slice(&x.c0.to_bytes()[..]);
 
-
         res[0] |= 1u8 << 7;
 
-
         res[0] |= u8::conditional_select(&0u8, &(1u8 << 6), infinity);
-
-
-
 
         res[0] |= u8::conditional_select(
             &0u8,
@@ -116,22 +94,14 @@ impl Serializable<96> for G2Affine {
         res
     }
 
-
-
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
-
-
-
-
         let compression_flag_set = Choice::from((buf[0] >> 7) & 1);
         let infinity_flag_set = Choice::from((buf[0] >> 6) & 1);
         let sort_flag_set = Choice::from((buf[0] >> 5) & 1);
 
-
         let xc1 = {
             let mut tmp = [0; 48];
             tmp.copy_from_slice(&buf[0..48]);
-
 
             tmp[0] &= 0b0001_1111;
 
@@ -149,23 +119,17 @@ impl Serializable<96> for G2Affine {
                 xc0.and_then(|xc0| {
                     let x = Fp2 { c0: xc0, c1: xc1 };
 
-
-
                     //
-
-
 
                     CtOption::new(
                         G2Affine::identity(),
-                        infinity_flag_set &
-                    compression_flag_set &
-                    (!sort_flag_set) &
-                    x.is_zero(),
+                        infinity_flag_set
+                            & compression_flag_set
+                            & (!sort_flag_set)
+                            & x.is_zero(),
                     )
                     .or_else(|| {
-
                         ((x.square() * x) + B).sqrt().and_then(|y| {
-
                             let y = Fp2::conditional_select(
                                 &y,
                                 &-y,
@@ -178,8 +142,7 @@ impl Serializable<96> for G2Affine {
                                     y,
                                     infinity: infinity_flag_set.into(),
                                 },
-                                (!infinity_flag_set) &
-                            compression_flag_set,
+                                (!infinity_flag_set) & compression_flag_set,
                             )
                         })
                     })
@@ -207,20 +170,29 @@ mod serde_support {
     use super::*;
 
     impl Serialize for G2Affine {
-        fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        fn serialize<S: Serializer>(
+            &self,
+            serializer: S,
+        ) -> Result<S::Ok, S::Error> {
             let s = hex::encode(self.to_bytes());
             s.serialize(serializer)
         }
     }
 
     impl<'de> Deserialize<'de> for G2Affine {
-        fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        fn deserialize<D: Deserializer<'de>>(
+            deserializer: D,
+        ) -> Result<Self, D::Error> {
             let s = String::deserialize(deserializer)?;
             let decoded = hex::decode(&s).map_err(SerdeError::custom)?;
             let decoded_len = decoded.len();
-            let bytes: [u8; G2Affine::SIZE] = decoded.try_into().map_err(|_| {
-                SerdeError::invalid_length(decoded_len, &G2Affine::SIZE.to_string().as_str())
-            })?;
+            let bytes: [u8; G2Affine::SIZE] =
+                decoded.try_into().map_err(|_| {
+                    SerdeError::invalid_length(
+                        decoded_len,
+                        &G2Affine::SIZE.to_string().as_str(),
+                    )
+                })?;
             let affine = G2Affine::from_bytes(&bytes)
                 .map_err(|err| SerdeError::custom(format!("{err:?}")))?;
             Ok(affine)
@@ -250,7 +222,8 @@ mod serde_support {
         fn serde_g2_affine_too_short_encoded() {
             let length_95_enc: &str = "\"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bd\"";
 
-            let g2_affine: Result<G2Affine, _> = serde_json::from_str(&length_95_enc);
+            let g2_affine: Result<G2Affine, _> =
+                serde_json::from_str(&length_95_enc);
             assert!(g2_affine.is_err());
         }
 
@@ -258,7 +231,8 @@ mod serde_support {
         fn serde_g2_affine_too_long_encoded() {
             let length_97_enc = "\"93e02b6052719f607dacd3a088274f65596bd0d09920b61ab5da61bbdc7f5049334cf11213945d57e5ac7d055d042b7e024aa2b2f08f0a91260805272dc51051c6e47ad4fa403b02b4510b647ae3d1770bac0326a805bbefd48056c8c121bdb800\"";
 
-            let g2_affine: Result<G2Affine, _> = serde_json::from_str(&length_97_enc);
+            let g2_affine: Result<G2Affine, _> =
+                serde_json::from_str(&length_97_enc);
             assert!(g2_affine.is_err());
         }
     }

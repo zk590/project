@@ -1,8 +1,7 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/proof_system/widget/ecc/scalar_mul/fixed_base.rs）。
 
 //
-
 
 #[cfg(feature = "alloc")]
 pub(crate) mod proverkey;
@@ -13,15 +12,3 @@ mod verifierkey;
 pub(crate) use proverkey::ProverKey;
 
 pub(crate) use verifierkey::VerifierKey;
-
-
-
-
-
-
-
-
-
-
-
-

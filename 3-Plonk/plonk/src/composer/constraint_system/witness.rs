@@ -1,19 +1,10 @@
-
-
+// 模块说明：本文件实现 PLONK
+// 组件（src/composer/constraint_system/witness.rs）。
 
 //
 
-
-
-
-
-
-
-
-
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub(crate) enum WireData {
-
     Left(usize),
 
     Right(usize),
@@ -22,7 +13,6 @@ pub(crate) enum WireData {
 
     Fourth(usize),
 }
-
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Witness {
@@ -36,17 +26,13 @@ impl Default for Witness {
 }
 
 impl Witness {
-
     pub const ZERO: Witness = Witness::new(0);
 
-
     pub const ONE: Witness = Witness::new(1);
-
 
     pub(crate) const fn new(index: usize) -> Self {
         Self { index }
     }
-
 
     pub const fn index(&self) -> usize {
         self.index

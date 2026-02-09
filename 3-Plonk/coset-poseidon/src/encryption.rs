@@ -1,44 +1,4 @@
-
-
-
 //
-
-
-
-//!
-
-//!
-
-
-//!
-
-
-
-
-
-
-//!
-
-
-
-
-
-
-
-//!
-
-
-
-
-
-
-//!
-
-
-
-
-
-//!
 
 //! ```
 
@@ -53,8 +13,6 @@ use coset_jubjub::JubJubAffine;
 use crate::hades::ScalarPermutation;
 use crate::{Domain, Error};
 
-
-
 /// 使用 Poseidon sponge 进行加密，返回密文字段向量。
 pub fn encrypt(
     plaintext_message: impl AsRef<[BlsScalar]>,
@@ -63,7 +21,7 @@ pub fn encrypt(
 ) -> Result<Vec<BlsScalar>, Error> {
     let shared_secret_coordinates =
         [shared_secret.get_u(), shared_secret.get_v()];
-    Ok(dusk_safe::encrypt(
+    Ok(coset_safe::encrypt(
         ScalarPermutation::new(),
         Domain::Encryption,
         plaintext_message,
@@ -71,9 +29,6 @@ pub fn encrypt(
         nonce_scalar,
     )?)
 }
-
-
-
 
 /// 使用相同共享密钥和随机数对密文执行解密。
 pub fn decrypt(
@@ -83,7 +38,7 @@ pub fn decrypt(
 ) -> Result<Vec<BlsScalar>, Error> {
     let shared_secret_coordinates =
         [shared_secret.get_u(), shared_secret.get_v()];
-    Ok(dusk_safe::decrypt(
+    Ok(coset_safe::decrypt(
         ScalarPermutation::new(),
         Domain::Encryption,
         ciphertext,

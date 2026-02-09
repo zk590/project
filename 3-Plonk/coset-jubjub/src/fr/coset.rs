@@ -1,8 +1,4 @@
-
-
-
-//
-
+//! Fr 的编码/解码与辅助实现（字节转换、排序与索引支持）。
 
 use core::cmp::{Ord, Ordering, PartialOrd};
 use core::convert::TryInto;
@@ -18,25 +14,6 @@ use crate::util::sbb;
 impl zeroize::DefaultIsZeroes for Fr {}
 
 impl Fr {
-
-
-
-    ///
-
-
-
-
-
-
-    ///
-
-    ///
-
-
-    ///
-
-    ///
-
     /// ```
     pub fn hash_to_scalar(input: &[u8]) -> Self {
         let state = blake2b_simd::Params::new()
@@ -47,7 +24,7 @@ impl Fr {
 
         let bytes = state.as_bytes();
 
-        Self::from_u512([
+        Self::reduce_u512_words([
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
@@ -58,7 +35,6 @@ impl Fr {
             u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[56..64]).unwrap()),
         ])
     }
-
 
     #[inline]
     pub fn divn(&mut self, mut n: u32) {
@@ -86,34 +62,19 @@ impl Fr {
         }
     }
 
-
-
     pub fn reduce(&self) -> Self {
         Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0u64, 0u64, 0u64, 0u64,
         )
     }
 
-
     pub fn is_even(&self) -> bool {
         self.0[0] % 2 == 0
     }
 
-
-    ///
-
-    ///
-
-
     pub fn mod_2_pow_k(&self, k: u8) -> u8 {
         (self.0[0] & ((1 << k) - 1)) as u8
     }
-
-
-    ///
-
-    ///
-
 
     pub fn mods_2_pow_k(&self, w: u8) -> i8 {
         assert!(w < 32u8);
@@ -125,15 +86,6 @@ impl Fr {
             true => modulus - ((1u8 << w) as i8),
         }
     }
-
-
-
-    ///
-
-
-
-
-
 
     pub fn compute_windowed_naf(&self, width: u8) -> [i8; 256] {
         let mut reduced_scalar = self.reduce();
@@ -157,9 +109,7 @@ impl Fr {
     }
 }
 
-
 impl From<i8> for Fr {
-
     fn from(val: i8) -> Fr {
         match (val >= 0, val < 0) {
             (true, false) => Fr([val.unsigned_abs() as u64, 0u64, 0u64, 0u64]),
@@ -173,9 +123,6 @@ impl From<Fr> for BlsScalar {
     fn from(scalar: Fr) -> BlsScalar {
         let bls_scalar =
             <BlsScalar as Serializable<32>>::from_bytes(&scalar.to_bytes());
-
-
-
 
         assert!(
             bls_scalar.is_ok(),
@@ -223,9 +170,6 @@ impl Ord for Fr {
 impl Serializable<32> for Fr {
     type Error = BytesError;
 
-
-
-
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let mut scalar = Fr([0, 0, 0, 0]);
 
@@ -234,14 +178,10 @@ impl Serializable<32> for Fr {
         scalar.0[2] = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
         scalar.0[3] = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
 
-
         let (_, borrow) = sbb(scalar.0[0], MODULUS.0[0], 0);
         let (_, borrow) = sbb(scalar.0[1], MODULUS.0[1], borrow);
         let (_, borrow) = sbb(scalar.0[2], MODULUS.0[2], borrow);
         let (_, borrow) = sbb(scalar.0[3], MODULUS.0[3], borrow);
-
-
-
 
         let is_some = (borrow as u8) & 1;
 
@@ -249,27 +189,25 @@ impl Serializable<32> for Fr {
             return Err(BytesError::InvalidData);
         }
 
-
-
         scalar *= &R2;
 
         Ok(scalar)
     }
 
-
-
     fn to_bytes(&self) -> [u8; Self::SIZE] {
-
-
         let canonical_scalar = Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
 
         let mut encoded_bytes = [0; Self::SIZE];
-        encoded_bytes[0..8].copy_from_slice(&canonical_scalar.0[0].to_le_bytes());
-        encoded_bytes[8..16].copy_from_slice(&canonical_scalar.0[1].to_le_bytes());
-        encoded_bytes[16..24].copy_from_slice(&canonical_scalar.0[2].to_le_bytes());
-        encoded_bytes[24..32].copy_from_slice(&canonical_scalar.0[3].to_le_bytes());
+        encoded_bytes[0..8]
+            .copy_from_slice(&canonical_scalar.0[0].to_le_bytes());
+        encoded_bytes[8..16]
+            .copy_from_slice(&canonical_scalar.0[1].to_le_bytes());
+        encoded_bytes[16..24]
+            .copy_from_slice(&canonical_scalar.0[2].to_le_bytes());
+        encoded_bytes[24..32]
+            .copy_from_slice(&canonical_scalar.0[3].to_le_bytes());
 
         encoded_bytes
     }
@@ -380,7 +318,6 @@ mod fuzz {
     use crate::util::sbb;
 
     fn is_scalar_in_range(scalar: &Fr) -> bool {
-
         let borrow = scalar
             .0
             .iter()

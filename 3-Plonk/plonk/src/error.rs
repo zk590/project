@@ -1,94 +1,59 @@
+// 模块说明：本文件实现 PLONK 组件（src/error.rs）。
 
 
-
-//
-
-
-
-
-use coset_bytes::Error as DuskBytesError;
-
+use coset_bytes::Error as CosetBytesError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
-
-
-
     InvalidEvalDomainSize {
-
         log_size_of_group: u32,
 
         adacity: u32,
     },
 
-
-
     ProofVerificationError,
 
-
     CircuitInputsNotFound,
-
 
     UninitializedPIGenerator,
 
     InvalidPublicInputBytes,
 
-
     CircuitAlreadyPreprocessed,
-
-
 
     InvalidCircuitSize(usize, usize),
 
-
-
-
     MismatchedPolyLen,
-
-
-
 
     DegreeIsZero,
 
-
     TruncatedDegreeTooLarge,
-
 
     TruncatedDegreeIsZero,
 
-
     PolynomialDegreeTooLarge,
-
 
     PolynomialDegreeIsZero,
 
-
     PairingCheckFailure,
 
-
-
-    BytesError(DuskBytesError),
-
+    BytesError(CosetBytesError),
 
     NotEnoughBytes,
 
     PointMalformed,
 
-
     BlsScalarMalformed,
-
 
     JubJubScalarMalformed,
 
     UnsupportedWNAF2k,
 
     PublicInputNotFound {
-
         index: usize,
     },
 
     InconsistentPublicInputsLen {
-
         expected: usize,
 
         provided: usize,
@@ -169,8 +134,8 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl From<DuskBytesError> for Error {
-    fn from(bytes_err: DuskBytesError) -> Self {
+impl From<CosetBytesError> for Error {
+    fn from(bytes_err: CosetBytesError) -> Self {
         Self::BytesError(bytes_err)
     }
 }

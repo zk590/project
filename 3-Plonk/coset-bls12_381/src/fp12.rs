@@ -12,8 +12,9 @@ use rand_core::RngCore;
 #[cfg(feature = "rkyv-impl")]
 use bytecheck::CheckBytes;
 #[cfg(feature = "rkyv-impl")]
-use rkyv::{Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize};
-
+use rkyv::{
+    Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
+};
 
 #[cfg_attr(
     feature = "rkyv-impl",
@@ -150,12 +151,10 @@ impl Fp12 {
         }
     }
 
-
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
         let c1 = self.c1.frobenius_map();
-
 
         let c1 = c1
             * Fp6::from(Fp2 {
@@ -620,9 +619,6 @@ fn test_arithmetic() {
             },
         },
     };
-
-
-
 
     let a = a.square().invert().unwrap().square() + c;
     let b = b.square().invert().unwrap().square() + a;
