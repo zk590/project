@@ -2,6 +2,16 @@
 name = "merkle-plonk"
 version = "0.1.0"
 edition = "2024"
+license = "MPL-2.0"
+description = "Merkle opening to PLONK proof service library and binaries"
+repository = "https://github.com/coset-network/3-plonk"
+readme = "README.md"
+keywords = ["plonk", "merkle", "zero-knowledge", "zk-snark"]
+categories = ["cryptography"]
+
+[lib]
+name = "merkle_plonk"
+path = "src/lib.rs"
 
 [dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

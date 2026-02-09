@@ -19,7 +19,7 @@ pub struct PublicKey(elliptic_curve::PublicKey<Secp256k1>);
 pub struct SecretKey(elliptic_curve::SecretKey<Secp256k1>);
 
 // 常量定义
-const COORDINATE_SIZE: usize = 32; // 椭圆曲线域元素的字节大小
+const COORDINATE_SIZE: usize = 32; 
 const UNCOMPRESSED_PUBLIC_KEY_SIZE: usize = 1 + 2 * COORDINATE_SIZE; // 非压缩公钥大小：1字节前缀 + 32字节x坐标 + 32字节y坐标
 const NONCE_SIZE: usize = 16; // AES-GCM使用的nonce大小
 const TAG_SIZE: usize = 16; // 认证标签大小
