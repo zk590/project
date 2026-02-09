@@ -190,6 +190,13 @@ fn load_or_compile_opening_circuit(
     }
 
     // 文件不存在或容量不匹配，编译电路
+    if let Some(parent) = config.circuit_cache_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    if let Some(parent) = config.verifier_file.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+
     let circuit_label = b"opening-circuit";
     let mut rng = rand::thread_rng();
     let public_parameters =

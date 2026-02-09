@@ -1,0 +1,8 @@
+[package]
+name = "merkle-plonk-caller"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+merkle-plonk = { path = "../3-Plonk/merkle-plonk" }
+common = { path = "../1-Sender/common" }
