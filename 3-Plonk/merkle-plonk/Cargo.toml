@@ -12,6 +12,7 @@ categories = ["cryptography"]
 [lib]
 name = "merkle_plonk"
 path = "src/lib.rs"
+crate-type = ["rlib", "staticlib"]
 
 [dependencies]
 serde_json = { version = "1.0", default-features = false, features = ["alloc"] }

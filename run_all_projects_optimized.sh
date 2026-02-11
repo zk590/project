@@ -79,12 +79,26 @@ cd /opt/project/4-zkMIPS/aggregation/host && source /etc/profile && cargo run --
 
 
 
+# 构建编译
+cd /opt/project/3-Plonk && cargo build -p merkle-plonk --release
 
 
+cd /opt/project/merkle-plonk-caller && cargo run
 
 
+cd /opt/project/merkle-plonk-caller && cargo run --release --bin merkle_some_prepare -- 8 4
+
+#运行
+cd /opt/project/merkle-plonk-caller && cargo run --bin merkle_plonk_process
+
+cd /opt/project/merkle-plonk-caller && cargo run --bin plonk_verify
 
 
+cd /opt/merkle-caller-bundle/merkle-plonk-caller
+source ../.env
+cargo run --release --bin merkle_some_prepare -- 8 4 "$MERKLE_SOME_INPUT"
+cargo run --release --bin merkle_plonk_process -- "$MERKLE_SOME_INPUT"
+cargo run --release --bin plonk_verify
 
 
 

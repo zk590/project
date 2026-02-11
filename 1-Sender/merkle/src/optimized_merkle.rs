@@ -6,9 +6,7 @@ use coset_poseidon::{Domain, Hash};
 use poseidon_merkle::{Item as PoseidonItem, Opening, Tree as PoseidonTree};
 
 use rkyv::{Archive, Serialize, Deserialize};
-use common::constants::{TREE_HEIGHT, MERKLE_FILE, MERKLE_SOME_FILE, MERKLE_TREE_STATE_FILE};
-
-use std::env;
+use common::constants::{TREE_HEIGHT, MERKLE_FILE, MERKLE_TREE_STATE_FILE};
 use std::fs::File;
 use std::io::{Write, Read};
 use std::path::Path;
@@ -97,7 +95,6 @@ fn load_tree_state() -> Result<PoseidonTree::<(), { TREE_HEIGHT }>, std::io::Err
     use std::fs::File;
     use std::io::Read;
     use std::path::Path;
-    use rkyv::Deserialize;
     
     let file_path = MERKLE_TREE_STATE_FILE;
     
@@ -135,13 +132,13 @@ fn save_tree_state(tree: &PoseidonTree<(), { TREE_HEIGHT }>) -> Result<(), std::
     // 写入序列化后的字节
     file.write_all(&bytes)?;
     
-    println!("Merkle树状态已保存到文件: {}", file_path);
+    // println!("Merkle树状态已保存到文件: {}", file_path);
     
     Ok(())
 }
 
 /// 将Merkle树状态保存到文件（获取全局树锁）
-fn save_global_tree_state() -> Result<(), std::io::Error> {
+pub fn save_global_tree_state() -> Result<(), std::io::Error> {
     // 获取全局树的锁
     let tree_guard = get_global_merkle_tree().lock().unwrap();
     
@@ -240,7 +237,7 @@ fn create_leaf_info(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64) -> 
 }
 
 /// 模拟链上Merkle树生成环境
-fn simulate_chain_environment(num_leaves: u64) {
+pub fn simulate_chain_environment(num_leaves: u64) {
     println!("1. 使用全局Poseidon Merkle树模拟链上环境");
     
     // 获取全局树的锁
@@ -292,7 +289,7 @@ fn simulate_chain_environment(num_leaves: u64) {
 }
 
 /// 创建并保存Merkle树叶子节点数据（支持单个或多个叶子节点）
-fn create_and_save_leaves_data(
+pub fn create_and_save_leaves_data(
     num_leaves: u64, 
     selected_count: u64, 
     output_file: &str
@@ -302,42 +299,41 @@ fn create_and_save_leaves_data(
     
     println!("1. 使用全局Poseidon Merkle树（高度为{})", TREE_HEIGHT);
     
-    // 检查树是否为空，如果为空则初始化，否则添加新叶子节点
-    if tree_guard.root().hash == BlsScalar::zero() {
+    // 保存实际添加的叶子节点位置
+    let actual_positions: Vec<u64> = if tree_guard.root().hash == BlsScalar::zero() {
         // 初始化全局树
         let start_time = Instant::now();
-        initialize_merkle_tree(&mut tree_guard, num_leaves);
+        let positions = initialize_merkle_tree(&mut tree_guard, num_leaves);
         let end_time = Instant::now();
         let duration = end_time.duration_since(start_time);
         println!("2. 全局Merkle树已初始化，包含{}个叶子节点，耗时: {:?}", num_leaves, duration);
+        positions
     } else {
         // 添加新的叶子节点
         let start_time = Instant::now();
-        let new_positions = add_new_leaves(&mut tree_guard, num_leaves);
+        let positions = add_new_leaves(&mut tree_guard, num_leaves);
         let end_time = Instant::now();
         let duration = end_time.duration_since(start_time);
         println!("2. 已向全局Merkle树添加{}个新叶子节点，耗时: {:?}", num_leaves, duration);
-        println!("   新叶子节点位置: {:?}", new_positions);
-    }
+        println!("   新叶子节点位置: {:?}", positions);
+        positions
+    };
     
     // 获取树的根节点
     let root = tree_guard.root();
     println!("3. Merkle树根节点哈希值: {:?}", root.hash);
     
-    // 生成所有可能的位置
-    let positions: Vec<u64> = (0..num_leaves).collect();
-    
     // 确定要生成证明的叶子节点位置
     let selected_positions: Vec<u64> = if num_leaves == 1 && selected_count == 1 {
         // 单个叶子节点情况
-        vec![0]
+        vec![actual_positions[0]]
     } else {
         // 多个叶子节点情况，随机选择
         let mut rng = StdRng::seed_from_u64(0xdea1);
         if selected_count < num_leaves {
-            positions.choose_multiple(&mut rng, selected_count as usize).copied().collect()
+            actual_positions.choose_multiple(&mut rng, selected_count as usize).copied().collect()
         } else {
-            positions.clone()
+            actual_positions.clone()
         }
     };
     
@@ -349,6 +345,11 @@ fn create_and_save_leaves_data(
         .collect();
     let end_time = Instant::now();
     let duration = end_time.duration_since(start_time);
+    //打印leaves_info
+    // for leaf_info in &leaves_info {
+    //     println!("position: {:?}", leaf_info.position);
+    //     println!("leaf_hash: {:?}", leaf_info.leaf_hash);
+    // }
     println!("4. 已选择 {} 个叶子节点进行证明生成,耗时: {:?}", selected_positions.len(), duration);
     
     // 创建MultipleLeavesData实例
@@ -369,7 +370,7 @@ fn create_and_save_leaves_data(
 }
 
 /// 验证叶子节点的证明（支持单个叶子节点或从文件验证所有叶子节点）
-fn verify_leaves(
+pub fn verify_leaves(
     file_path: Option<&str>, 
     position: Option<u64>,
     leaf_hash: Option<[u8; 32]>,
@@ -453,69 +454,5 @@ fn verify_leaves(
         }
     } else {
         Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "无效的验证参数"))
-    }
-}
-
-// 打印使用说明
-fn print_usage() {
-    println!("用法:");
-    println!("  cargo run -- [参数]");
-    println!("参数:");
-    println!("  only      - 生成一个叶子节点并序列化到文件");
-    println!("  Some <n> <leaf_num>  - 生成n个叶子节点并为leaf_num个节点生成证明并序列化到文件");
-}
-
-fn main() {
-    let args: Vec<String> = env::args().collect();
-    let output_file = MERKLE_SOME_FILE;
-    
-    // 处理命令行参数
-    if args.len() >= 2 {
-        match args[1].as_str() {
-            "only" => {
-                println!("===== 生成单个叶子节点 ======");
-                if let Err(err) = create_and_save_leaves_data(1, 1, output_file) {
-                    eprintln!("创建单叶子节点数据失败: {}", err);
-                }
-            },
-            "Some" | "--Some" => {
-                if args.len() >= 4 {
-                    match (args[2].parse::<u64>(), args[3].parse::<u64>()) {
-                        (Ok(n), Ok(leaf_num)) => {
-                            println!("===== 生成 {} 个叶子节点，并为 {} 个节点生成证明 ======", n, leaf_num);
-                            if let Err(err) = create_and_save_leaves_data(n, leaf_num, output_file) {
-                                eprintln!("创建叶子节点数据失败: {}", err);
-                            }
-                        },
-                        _ => {
-                            eprintln!("错误: 'Some' 参数后需要提供两个有效的数字: n(叶子总节点数) 和 leaf_num(生成证明的叶子节点数)");
-                            print_usage();
-                        }
-                    }
-                } else {
-                    eprintln!("错误: 'Some' 参数需要指定n和leaf_num的值");
-                    print_usage();
-                }
-            },
-            _ => {
-                eprintln!("错误: 无效的参数");
-                print_usage();
-            }
-        }
-    } else {
-        // 默认行为：模拟链上环境并测试多叶子节点功能
-        println!("===== 模拟链上Merkle树生成 =====");
-        simulate_chain_environment(4);
-        
-        println!("\n===== 测试多叶子节点功能 =====");
-        match create_and_save_leaves_data(8, 4, output_file) {
-            Ok(_) => {
-                println!("\n===== 验证多叶子节点数据 =====");
-                if let Err(err) = verify_leaves(Some(output_file), None, None, None, None) {
-                    eprintln!("验证失败: {}", err);
-                }
-            },
-            Err(err) => eprintln!("创建多叶子节点数据失败: {}", err)
-        }
     }
 }

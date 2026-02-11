@@ -9,8 +9,10 @@ use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rkyv::{Archive, Deserialize, Serialize};
 use std::fs::File;
+use std::ffi::CStr;
 use std::io::{Error as IoError, ErrorKind};
 use std::io::{Read, Write};
+use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -238,7 +240,6 @@ pub fn process_batch_proofs_with_config(
     let bytes = read_file_bytes_checked(&config.merkle_input_file)?;
     let all_leaves_data =
         unsafe { rkyv::archived_root::<MultipleLeavesData>(&bytes) };
-    println!("MultipleLeavesData 加载成功");
     // 解析根哈希
     let root_hash =
         match BlsScalar::from_bytes(&all_leaves_data.root_hash).into_option() {
@@ -250,7 +251,6 @@ pub fn process_batch_proofs_with_config(
                 )));
             }
         };
-    println!("根哈希加载成功");
     let circuit_load_start = Instant::now();
     // 加载或编译电路
     let (prover, verifier) = load_or_compile_opening_circuit(config)?;
@@ -258,26 +258,24 @@ pub fn process_batch_proofs_with_config(
     let circuit_load_duration =
         circuit_load_end.duration_since(circuit_load_start);
     println!("加载电路耗时: {:?}", circuit_load_duration);
-    println!(
-        "Plonk Proof verifier = {}",
-        hex::encode(verifier.to_bytes())
-    );
+    // println!(
+    //     "Plonk Proof verifier = {}",
+    //     hex::encode(verifier.to_bytes())
+    // );
 
     println!(
         "1. 收到{} 个叶子节点数据",
         all_leaves_data.leaves_info.len()
     );
-    println!(
-        "Plonk Public_input.root = {}",
-        hex::encode(all_leaves_data.root_hash)
-    );
+    // println!(
+    //     "Plonk Public_input.root = {}",
+    //     hex::encode(all_leaves_data.root_hash)
+    // );
     // 处理所有叶子节点
     for (leaf_index, leaf_info) in
         all_leaves_data.leaves_info.iter().enumerate()
     {
-        println!("\n处理叶子节点 ");
-        // println!("\n处理叶子节点 {} （位置: {}）", leaf_index + 1,
-        // leaf_info.position);
+        println!("\n处理叶子节点 {} （位置: {}）", leaf_index + 1,leaf_info.position);
         if leaf_index == 0 {
             println!(
                 "Plonk Public_input.leaf = {}",
@@ -332,7 +330,7 @@ pub fn process_batch_proofs_with_config(
         let (proof, public_inputs) = prover.prove(&mut rng, &circuit)?;
         // println!("  生成零知识证明成功");
         if let Some(first_start) = first_circuit_start {
-            println!("Plonk proof = {}", hex::encode(proof.to_bytes()));
+            // println!("Plonk proof = {}", hex::encode(proof.to_bytes()));
             let first_end = Instant::now();
             let first_proof_duration = first_end.duration_since(first_start);
             println!("生成Plonk证明耗时: {:?}", first_proof_duration);
@@ -342,7 +340,7 @@ pub fn process_batch_proofs_with_config(
         verifier.verify(&proof, &public_inputs).map_err(|error| {
             IoError::new(ErrorKind::Other, format!("验证证明失败: {:?}", error))
         })?;
-        println!("  验证零知识证明成功");
+        println!("  本地验证零知识证明成功");
         // 将Proof转换为字节数组
         let proof_bytes = proof.to_bytes();
 
@@ -385,13 +383,13 @@ pub fn process_batch_proofs_with_config(
         public_inputs_file.write_all(&public_inputs_bytes_serialized)?;
 
         println!("  成功保存证明数据");
-        println!("   ├── 证明文件: {}", proof_file_path.display());
-        println!("   ├── 证明数据大小: {} 字节", proof_bytes_serialized.len());
-        println!("   ├── 公开输入文件: {}", public_inputs_file_path.display());
-        println!(
-            "   └── 公开输入数据大小: {} 字节",
-            public_inputs_bytes_serialized.len()
-        );
+        // println!("   ├── 证明文件: {}", proof_file_path.display());
+        // println!("   ├── 证明数据大小: {} 字节", proof_bytes_serialized.len());
+        // println!("   ├── 公开输入文件: {}", public_inputs_file_path.display());
+        // println!(
+        //     "   └── 公开输入数据大小: {} 字节",
+        //     public_inputs_bytes_serialized.len()
+        // );
     }
 
     // println!("\n===== 批量处理完成 ======");
@@ -427,5 +425,75 @@ pub fn run_batch_cli_with_config(config: &BatchProofConfig) {
             println!("\n错误：批量验证和零知识证明生成失败");
             println!("  ├── 详细信息: {}", error);
         }
+    }
+}
+
+fn parse_c_string_path(raw: *const c_char) -> Result<PathBuf, ()> {
+    if raw.is_null() {
+        return Err(());
+    }
+    // SAFETY: 调用方需保证传入的是以 NUL 结尾的有效 C 字符串。
+    let cstr = unsafe { CStr::from_ptr(raw) };
+    let utf8 = cstr.to_str().map_err(|_| ())?;
+    Ok(PathBuf::from(utf8))
+}
+
+/// C ABI: 使用默认配置执行批量证明流程。
+///
+/// 返回值：
+/// - `0` 成功
+/// - `1` 失败
+#[unsafe(no_mangle)]
+pub extern "C" fn merkle_plonk_process_batch_default() -> i32 {
+    match process_batch_proofs() {
+        Ok(()) => 0,
+        Err(_) => 1,
+    }
+}
+
+/// C ABI: 通过调用方传入路径与容量配置执行批量证明流程。
+///
+/// 返回值：
+/// - `0` 成功
+/// - `1` 业务处理失败
+/// - `2` 参数无效（空指针或非 UTF-8）
+#[unsafe(no_mangle)]
+pub extern "C" fn merkle_plonk_process_batch_with_paths(
+    merkle_input_file: *const c_char,
+    verifier_file: *const c_char,
+    circuit_cache_file: *const c_char,
+    output_dir: *const c_char,
+    capacity: usize,
+) -> i32 {
+    let merkle_input_file = match parse_c_string_path(merkle_input_file) {
+        Ok(v) => v,
+        Err(_) => return 2,
+    };
+    let verifier_file = match parse_c_string_path(verifier_file) {
+        Ok(v) => v,
+        Err(_) => return 2,
+    };
+    let circuit_cache_file = match parse_c_string_path(circuit_cache_file) {
+        Ok(v) => v,
+        Err(_) => return 2,
+    };
+    let output_dir = match parse_c_string_path(output_dir) {
+        Ok(v) => v,
+        Err(_) => return 2,
+    };
+
+    let config = BatchProofConfig {
+        merkle_input_file,
+        verifier_file,
+        circuit_cache_file,
+        output_dir,
+        proof_file_prefix: "plonk_proof_".to_string(),
+        public_inputs_file_prefix: "plonk_publicinputs_".to_string(),
+        capacity,
+    };
+
+    match process_batch_proofs_with_config(&config) {
+        Ok(()) => 0,
+        Err(_) => 1,
     }
 }
