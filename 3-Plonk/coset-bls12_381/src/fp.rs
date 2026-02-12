@@ -173,85 +173,76 @@ impl Fp {
         R
     }
 
-    /// 常时间判断是否为 0。
+    /// 常时间判断当前 Fp 元素是否为零。
+    /// 实现通过与 `Fp::zero()` 的常量时间比较完成。
+    /// 该接口适用于密码学场景中的安全分支前置判断。
     pub fn is_zero(&self) -> Choice {
         self.ct_eq(&Fp::zero())
     }
 
-    /// 从 48 字节大端编码反序列化，并校验是否在模域范围内。
+    /// 从 48 字节大端编码反序列化 Fp 元素。
+    /// 过程会验证输入是否小于模数，拒绝非规范表示。
+    /// 反序列化成功后会转换到 Montgomery 表示供内部运算使用。
     pub fn from_bytes(bytes: &[u8; 48]) -> CtOption<Fp> {
-        let mut tmp = Fp([0, 0, 0, 0, 0, 0]);
+        let mut limbs = [0u64; 6];
+        for (index, chunk) in bytes.chunks_exact(8).enumerate() {
+            // 输入是大端块序，内部 limb 采用小端索引，因此需要反向映射。
+            limbs[5 - index] =
+                u64::from_be_bytes(<[u8; 8]>::try_from(chunk).unwrap());
+        }
 
-        tmp.0[5] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap());
-        tmp.0[4] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap());
-        tmp.0[3] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap());
-        tmp.0[2] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap());
-        tmp.0[1] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap());
-        tmp.0[0] =
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap());
-
-        let (_, borrow) = sbb(tmp.0[0], MODULUS[0], 0);
-        let (_, borrow) = sbb(tmp.0[1], MODULUS[1], borrow);
-        let (_, borrow) = sbb(tmp.0[2], MODULUS[2], borrow);
-        let (_, borrow) = sbb(tmp.0[3], MODULUS[3], borrow);
-        let (_, borrow) = sbb(tmp.0[4], MODULUS[4], borrow);
-        let (_, borrow) = sbb(tmp.0[5], MODULUS[5], borrow);
+        let mut candidate = Fp(limbs);
+        let (_, borrow) = sbb(candidate.0[0], MODULUS[0], 0);
+        let (_, borrow) = sbb(candidate.0[1], MODULUS[1], borrow);
+        let (_, borrow) = sbb(candidate.0[2], MODULUS[2], borrow);
+        let (_, borrow) = sbb(candidate.0[3], MODULUS[3], borrow);
+        let (_, borrow) = sbb(candidate.0[4], MODULUS[4], borrow);
+        let (_, borrow) = sbb(candidate.0[5], MODULUS[5], borrow);
 
         let is_some = (borrow as u8) & 1;
+        candidate *= &R2;
 
-        tmp *= &R2;
-
-        CtOption::new(tmp, Choice::from(is_some))
+        CtOption::new(candidate, Choice::from(is_some))
     }
 
-    /// 将域元素序列化为 48 字节大端编码。
+    /// 将 Fp 元素序列化为 48 字节大端编码。
+    /// 编码前会从 Montgomery 域还原到标准表示。
+    /// 该格式是跨实现互操作时的常用外部表示。
     pub fn to_bytes(self) -> [u8; 48] {
-        let tmp = Fp::montgomery_reduce(
+        let canonical = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5],
             0, 0, 0, 0, 0, 0,
         );
 
-        let mut res = [0; 48];
-        res[0..8].copy_from_slice(&tmp.0[5].to_be_bytes());
-        res[8..16].copy_from_slice(&tmp.0[4].to_be_bytes());
-        res[16..24].copy_from_slice(&tmp.0[3].to_be_bytes());
-        res[24..32].copy_from_slice(&tmp.0[2].to_be_bytes());
-        res[32..40].copy_from_slice(&tmp.0[1].to_be_bytes());
-        res[40..48].copy_from_slice(&tmp.0[0].to_be_bytes());
+        let mut encoded = [0u8; 48];
+        for (chunk, limb) in encoded
+            .chunks_exact_mut(8)
+            .zip(canonical.0.iter().rev().copied())
+        {
+            chunk.copy_from_slice(&limb.to_be_bytes());
+        }
 
-        res
+        encoded
     }
 
+    /// 采样一个近似均匀的 Fp 随机元素。
+    /// 先生成 768 位随机输入，再通过宽约简映射到域内。
+    /// 该方式避免拒绝采样循环，接口行为更稳定可预测。
     pub(crate) fn random(mut rng: impl RngCore) -> Fp {
         let mut bytes = [0u8; 96];
         rng.fill_bytes(&mut bytes);
 
-        Fp::reduce_u768_words([
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[48..56]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[56..64]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[64..72]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[72..80]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[80..88]).unwrap()),
-            u64::from_be_bytes(<[u8; 8]>::try_from(&bytes[88..96]).unwrap()),
-        ])
+        let mut wide_limbs = [0u64; 12];
+        for (limb, chunk) in wide_limbs.iter_mut().zip(bytes.chunks_exact(8)) {
+            *limb = u64::from_be_bytes(<[u8; 8]>::try_from(chunk).unwrap());
+        }
+        Fp::reduce_u768_words(wide_limbs)
     }
 
+    /// 将 768 位输入（12 个 limb）约简到 Fp。
+    /// 通过拆分高低 384 位并结合 `R2/R3` 完成 Montgomery 域映射。
+    /// 该实现复用现有乘法路径，避免独立实现大整数除法。
     fn reduce_u768_words(limbs: [u64; 12]) -> Fp {
-        //
-
-        //
-
         let d1 =
             Fp([limbs[11], limbs[10], limbs[9], limbs[8], limbs[7], limbs[6]]);
         let d0 =
@@ -260,7 +251,9 @@ impl Fp {
         d0 * R2 + d1 * R3
     }
 
-    /// 判断当前元素是否位于字典序较大半区，用于点压缩符号位。
+    /// 判断当前元素是否位于字典序较大半区。
+    /// 该判定常用于点压缩时决定符号位取值。
+    /// 实现基于规范表示与 `(p-1)/2` 的比较关系。
     pub fn lexicographically_largest(&self) -> Choice {
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5],
@@ -277,12 +270,16 @@ impl Fp {
         !Choice::from((borrow as u8) & 1)
     }
 
-    /// 从原始 limbs 直接构造元素，不执行范围检查。
+    /// 从原始 limb 直接构造域元素，不做范围与规范化检查。
+    /// 该接口通常用于内部常量定义或受控路径。
+    /// 外部反序列化应优先走 `from_bytes` 进行合法性校验。
     pub const fn from_raw_unchecked(v: [u64; 6]) -> Fp {
         Fp(v)
     }
 
-    /// 变长时间幂运算，适用于公开指数。
+    /// 变长时间幂运算，适用于公开指数场景。
+    /// 该实现包含数据相关分支，不适合秘密指数。
+    /// 在公开参数下它通常更直接，也更容易审阅。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -297,8 +294,10 @@ impl Fp {
         res
     }
 
+    /// 计算当前元素的平方根（若存在）。
+    /// 算法使用固定指数幂路径，基于该素域的结构参数构造。
+    /// 当元素为非二次剩余时返回 `CtOption::none()`。
     #[inline]
-    /// 计算平方根；非二次剩余时返回空值。
     pub fn sqrt(&self) -> CtOption<Self> {
         let sqrt = self.pow_vartime(&[
             0xee7f_bfff_ffff_eaab,
@@ -312,9 +311,10 @@ impl Fp {
         CtOption::new(sqrt, sqrt.square().ct_eq(self))
     }
 
+    /// 计算当前元素的乘法逆元。
+    /// 本实现基于费马小定理的指数幂路径，保持实现简洁稳定。
+    /// 输入为零时无逆元，返回 `CtOption::none()`。
     #[inline]
-
-    /// 计算乘法逆元；0 元素返回空值。
     pub fn invert(&self) -> CtOption<Self> {
         let t = self.pow_vartime(&[
             0xb9fe_ffff_ffff_aaa9,
@@ -328,6 +328,9 @@ impl Fp {
         CtOption::new(t, !self.is_zero())
     }
 
+    /// 条件减去一次模数，使结果落回标准区间 `[0, p)`。
+    /// 若当前值已小于模数，则通过掩码保留原值。
+    /// 该实现无数据相关分支，适合密码学常时语境。
     #[inline]
     const fn subtract_p(&self) -> Fp {
         let (r0, borrow) = sbb(self.0[0], MODULUS[0], 0);
@@ -347,6 +350,9 @@ impl Fp {
         Fp([r0, r1, r2, r3, r4, r5])
     }
 
+    /// 模 p 加法：先做 limb 级加法，再执行条件归约。
+    /// 返回值始终保持在标准表示区间内。
+    /// 该函数是域运算的基础构件，被上层算子广泛复用。
     #[inline]
     pub const fn add(&self, rhs: &Fp) -> Fp {
         let (d0, carry) = adc(self.0[0], rhs.0[0], 0);
@@ -359,6 +365,9 @@ impl Fp {
         (&Fp([d0, d1, d2, d3, d4, d5])).subtract_p()
     }
 
+    /// 模 p 取负（加法逆元）运算。
+    /// 通过 `p - a` 计算，并用掩码处理 `a == 0` 的边界。
+    /// 整体过程保持常时间特征，避免分支泄露。
     #[inline]
     pub const fn neg(&self) -> Fp {
         let (d0, borrow) = sbb(MODULUS[0], self.0[0], 0);
@@ -387,20 +396,22 @@ impl Fp {
         ])
     }
 
+    /// 模 p 减法，内部复用 `neg + add` 路径。
+    /// 这种写法可复用已有归约逻辑并减少重复代码。
+    /// 返回结果保持在规范区间 `[0, p)`。
     #[inline]
     pub const fn sub(&self, rhs: &Fp) -> Fp {
         (&rhs.neg()).add(self)
     }
 
-    ///
-
+    /// 计算多对域元素乘积求和：`sum_i a[i] * b[i]`。
+    /// 该实现把乘加和 Montgomery 约简融合，减少中间对象开销。
+    /// 常用于 MSM、配对中间步骤等高吞吐场景。
     #[inline]
     pub(crate) fn sum_of_products<const T: usize>(
         a: [Fp; T],
         b: [Fp; T],
     ) -> Fp {
-        //
-
         let (u0, u1, u2, u3, u4, u5) =
             (0..6).fold((0, 0, 0, 0, 0, 0), |(u0, u1, u2, u3, u4, u5), j| {
                 let (t0, t1, t2, t3, t4, t5, t6) = (0..T).fold(
@@ -433,6 +444,9 @@ impl Fp {
         (&Fp([u0, u1, u2, u3, u4, u5])).subtract_p()
     }
 
+    /// CIOS Montgomery 约简核心过程。
+    /// 输入为 12-limb 中间积，输出为 6-limb 域元素表示。
+    /// 该函数是 `mul/square` 与批量运算共享的关键基础设施。
     #[inline(always)]
     pub(crate) const fn montgomery_reduce(
         t0: u64,
@@ -505,6 +519,9 @@ impl Fp {
         (&Fp([r6, r7, r8, r9, r10, r11])).subtract_p()
     }
 
+    /// 模 p 乘法：先计算 6x6 limb 乘积，再做 Montgomery 约简。
+    /// 中间值宽度为 768 位，最终映射回规范域表示。
+    /// 该实现是性能敏感路径，保持展开写法以利编译器优化。
     #[inline]
     pub const fn mul(&self, rhs: &Fp) -> Fp {
         let (t0, carry) = mac(0, self.0[0], rhs.0[0], 0);
@@ -554,6 +571,9 @@ impl Fp {
         )
     }
 
+    /// 模 p 平方运算，针对对称项做了专门展开优化。
+    /// 先构造中间宽积，再复用 Montgomery 约简得到结果。
+    /// 在许多算法中平方频率高于乘法，因此单独优化。
     #[inline]
     pub const fn square(&self) -> Self {
         let (t1, carry) = mac(0, self.0[0], self.0[1], 0);

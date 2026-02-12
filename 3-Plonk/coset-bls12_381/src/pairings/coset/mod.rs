@@ -1,4 +1,6 @@
-//
+//! 配对预处理结构 `G2Prepared` 的扩展编解码支持。
+//! 提供原始字节快照接口与 serde 结构化序列化接口。
+//! 主要服务于受信缓存、跨进程序列化和测试回归场景。
 
 use crate::fp::Fp;
 use crate::fp2::Fp2;
@@ -8,8 +10,10 @@ use super::G2Prepared;
 use alloc::vec::Vec;
 
 impl G2Prepared {
-    ///
-
+    /// 将 `G2Prepared` 的 Miller 系数按内部原始布局导出为字节序列。
+    /// 每个系数三元组 `(a,b,c)` 展开为多个 `Fp` limb，并统一按 little-endian
+    /// 写出。 该格式主要用于受信环境下的快速缓存与回放，
+    /// 不等同于标准外部协议编码。
     pub fn to_raw_bytes(&self) -> Vec<u8> {
         let mut bytes = alloc::vec![0u8; 288 * self.coeffs.len()];
         let mut chunks = bytes.chunks_exact_mut(8);
@@ -32,8 +36,9 @@ impl G2Prepared {
         bytes
     }
 
-    ///
-
+    /// 从原始字节切片恢复 `G2Prepared`，不做数学合法性与结构一致性检查。
+    /// 调用者需保证字节长度与字段布局正确，否则结果可能是无效内部状态。
+    /// 该接口被标记为 `unsafe`，用于高性能场景下的“已验证输入”快速反序列化。
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
         let coeffs = bytes
             .chunks_exact(288)
@@ -89,6 +94,9 @@ mod serde_support {
     use crate::coset::choice::Choice;
 
     impl Serialize for G2Prepared {
+        /// 将 `G2Prepared` 序列化为结构化对象 `{ infinity, coeffs }`。
+        /// 这种字段化表示可读性更好，也便于不同语言实现按键名解码。
+        /// 其中 `infinity` 采用基础整数表示，避免常量时间类型跨边界歧义。
         fn serialize<S: Serializer>(
             &self,
             serializer: S,
@@ -103,6 +111,9 @@ mod serde_support {
     }
 
     impl<'de> Deserialize<'de> for G2Prepared {
+        /// 从结构化对象反序列化 `G2Prepared`。
+        /// 实现通过自定义 Visitor 精确控制字段去重、缺失与未知字段错误语义。
+        /// 该策略可提升输入鲁棒性，并保证反序列化错误信息可诊断。
         fn deserialize<D: Deserializer<'de>>(
             deserializer: D,
         ) -> Result<Self, D::Error> {
@@ -113,6 +124,9 @@ mod serde_support {
             impl<'de> Visitor<'de> for G2PreparedVisitor {
                 type Value = G2Prepared;
 
+                /// 声明该 Visitor 期望的输入结构描述。
+                /// serde 在报错时会引用该描述，帮助调用者快速定位格式问题。
+                /// 对复杂结构类型，清晰的 expecting 文本能显著改善可维护性。
                 fn expecting(
                     &self,
                     formatter: &mut ::core::fmt::Formatter,
@@ -121,6 +135,9 @@ mod serde_support {
                         .write_str("a struct a with fields infinity and coeffs")
                 }
 
+                /// 逐字段解析 map 输入并构造 `G2Prepared`。
+                /// 该过程显式处理重复字段、未知字段、缺失字段三类常见输入异常。
+                /// 解析完成后再统一构造目标对象，保证状态完整性与错误可追踪性。
                 fn visit_map<A: MapAccess<'de>>(
                     self,
                     mut map: A,
@@ -182,6 +199,9 @@ mod serde_support {
         use crate::G2Affine;
 
         #[test]
+        /// 验证 `G2Prepared` 的 serde 往返一致性。
+        /// 使用固定 JSON 向量可同时验证结构格式和字段内容的稳定性。
+        /// 对配对预处理缓存而言，稳定序列化是跨版本兼容的重要保障。
         fn serde_g2_prepared() -> Result<(), Box<dyn std::error::Error>> {
             let g2_prepared = G2Prepared::from(G2Affine::generator());
             let ser = test_utils::assert_canonical_json(
@@ -201,6 +221,9 @@ mod serde_support {
 }
 
 #[test]
+/// 验证 `G2Prepared` 原始字节编解码（unchecked）在受信输入下的可逆性。
+/// 该测试比较的是系数字段内容，确保内部布局写回后不发生错位。
+/// 其目标是守住缓存快照路径的二进制稳定性，而非验证数学合法性。
 fn g2_prepared_bytes_unchecked() {
     use crate::G2Affine;
 

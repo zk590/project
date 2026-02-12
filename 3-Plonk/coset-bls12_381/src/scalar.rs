@@ -186,7 +186,9 @@ const TWO_INV: Scalar = Scalar([
 
 pub const TWO_ADACITY: u32 = 32;
 
-///
+/// 2-adicity 阶对应的本原单位根。
+/// 该常量用于 FFT/NTT 场景中构造长度为 `2^S` 的评价域。
+/// 与 `TWO_ADACITY`、`ROOT_OF_UNITY_INV` 配套使用。
 
 pub const ROOT_OF_UNITY: Scalar = Scalar([
     0xb9b5_8d8c_5f0e_466a,
@@ -238,75 +240,77 @@ impl Scalar {
         self.add(self)
     }
 
-    /// 从 32 字节小端编码反序列化标量，并检查是否小于模数。
+    /// 从 32 字节小端编码反序列化标量。
+    /// 过程会先解析 limb，再检查输入是否严格小于模数。
+    /// 成功后会转换到 Montgomery 表示以供内部运算使用。
     pub fn from_bytes(bytes: &[u8; 32]) -> CtOption<Scalar> {
-        let mut tmp = Scalar([0, 0, 0, 0]);
+        let mut limbs = [0u64; 4];
+        for (limb, chunk) in limbs.iter_mut().zip(bytes.chunks_exact(8)) {
+            *limb = u64::from_le_bytes(<[u8; 8]>::try_from(chunk).unwrap());
+        }
 
-        tmp.0[0] =
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap());
-        tmp.0[1] =
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap());
-        tmp.0[2] =
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap());
-        tmp.0[3] =
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap());
-
-        let (_, borrow) = sbb(tmp.0[0], MODULUS.0[0], 0);
-        let (_, borrow) = sbb(tmp.0[1], MODULUS.0[1], borrow);
-        let (_, borrow) = sbb(tmp.0[2], MODULUS.0[2], borrow);
-        let (_, borrow) = sbb(tmp.0[3], MODULUS.0[3], borrow);
+        let mut candidate = Scalar(limbs);
+        let (_, borrow) = sbb(candidate.0[0], MODULUS.0[0], 0);
+        let (_, borrow) = sbb(candidate.0[1], MODULUS.0[1], borrow);
+        let (_, borrow) = sbb(candidate.0[2], MODULUS.0[2], borrow);
+        let (_, borrow) = sbb(candidate.0[3], MODULUS.0[3], borrow);
 
         let is_some = (borrow as u8) & 1;
+        candidate *= &R2;
 
-        tmp *= &R2;
-
-        CtOption::new(tmp, Choice::from(is_some))
+        CtOption::new(candidate, Choice::from(is_some))
     }
 
     /// 将标量序列化为 32 字节小端编码。
+    /// 编码前会执行 Montgomery 归约，得到规范表示。
+    /// 该格式适用于网络传输、持久化与跨语言协议对接。
     pub fn to_bytes(&self) -> [u8; 32] {
-        let tmp = Scalar::montgomery_reduce(
+        let canonical_scalar = Scalar::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
 
-        let mut res = [0; 32];
-        res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
-        res[8..16].copy_from_slice(&tmp.0[1].to_le_bytes());
-        res[16..24].copy_from_slice(&tmp.0[2].to_le_bytes());
-        res[24..32].copy_from_slice(&tmp.0[3].to_le_bytes());
+        let mut encoded = [0u8; 32];
+        for (chunk, limb) in encoded
+            .chunks_exact_mut(8)
+            .zip(canonical_scalar.0.iter().copied())
+        {
+            chunk.copy_from_slice(&limb.to_le_bytes());
+        }
 
-        res
+        encoded
     }
 
-    /// 从 64 字节宽输入构造标量，内部会执行模约简。
+    /// 从 64 字节宽输入构造标量。
+    /// 该接口适配哈希输出等“超模长输入”场景。
+    /// 内部通过 512 位约简映射回标量域。
     pub fn from_bytes_wide(bytes: &[u8; 64]) -> Scalar {
-        Scalar::reduce_u512_words([
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[48..56]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[56..64]).unwrap()),
-        ])
+        let mut wide_limbs = [0u64; 8];
+        for (limb, chunk) in wide_limbs.iter_mut().zip(bytes.chunks_exact(8)) {
+            *limb = u64::from_le_bytes(<[u8; 8]>::try_from(chunk).unwrap());
+        }
+        Scalar::reduce_u512_words(wide_limbs)
     }
 
+    /// 将 512 位整数（8 个 limb）约简到标量域。
+    /// 思路是把高低 256 位拆分后映射到 Montgomery 域，再线性组合。
+    /// 该写法避免手写超长除法流程，且与域内乘法路径可复用。
     fn reduce_u512_words(limbs: [u64; 8]) -> Scalar {
-        // 将 512 位输入拆成高低两个 256 位块，在 Montgomery 域中用 R^2/R^3 合并，
-        // 等价于一次完整模约简但实现更紧凑。
-
         let d0 = Scalar([limbs[0], limbs[1], limbs[2], limbs[3]]);
         let d1 = Scalar([limbs[4], limbs[5], limbs[6], limbs[7]]);
 
         d0 * R2 + d1 * R3
     }
 
-    /// 将普通整数表示转换为 Montgomery 域元素。
+    /// 将常规整数 limb 表示转换到 Montgomery 表示。
+    /// 输入 `val` 被视作标准域元素，再乘以 `R^2` 完成域内嵌入。
+    /// 返回值可直接参与本文件中的 Montgomery 乘法流程。
     pub const fn from_raw(val: [u64; 4]) -> Self {
         (&Scalar(val)).mul(&R2)
     }
 
+    /// 计算当前标量的平方（Montgomery 域内）。
+    /// 实现采用展开后的 limb 级乘法，先构造 512 位中间结果。
+    /// 最后通过 `montgomery_reduce` 归约回 255 位素数域。
     #[inline]
     pub const fn square(&self) -> Scalar {
         let (r1, carry) = mac(0, self.0[0], self.0[1], 0);
@@ -339,6 +343,8 @@ impl Scalar {
     }
 
     /// 使用固定流程的平方-乘算法做幂运算（常时间路径）。
+    /// 该实现避免数据相关分支，适用于秘密指数。
+    /// 在密码学协议中常用于逆元或固定幂构造。
     pub fn pow(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -352,9 +358,13 @@ impl Scalar {
         res
     }
 
-    ///
+    /// 与 `pow` 相比，此函数放弃常时间约束以换取更直接实现。
+    /// 适合公开指数与离线预计算等非敏感场景。
+    /// 若指数含秘密信息，请优先使用常时间版本 `pow`。
 
     /// 变长时间幂运算，适合公开指数场景。
+    /// 该实现包含数据相关分支，因此不应用于秘密指数。
+    /// 当指数公开可见时，它通常比常时路径更直接易读。
     pub fn pow_vartime(&self, by: &[u64; 4]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {
@@ -369,7 +379,9 @@ impl Scalar {
         res
     }
 
-    /// 求乘法逆元；0 无逆元时返回 None。
+    /// 求乘法逆元；0 无逆元时返回 `None`。
+    /// 本函数先处理常见边界值，再委托常时间实现。
+    /// 用 `Option` 暴露语义，便于上层显式处理零值输入。
     pub fn invert(&self) -> Option<Self> {
         if *self == Scalar::zero() {
             return None;
@@ -381,6 +393,8 @@ impl Scalar {
     }
 
     /// 常时间逆元计算，避免分支泄露。
+    /// 实现采用预推导加法链计算 `a^(p-2)`。
+    /// 该路径适合秘密数据场景下的安全求逆。
     pub fn invert_ct(&self) -> CtOption<Self> {
         #[inline(always)]
         fn square_assign_multi(n: &mut Scalar, num_times: usize) {
@@ -577,6 +591,9 @@ impl Scalar {
         (&Scalar([d0, d1, d2, d3])).sub(&MODULUS)
     }
 
+    /// 计算模 p 的加法逆元（即 `-a mod p`）。
+    /// 若输入为零，结果仍为零，借助掩码避免分支。
+    /// 该实现保持常时间行为，适合密码学上下文调用。
     #[inline]
     pub const fn neg(&self) -> Self {
         let (d0, borrow) = sbb(MODULUS.0[0], self.0[0], 0);
@@ -608,6 +625,9 @@ impl Field for Scalar {
     const ZERO: Self = Self::zero();
     const ONE: Self = Self::one();
 
+    /// 生成一个均匀随机标量。
+    /// 先采样 512 位随机字节，再用宽输入约简到模数范围内。
+    /// 该策略避免拒绝采样循环，接口实现更稳定。
     fn random(mut rng: impl RngCore) -> Self {
         let mut buf = [0; 64];
         rng.fill_bytes(&mut buf);
@@ -626,10 +646,16 @@ impl Field for Scalar {
         self.invert_ct()
     }
 
+    /// 计算 `num / div` 的平方根比值辅助函数。
+    /// 该实现委托给 ff 提供的通用算法，保持与生态接口一致。
+    /// 返回值中的 `Choice` 指示结果是否为二次剩余。
     fn sqrt_ratio(num: &Self, div: &Self) -> (Choice, Self) {
         ff::helpers::sqrt_ratio_generic(num, div)
     }
 
+    /// 计算当前元素的平方根（若存在）。
+    /// 采用 Tonelli-Shanks 方案，并使用该域特定参数常量。
+    /// 不可开方时返回 `CtOption::none()`。
     fn sqrt(&self) -> CtOption<Self> {
         ff::helpers::sqrt_tonelli_shanks(
             self,
@@ -642,6 +668,9 @@ impl Field for Scalar {
         )
     }
 
+    /// 变长时间零值判断，适用于非敏感路径。
+    /// 该接口直接比较内部 limb，不提供常时间保证。
+    /// 若输入含秘密信息，应优先使用常时比较接口。
     fn is_zero_vartime(&self) -> bool {
         self.0 == Self::zero().0
     }
@@ -650,14 +679,23 @@ impl Field for Scalar {
 impl PrimeField for Scalar {
     type Repr = [u8; 32];
 
+    /// 从规范字节表示解码标量。
+    /// 该入口会验证输入是否小于模数，避免非法表示。
+    /// 返回 `CtOption` 以保持常时间风格错误处理。
     fn from_repr(r: Self::Repr) -> CtOption<Self> {
         Self::from_bytes(&r)
     }
 
+    /// 将标量编码为规范字节表示。
+    /// 输出采用小端格式，便于与常见 Rust 序列化习惯对齐。
+    /// 编码前会从 Montgomery 域还原到标准表示。
     fn to_repr(&self) -> Self::Repr {
         self.to_bytes()
     }
 
+    /// 返回当前标量最低位奇偶性。
+    /// 实现通过字节表示最低 bit 判断，语义清晰稳定。
+    /// 该接口常用于序列化压缩和符号选择逻辑。
     fn is_odd(&self) -> Choice {
         Choice::from(self.to_bytes()[0] & 1)
     }

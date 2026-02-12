@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/lib.rs）。
-
-//
-
 #![allow(clippy::suspicious_arithmetic_impl)]
 #![allow(clippy::suspicious_op_assign_impl)]
 #![allow(clippy::many_single_char_names)]
@@ -11,6 +7,9 @@
 #![allow(missing_docs)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+// `plonk` 库根模块。
+// 该文件负责组装编译器、约束系统、证明系统与承诺方案等子模块，
+// 并按特性开关控制 `alloc/std/debug/rkyv` 相关能力导出。
 cfg_if::cfg_if!(
 if #[cfg(feature = "alloc")] {
 

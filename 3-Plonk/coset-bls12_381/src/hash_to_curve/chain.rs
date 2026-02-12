@@ -11,7 +11,11 @@ macro_rules! square {
 }
 
 #[allow(clippy::cognitive_complexity)]
-
+/// 在 Fp 上计算固定指数链 `((p - 3) / 4)` 所需的幂次组合。
+/// 该函数是 hash-to-curve
+/// 映射中平方根相关步骤的优化子程序，避免通用幂运算开销。
+/// 实现使用手工展开的 square-and-mul addition
+/// chain，以最少乘法次数达成固定指数目标。
 pub fn chain_pm3div4(var0: &Fp) -> Fp {
     let mut var1 = var0.square();
 
@@ -316,7 +320,10 @@ pub fn chain_pm3div4(var0: &Fp) -> Fp {
 }
 
 #[allow(clippy::cognitive_complexity)]
-
+/// 在 Fp2 上计算固定指数链 `((p^2 - 9) / 16)` 对应的幂运算流程。
+/// 该链用于 G2 SWU 映射中的平方根候选构造，是协议正确性与性能的关键路径之一。
+/// 与 Fp 版本相同，这里采用预计算加法链以替代通用指数算法，
+/// 降低总约束与乘法成本。
 pub fn chain_p2m9div16(var0: &Fp2) -> Fp2 {
     let mut var1 = var0.square();
 

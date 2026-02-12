@@ -5,6 +5,9 @@ use crate::scalar::Scalar;
 impl HashToField for Scalar {
     type InputLength = U48;
 
+    /// 将 48 字节 OKM 映射为标量域元素。
+    /// 实现通过左侧补零扩展到 64 字节，再按 `from_bytes_wide` 执行宽字节约简。
+    /// 这种“宽输入约简”可降低偏差，符合哈希到标量的常见安全实践。
     fn from_okm(okm: &GenericArray<u8, U48>) -> Scalar {
         let mut bs = [0u8; 64];
         bs[16..].copy_from_slice(okm);
@@ -14,6 +17,9 @@ impl HashToField for Scalar {
 }
 
 #[test]
+/// 验证 hash-to-scalar 在固定测试向量上的输出稳定性。
+/// 该测试覆盖全零输入与两组可读字符串输入，便于人工复核。
+/// 向量回归可防止字节序、补零和约简路径在重构后发生漂移。
 fn test_hash_to_scalar() {
     let tests: &[(&[u8], &str)] = &[
         (

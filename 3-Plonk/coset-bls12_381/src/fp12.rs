@@ -100,6 +100,9 @@ impl ConstantTimeEq for Fp12 {
 }
 
 impl Fp12 {
+    /// 返回 Fp12 的加法单位元。
+    /// 二次扩域表示 `c0 + c1*w` 中两个分量都置为零。
+    /// 该值用于累加初始化和错误回退路径。
     #[inline]
     pub fn zero() -> Self {
         Fp12 {
@@ -108,6 +111,9 @@ impl Fp12 {
         }
     }
 
+    /// 返回 Fp12 的乘法单位元。
+    /// 仅 `c0` 为 Fp6::one，`c1` 为零。
+    /// 该元素在幂运算与逆元算法中作为初始值使用。
     #[inline]
     pub fn one() -> Self {
         Fp12 {
@@ -117,6 +123,9 @@ impl Fp12 {
     }
 
     #[cfg(feature = "pairings")]
+    /// 生成一个 Fp12 随机元素。
+    /// 两个 Fp6 分量分别独立随机采样并组合成扩域元素。
+    /// 该接口主要用于配对测试、基准和随机实例构造。
     pub(crate) fn random(mut rng: impl RngCore) -> Self {
         Fp12 {
             c0: Fp6::random(&mut rng),
@@ -124,6 +133,9 @@ impl Fp12 {
         }
     }
 
+    /// 与稀疏元素 `(c0, c1, c4)` 进行特化乘法。
+    /// 该路径避免通用 Fp12 乘法的冗余项计算，显著降低成本。
+    /// 在 Miller 循环线函数累乘中会被高频调用。
     pub fn mul_by_014(&self, c0: &Fp2, c1: &Fp2, c4: &Fp2) -> Fp12 {
         let aa = self.c0.mul_by_01(c0, c1);
         let bb = self.c1.mul_by_1(c4);
@@ -138,11 +150,17 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// 常时间判断 Fp12 元素是否为零。
+    /// 通过合并 `c0/c1` 两个 Fp6 分量的零判定得到结果。
+    /// 该接口可用于密码学场景下的安全分支控制。
     #[inline(always)]
     pub fn is_zero(&self) -> Choice {
         self.c0.is_zero() & self.c1.is_zero()
     }
 
+    /// Fp12 共轭映射：`c0 + c1*w -> c0 - c1*w`。
+    /// 该操作在逆元与最终指数运算中经常出现。
+    /// 与复数共轭类似，保持范数相关结构不变。
     #[inline(always)]
     pub fn conjugate(&self) -> Self {
         Fp12 {
@@ -151,6 +169,9 @@ impl Fp12 {
         }
     }
 
+    /// 对 Fp12 应用 Frobenius 自同构。
+    /// 分别对 `c0/c1` 做 Fp6 Frobenius，再对 `c1` 乘预计算系数。
+    /// 该映射是配对最终指数分解与优化的基础工具。
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
@@ -179,6 +200,9 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// Fp12 平方的特化实现。
+    /// 利用二次扩域结构复用中间量，减少相较通用乘法的操作数。
+    /// 该函数是最终指数运算中的性能关键路径之一。
     #[inline]
     pub fn square(&self) -> Self {
         let ab = self.c0 * self.c1;
@@ -193,6 +217,9 @@ impl Fp12 {
         Fp12 { c0, c1 }
     }
 
+    /// 计算 Fp12 乘法逆元。
+    /// 将逆元问题降到 Fp6 上：`(c0^2 - nr*c1^2)^{-1}`。
+    /// 若判别式不可逆（零元情形），返回 `CtOption::none()`。
     pub fn invert(&self) -> CtOption<Self> {
         (self.c0.square() - self.c1.square().mul_by_nonresidue())
             .invert()

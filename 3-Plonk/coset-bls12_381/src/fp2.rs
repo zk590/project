@@ -141,11 +141,16 @@ impl Fp2 {
         }
     }
 
-    /// 常时间判断是否为 0。
+    /// 常时间判断当前 Fp2 元素是否为零。
+    /// 该判断要求两个分量 `c0/c1` 同时为零。
+    /// 常量时间语义可避免比较路径泄露敏感信息。
     pub fn is_zero(&self) -> Choice {
         self.c0.is_zero() & self.c1.is_zero()
     }
 
+    /// 生成一个 Fp2 随机元素。
+    /// 两个分量 `c0/c1` 分别在基域 Fp 中独立采样。
+    /// 该方法用于测试与协议中的随机扩域取样场景。
     pub(crate) fn random(mut rng: impl RngCore) -> Fp2 {
         Fp2 {
             c0: Fp::random(&mut rng),
@@ -155,12 +160,16 @@ impl Fp2 {
 
     #[inline(always)]
     /// 在 Fp2 上应用 Frobenius 自同构。
+    /// 对该扩域实现而言，映射结果等价于共轭操作。
+    /// 该步骤在配对相关扩域链中会频繁出现。
     pub fn frobenius_map(&self) -> Self {
         self.conjugate()
     }
 
     #[inline(always)]
-    /// 共轭映射：a + bu -> a - bu。
+    /// 执行 Fp2 共轭映射：`a + bu -> a - bu`。
+    /// 共轭在逆元、范数和 Frobenius 计算中是基础操作。
+    /// 该变换保持 `c0` 不变并翻转 `c1` 的符号。
     pub fn conjugate(&self) -> Self {
         Fp2 {
             c0: self.c0,
@@ -169,7 +178,9 @@ impl Fp2 {
     }
 
     #[inline(always)]
-    /// 乘以二次扩域的非二次剩余元 u + 1。
+    /// 乘以二次扩域的非二次剩余元 `u + 1`。
+    /// 该特化运算常用于高阶扩域（如 Fp6/Fp12）构造。
+    /// 通过分量重组可避免一次通用 Fp2 乘法。
     pub fn mul_by_nonresidue(&self) -> Fp2 {
         Fp2 {
             c0: self.c0 - self.c1,
@@ -178,7 +189,9 @@ impl Fp2 {
     }
 
     #[inline]
-    /// 判断扩域元素是否在字典序较大半区，用于压缩编码。
+    /// 判断扩域元素是否在字典序较大半区。
+    /// 压缩编码时可据此决定符号位，保持解码唯一性。
+    /// 规则为优先比较 `c1`，若其为零再比较 `c0`。
     pub fn lexicographically_largest(&self) -> Choice {
         self.c1.lexicographically_largest()
             | (self.c1.is_zero() & self.c0.lexicographically_largest())
@@ -186,11 +199,9 @@ impl Fp2 {
 
     /// 计算 Fp2 平方，使用 Karatsuba 形式减少乘法次数。
     pub const fn square(&self) -> Fp2 {
-        //
-
-        //
-
-        //
+        // 设 `x = c0 + c1*u` 且 `u^2 = -1`，则
+        // `x^2 = (c0 + c1)(c0 - c1) + (2*c0*c1)u`。
+        // 该重写可把乘法数量从朴素方案进一步压缩。
 
         let a = (&self.c0).add(&self.c1);
         let b = (&self.c0).sub(&self.c1);
@@ -203,14 +214,12 @@ impl Fp2 {
     }
 
     /// 计算 Fp2 乘法，内部用 `sum_of_products` 降低中间开销。
+    /// 该实现把扩域乘法拆成两条 Fp 层融合乘加路径。
+    /// 在批量运算场景下可减少临时值并提升吞吐。
     pub fn mul(&self, rhs: &Fp2) -> Fp2 {
-        //
-
-        //
-
-        //
-
-        //
+        // 对 `(a0 + a1*u) * (b0 + b1*u)`，使用交织乘加把 Fp2 乘法
+        // 拆成两次 Fp 的 `sum_of_products`，减少临时对象和寄存器压力。
+        // 在批量配对与扩域幂运算中，这种写法通常更利于编译器优化。
 
         Fp2 {
             c0: Fp::sum_of_products([self.c0, -self.c1], [rhs.c0, rhs.c1]),
@@ -218,6 +227,9 @@ impl Fp2 {
         }
     }
 
+    /// Fp2 分量加法：分别对 `c0` 和 `c1` 执行模 p 加法。
+    /// 运算保持在扩域表示内，不需要额外基变换。
+    /// 结果自动落在规范域表示区间内。
     pub const fn add(&self, rhs: &Fp2) -> Fp2 {
         Fp2 {
             c0: (&self.c0).add(&rhs.c0),
@@ -225,6 +237,9 @@ impl Fp2 {
         }
     }
 
+    /// Fp2 分量减法：分别计算 `self.c0 - rhs.c0` 与 `self.c1 - rhs.c1`。
+    /// 内部复用 Fp 的模减法逻辑，保证结果仍在域内。
+    /// 该函数是点运算和配对算法中的高频基础算子。
     pub const fn sub(&self, rhs: &Fp2) -> Fp2 {
         Fp2 {
             c0: (&self.c0).sub(&rhs.c0),
@@ -232,6 +247,9 @@ impl Fp2 {
         }
     }
 
+    /// Fp2 加法逆元计算。
+    /// 逐分量执行 Fp 取负，得到 `-(c0 + c1*u)`。
+    /// 该操作在减法与共轭相关流程中会频繁出现。
     pub const fn neg(&self) -> Fp2 {
         Fp2 {
             c0: (&self.c0).neg(),
@@ -240,6 +258,8 @@ impl Fp2 {
     }
 
     /// 计算 Fp2 平方根；不存在时返回空值。
+    /// 过程先处理零元素，再通过中间变量 `alpha/x0` 构造候选解。
+    /// 最后用 `sqrt^2 == self` 回验，确保返回值正确。
     pub fn sqrt(&self) -> CtOption<Self> {
         CtOption::new(Fp2::zero(), self.is_zero()).or_else(|| {
             let a1 = self.pow_vartime(&[
@@ -280,15 +300,9 @@ impl Fp2 {
     }
 
     /// 计算 Fp2 乘法逆元。
+    /// 利用公式 `(a+bu)^{-1} = (a-bu)/(a^2+b^2)`，把问题降到 Fp 逆元。
+    /// 若分母为零（即元素为零），则返回 `CtOption::none()`。
     pub fn invert(&self) -> CtOption<Self> {
-        //
-
-        //
-
-        //
-
-        //
-
         (self.c0.square() + self.c1.square()).invert().map(|t| Fp2 {
             c0: self.c0 * t,
             c1: self.c1 * -t,
@@ -296,6 +310,8 @@ impl Fp2 {
     }
 
     /// 变长时间幂运算，适用于公开指数场景。
+    /// 该实现包含条件分支，不应直接用于秘密指数的常时路径。
+    /// 在公开参数上下文中，该算法实现简单且可读性高。
     pub fn pow_vartime(&self, by: &[u64; 6]) -> Self {
         let mut res = Self::one();
         for e in by.iter().rev() {

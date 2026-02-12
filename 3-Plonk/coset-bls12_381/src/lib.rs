@@ -1,6 +1,6 @@
-//!
-
-//!
+//! BLS12-381 曲线与配对相关实现入口。
+//! 该模块统一导出标量域、群运算与配对接口，供上层协议直接复用。
+//! 通过 feature 开关可按需裁剪功能（groups/pairings/alloc/rkyv 等）。
 
 #![no_std]
 #![cfg_attr(docsrs, feature(doc_cfg))]

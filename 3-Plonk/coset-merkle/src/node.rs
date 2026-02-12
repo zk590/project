@@ -1,4 +1,3 @@
-
 use alloc::boxed::Box;
 use core::cell::{Ref, RefCell};
 
@@ -29,9 +28,7 @@ where
     }
     /// 读取当前节点聚合值；若缓存为空则按子节点现算并缓存。
     pub(crate) fn aggregated_item(&self) -> Ref<'_, T> {
-
         if self.item.borrow().is_none() {
-
             let empty_subtree = &T::EMPTY_SUBTREE;
             let mut item_refs = [empty_subtree; A];
 
@@ -43,15 +40,14 @@ where
                 });
 
             let mut has_children = false;
-            item_refs
-                .iter_mut()
-                .zip(&child_items)
-                .for_each(|(item_ref_slot, child_item)| {
+            item_refs.iter_mut().zip(&child_items).for_each(
+                |(item_ref_slot, child_item)| {
                     if let Some(child_item) = child_item {
                         *item_ref_slot = child_item;
                         has_children = true;
                     }
-                });
+                },
+            );
 
             if has_children {
                 self.item.replace(Some(T::aggregate(item_refs)));
@@ -59,7 +55,6 @@ where
                 self.item.replace(Some(T::EMPTY_SUBTREE));
             }
         }
-
 
         Ref::map(self.item.borrow(), |item| item.as_ref().unwrap())
     }
@@ -69,8 +64,6 @@ where
         position: u64,
     ) -> (usize, u64) {
         let child_cap = level_capacity(A as u64, H - height - 1);
-
-
 
         #[allow(clippy::cast_possible_truncation)]
         let child_index = (position / child_cap) as usize;
@@ -99,7 +92,6 @@ where
             *selected_child = Some(Box::new(Node::new()));
         }
 
-
         let selected_child = self.children[child_index].as_mut().unwrap();
         Self::insert(selected_child, height + 1, child_pos, item);
     }
@@ -107,7 +99,6 @@ where
     /// 递归删除叶子，并返回 `(被删元素, 当前节点是否仍有子节点)`。
     pub(crate) fn remove(&mut self, height: usize, position: u64) -> (T, bool) {
         if height == H {
-
             let item = self.item.take().unwrap();
             return (item, false);
         }
@@ -198,6 +189,9 @@ mod rkyv_impl {
         S: Serializer + ?Sized,
         T: Archive + Serialize<S>,
     {
+        /// 将节点序列化为归档格式所需的 resolver。
+        /// 该实现分别序列化节点缓存值与子节点数组，并保持结构拓扑不变。
+        /// 返回的 resolver 会在 `resolve` 阶段被用于写入最终归档内存布局。
         fn serialize(
             &self,
             serializer: &mut S,
@@ -218,6 +212,10 @@ mod rkyv_impl {
         T: Archive,
         Archived<T>: Deserialize<T, D>,
     {
+        /// 从归档节点反序列化回运行时节点结构。
+        /// 反序列化后会重建 `RefCell<Option<T>>`
+        /// 与子节点数组，恢复可变借用语义。 该过程不重新计算聚合值，
+        /// 完全依赖归档中已有的数据内容。
         fn deserialize(
             &self,
             deserializer: &mut D,

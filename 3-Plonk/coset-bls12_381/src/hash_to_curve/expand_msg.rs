@@ -15,10 +15,9 @@ use alloc::vec::Vec;
 
 const OVERSIZE_DST_SALT: &[u8] = b"H2C-OVERSIZE-DST-";
 
-///
-
-///
-
+/// `ExpandMsgDst` 统一管理 DST（domain separation tag）的处理结果。
+/// 当 DST 过长时需要先哈希压缩到固定长度，以满足 RFC 9380 的长度约束。
+/// 该类型将“原始 DST”与“压缩后 DST”封装为同一访问接口，便于后续流程复用。
 #[derive(Debug)]
 enum ExpandMsgDst<'x, L: ArrayLength<u8>> {
     Hashed(GenericArray<u8, L>),
@@ -27,6 +26,9 @@ enum ExpandMsgDst<'x, L: ArrayLength<u8>> {
 }
 
 impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
+    /// 按 XOF 流程处理 DST，必要时执行超长 DST 压缩。
+    /// 若 `dst.len() > 255`，使用 `H2C-OVERSIZE-DST- || dst` 进行 XOF
+    /// 扩展哈希。 该步骤保证后续 expand_message 算法在协议要求范围内运行。
     pub fn process_xof<H>(dst: &'x [u8]) -> Self
     where
         H: Default + Update + ExtendableOutputDirty,
@@ -44,6 +46,9 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
+    /// 按 XMD 流程处理 DST，必要时执行超长 DST 压缩。
+    /// 与 `process_xof` 类似，但这里使用固定输出长度的摘要哈希。
+    /// 返回值保持抽象一致，调用方无需关心 DST 是否被压缩。
     pub fn process_xmd<H>(dst: &'x [u8]) -> Self
     where
         H: Digest<OutputSize = L>,
@@ -57,6 +62,9 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
+    /// 读取 DST 的字节切片视图。
+    /// 若当前是哈希压缩模式，返回压缩结果；否则返回原始输入。
+    /// 该方法为后续哈希链式拼接提供统一数据入口。
     pub fn data(&'x self) -> &'x [u8] {
         match self {
             Self::Hashed(arr) => &arr[..],
@@ -64,6 +72,9 @@ impl<'x, L: ArrayLength<u8>> ExpandMsgDst<'x, L> {
         }
     }
 
+    /// 返回当前 DST 的有效长度。
+    /// 对压缩模式，长度为类型参数 `L` 的固定字节数。
+    /// 对原始模式，长度即输入 DST 的真实长度。
     pub fn len(&'x self) -> usize {
         match self {
             Self::Hashed(_) => L::to_usize(),
@@ -77,6 +88,9 @@ pub trait ExpandMessage: for<'x> InitExpandMessage<'x> {}
 pub trait InitExpandMessage<'x> {
     type Expander: ExpandMessageState<'x>;
 
+    /// 初始化扩展消息状态机，准备按需读取 `len_in_bytes` 字节。
+    /// 参数 `message` 为待映射消息，`dst` 用于域分离。
+    /// 具体构造过程由 XOF/XMD 两类算法实现各自定义。
     fn init_expand(
         message: &[u8],
         dst: &'x [u8],
@@ -87,12 +101,20 @@ pub trait InitExpandMessage<'x> {
 impl<X: for<'x> InitExpandMessage<'x>> ExpandMessage for X {}
 
 pub trait ExpandMessageState<'x> {
+    /// 从扩展器状态中读取字节到输出缓冲区，返回本次实际写入长度。
+    /// 读取过程会推进内部游标，后续调用将继续从剩余数据位置读取。
+    /// 该接口是 hash_to_field 获取均匀字节流的核心抽象。
     fn read_into(&mut self, output: &mut [u8]) -> usize;
 
+    /// 返回当前状态下还可读取的剩余字节数。
+    /// 调用方可据此决定分块读取策略或提前分配输出缓冲区。
+    /// 保持准确的 remain 计数是状态机正确性的关键。
     fn remain(&self) -> usize;
 
     #[cfg(feature = "alloc")]
-
+    /// 将扩展器剩余字节一次性收集为 `Vec<u8>`。
+    /// 该辅助方法主要用于测试断言和调试，简化调用代码。
+    /// 内部会消费状态机，因此后续不应再继续读取同一实例。
     fn into_vec(mut self) -> Vec<u8>
     where
         Self: Sized,
@@ -103,16 +125,18 @@ pub trait ExpandMessageState<'x> {
     }
 }
 
-///
-
-///
-
+/// XOF 版本的扩展消息实现（如 SHAKE128/SHAKE256）。
+/// 该实现直接依赖可扩展输出哈希，按需生成任意长度字节流。
+/// 在长度需求较大场景下，XOF 往往能减少多轮摘要拼接开销。
 pub struct ExpandMsgXof<H: ExtendableOutputDirty> {
     hash: <H as ExtendableOutputDirty>::Reader,
     remain: usize,
 }
 
 impl<H: ExtendableOutputDirty> Debug for ExpandMsgXof<H> {
+    /// 自定义调试输出，仅暴露剩余字节数以避免泄露内部 reader 细节。
+    /// 对状态机对象而言，`remain` 是最关键的可观测诊断指标。
+    /// 保持简洁 Debug 表示也有助于测试日志可读性。
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ExpandMsgXof")
             .field("remain", &self.remain)
@@ -124,6 +148,9 @@ impl<'x, H> ExpandMessageState<'x> for ExpandMsgXof<H>
 where
     H: ExtendableOutputDirty,
 {
+    /// 从 XOF reader 读取数据到输出缓冲区，并同步减少 `remain` 计数。
+    /// 实际读取长度取 `remain` 与输出缓冲区长度的较小值。
+    /// 该行为保证多次读取时不会越界，也不会重复产出已读数据。
     fn read_into(&mut self, output: &mut [u8]) -> usize {
         let len = self.remain.min(output.len());
         self.hash.read(&mut output[..len]);
@@ -131,6 +158,9 @@ where
         len
     }
 
+    /// 返回 XOF 扩展器剩余可读字节数。
+    /// 该值随 `read_into` 调用单调递减，直到归零。
+    /// 可用于调用方分段拉取字节时的终止判断。
     fn remain(&self) -> usize {
         self.remain
     }
@@ -142,6 +172,9 @@ where
 {
     type Expander = Self;
 
+    /// 初始化 XOF 扩展器状态。
+    /// 该过程按规范拼接 `message || len || DST || DST_len` 后进入 XOF reader。
+    /// 构造完成后可通过 `read_into` 增量提取目标长度字节流。
     fn init_expand(message: &[u8], dst: &[u8], len_in_bytes: usize) -> Self {
         let dst = ExpandMsgDst::<U32>::process_xof::<H>(dst);
         let hash = H::default()
@@ -157,17 +190,15 @@ where
     }
 }
 
-///
-
-///
-
+/// XMD 版本的扩展消息实现类型标记（如 SHA-256/SHA-512）。
+/// XMD 通过多轮固定长度摘要拼接构造长输出，兼容传统摘要函数。
+/// 该类型本身仅承载泛型信息，真正状态保存在 `ExpandMsgXmdState`。
 #[derive(Debug)]
 pub struct ExpandMsgXmd<H: Digest>(PhantomData<H>);
 
-///
-
-///
-
+/// XMD 扩展状态机，保存 b0、当前块、块索引与偏移等中间状态。
+/// 该结构实现了 RFC 9380 中 expand_message_xmd 的迭代生成逻辑。
+/// 通过状态化读取可支持流式消费，避免一次性分配超大缓冲。
 pub struct ExpandMsgXmdState<'x, H: Digest> {
     dst: ExpandMsgDst<'x, H::OutputSize>,
     b_0: GenericArray<u8, H::OutputSize>,
@@ -178,6 +209,9 @@ pub struct ExpandMsgXmdState<'x, H: Digest> {
 }
 
 impl<H: Digest> Debug for ExpandMsgXmdState<'_, H> {
+    /// 自定义调试输出，仅显示剩余字节数。
+    /// 对扩展状态机来说，`remain` 直接反映读取进度。
+    /// 隐藏内部哈希块可避免日志噪声与不必要的信息暴露。
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         f.debug_struct("ExpandMsgXmdState")
             .field("remain", &self.remain)
@@ -191,6 +225,9 @@ where
 {
     type Expander = ExpandMsgXmdState<'x, H>;
 
+    /// 初始化 XMD 扩展状态。
+    /// 该过程先计算 `b0` 与首块 `b1`，再设置后续块生成所需游标信息。
+    /// 若块数 `ell` 超过 255 会直接 panic，以遵守规范上限约束。
     fn init_expand(
         message: &[u8],
         dst: &'x [u8],
@@ -232,6 +269,9 @@ impl<'x, H> ExpandMessageState<'x> for ExpandMsgXmdState<'x, H>
 where
     H: Digest + BlockInput,
 {
+    /// 从 XMD 状态中读取字节到输出缓冲区。
+    /// 当当前块读尽时，按 `b_i = H(strxor(b0, b_{i-1}) || i || DST || len)`
+    /// 生成下一块。 该实现严格维护块偏移与剩余长度，保证输出与规范一致。
     fn read_into(&mut self, output: &mut [u8]) -> usize {
         let read_len = self.remain.min(output.len());
         let mut offs = 0;
@@ -264,6 +304,9 @@ where
         read_len
     }
 
+    /// 返回 XMD 状态机剩余可读字节数。
+    /// 该值由初始化长度决定，并在每次读取后递减。
+    /// 对测试与调用方分段读取策略都很重要。
     fn remain(&self) -> usize {
         self.remain
     }
@@ -277,6 +320,9 @@ mod tests {
     use sha3::{Shake128, Shake256};
 
     #[test]
+    /// 使用 draft12 向量验证 XMD(SHA-256) 的输出正确性。
+    /// 该测试覆盖不同消息长度与输出长度，确保实现与规范兼容。
+    /// 标准向量回归可有效发现拼接顺序或 DST 处理错误。
     fn expand_message_xmd_works_for_draft12_testvectors_sha256() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA256-128";
 
@@ -449,6 +495,9 @@ mod tests {
     }
 
     #[test]
+    /// 验证 XMD(SHA-256) 在“超长 DST”场景下的兼容行为。
+    /// 重点检查 `H2C-OVERSIZE-DST-` 压缩路径是否符合规范定义。
+    /// 该场景在真实协议升级中较常见，必须保持跨实现一致。
     fn expand_message_xmd_works_for_draft12_testvectors_sha256_long_dst() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA256-128-long-DST-111111\
             111111111111111111111111111111111111111111111111111111\
@@ -625,6 +674,9 @@ mod tests {
     }
 
     #[test]
+    /// 使用 draft12 向量验证 XMD(SHA-512) 实现正确性。
+    /// 与 SHA-256 版本互补，覆盖不同摘要块大小与输出尺寸行为。
+    /// 该回归可防止泛型实现在哈希类型切换时产生细微偏差。
     fn expand_message_xmd_works_for_draft12_testvectors_sha512() {
         let dst = b"QUUX-V01-CS02-with-expander-SHA512-256";
 
@@ -797,6 +849,9 @@ mod tests {
     }
 
     #[test]
+    /// 使用 draft12 向量验证 XOF(SHAKE128) 输出正确性。
+    /// XOF 路径与 XMD 路径实现机制不同，需要独立回归集保障正确性。
+    /// 测试覆盖空消息、短消息与长消息，检查 reader 读取链路稳定性。
     fn expand_message_xof_works_for_draft12_testvectors_shake128() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE128";
 
@@ -969,6 +1024,9 @@ mod tests {
     }
 
     #[test]
+    /// 验证 XOF(SHAKE128) 在超长 DST 条件下的行为。
+    /// 该测试专门覆盖 DST 压缩后再扩展的组合路径。
+    /// 通过标准向量对照可确认边界分支未引入不兼容结果。
     fn expand_message_xof_works_for_draft12_testvectors_shake128_long_dst() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE128-long-DST-11111111\
             111111111111111111111111111111111111111111111111111111\
@@ -1145,6 +1203,9 @@ mod tests {
     }
 
     #[test]
+    /// 使用 draft12 向量验证 XOF(SHAKE256) 输出正确性。
+    /// 该测试与 SHAKE128 互补，覆盖不同安全参数下的实现一致性。
+    /// 对 hash-to-curve 体系来说，稳定的扩展消息层是整个映射正确性的前提。
     fn expand_message_xof_works_for_draft12_testvectors_shake256() {
         let dst = b"QUUX-V01-CS02-with-expander-SHAKE256";
 

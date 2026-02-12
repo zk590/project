@@ -9,6 +9,9 @@ mod serde_support {
     use super::*;
 
     impl Serialize for Fp6 {
+        /// 将 Fp6 序列化为结构体 `{c0, c1, c2}`。
+        /// 具名字段表示有利于跨语言映射与人工可读性。
+        /// 每个分量继续复用各自类型的安全序列化逻辑。
         fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where
             S: Serializer,
@@ -22,6 +25,9 @@ mod serde_support {
     }
 
     impl<'de> Deserialize<'de> for Fp6 {
+        /// 从结构体 `{c0, c1, c2}` 反序列化 Fp6。
+        /// 该实现通过 Visitor 显式处理缺失字段、重复字段和未知字段。
+        /// 严格输入验证有助于避免宽松解析带来的协议歧义。
         fn deserialize<D: Deserializer<'de>>(
             deserializer: D,
         ) -> Result<Self, D::Error> {
@@ -32,6 +38,9 @@ mod serde_support {
             impl<'de> Visitor<'de> for Fp6Visitor {
                 type Value = Fp6;
 
+                /// 描述该 Visitor 期望的输入格式。
+                /// serde 在错误提示时会使用这段文本，帮助定位问题。
+                /// 对结构化类型而言，明确字段列表可提升诊断效率。
                 fn expecting(
                     &self,
                     formatter: &mut ::core::fmt::Formatter,
@@ -39,6 +48,9 @@ mod serde_support {
                     formatter.write_str("a struct with fields c0, c1 and c2")
                 }
 
+                /// 逐项读取 map 字段并构造 Fp6。
+                /// 该流程对重复键、未知键、缺失键执行严格校验。
+                /// 只有在 `c0/c1/c2` 全部成功解析后才返回目标对象。
                 fn visit_map<A: MapAccess<'de>>(
                     self,
                     mut map: A,
@@ -106,6 +118,9 @@ mod serde_support {
         use crate::coset::test_utils;
 
         #[test]
+        /// 验证 Fp6 的 serde 往返一致性。
+        /// 用固定随机种子和静态 JSON 样本保证编码格式稳定。
+        /// 该测试可防止结构字段顺序或命名在重构时无意漂移。
         fn serde_fp6() -> Result<(), Box<dyn std::error::Error>> {
             let mut rng = StdRng::seed_from_u64(0xc0b);
             let fp6 = Fp6::random(&mut rng);

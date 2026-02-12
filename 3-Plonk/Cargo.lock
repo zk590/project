@@ -840,7 +840,6 @@ dependencies = [
  "bytecheck",
  "byteorder",
  "coset-bytes",
- "criterion 0.3.6",
  "csv",
  "digest 0.9.0",
  "ff",

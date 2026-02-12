@@ -1,9 +1,7 @@
-
 use alloc::collections::BTreeSet;
 use core::cell::Ref;
 
 use crate::{level_capacity, Aggregate, Node, Opening, Walk};
-
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(
@@ -20,6 +18,9 @@ impl<T, const H: usize, const A: usize> Default for Tree<T, H, A>
 where
     T: Aggregate<A>,
 {
+    /// 返回一棵默认空树。
+    /// 该实现让 `Tree` 可直接参与标准容器与泛型默认构造流程。
+    /// 语义等价于调用 `Tree::new()`。
     fn default() -> Self {
         Self::new()
     }
@@ -29,7 +30,6 @@ impl<T, const H: usize, const A: usize> Tree<T, H, A>
 where
     T: Aggregate<A>,
 {
-
     #[must_use]
     /// 创建一棵空的 Merkle 树。
     pub const fn new() -> Self {
@@ -52,7 +52,6 @@ where
         self.root.insert(0, index, item);
         self.positions.insert(index);
     }
-
 
     /// 移除指定位置的叶子元素；若位置不存在则返回 `None`。
     pub fn remove(&mut self, position: u64) -> Option<T> {
@@ -95,26 +94,18 @@ where
         let mut current_node = &self.root;
         let mut current_height = H;
         loop {
-            let mut non_empty_children =
-                current_node.children.iter().flatten();
+            let mut non_empty_children = current_node.children.iter().flatten();
             match non_empty_children.next() {
-
-
-
                 None => return (self.root(), 0),
                 Some(child) => {
-
-
-                    if non_empty_children.next().is_none()
-                        && current_height > 1
+                    if non_empty_children.next().is_none() && current_height > 1
                     {
                         current_node = child;
-                    }
-
-
-
-                    else {
-                        return (current_node.aggregated_item(), current_height);
+                    } else {
+                        return (
+                            current_node.aggregated_item(),
+                            current_height,
+                        );
                     }
                 }
             }
@@ -215,10 +206,7 @@ mod tests {
         tree.insert(tree.capacity(), 42);
     }
 
-
-
     type RangeTree = Tree<Option<Range>, H, A>;
-
 
     #[derive(Debug, Clone, Copy, PartialEq)]
     struct Range {

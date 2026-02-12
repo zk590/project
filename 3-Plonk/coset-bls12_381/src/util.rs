@@ -1,18 +1,24 @@
-/// 64 位加法带进位：返回 `(结果低 64 位, 新进位)`。
+/// 64 位加法带进位原语。
+/// 计算 `a + b + carry`，返回低 64 位结果与新的进位。
+/// 该函数是多精度加法（limb 链式运算）的基础构件。
 #[inline(always)]
 pub const fn adc(a: u64, b: u64, carry: u64) -> (u64, u64) {
     let ret = (a as u128) + (b as u128) + (carry as u128);
     (ret as u64, (ret >> 64) as u64)
 }
 
-/// 64 位减法带借位：返回 `(结果低 64 位, 新借位掩码)`。
+/// 64 位减法带借位原语。
+/// 计算 `a - (b + borrow_in)`，返回低 64 位结果与新的借位掩码。
+/// 在大整数模减法中，该借位会被继续传递到高位 limb。
 #[inline(always)]
 pub const fn sbb(a: u64, b: u64, borrow: u64) -> (u64, u64) {
     let ret = (a as u128).wrapping_sub((b as u128) + ((borrow >> 63) as u128));
     (ret as u64, (ret >> 64) as u64)
 }
 
-/// 乘加原语：计算 `a + b*c + carry`，用于多精度乘法内核。
+/// 乘加（multiply-accumulate）原语。
+/// 计算 `a + b * c + carry` 并返回 `(低 64 位, 新进位)`。
+/// 该函数是 Montgomery 乘法和卷积式 limb 乘法的核心基础。
 #[inline(always)]
 pub const fn mac(a: u64, b: u64, c: u64, carry: u64) -> (u64, u64) {
     let ret = (a as u128) + ((b as u128) * (c as u128)) + (carry as u128);
@@ -121,7 +127,8 @@ macro_rules! impl_binops_multiplicative_mixed {
 
 macro_rules! impl_binops_additive {
     ($lhs:ident, $rhs:ident) => {
-        // 为值/引用的各种组合补齐 `+` 与 `-` 运算实现，避免调用方频繁手动解引用。
+        // 为值/引用的各种组合补齐 `+` 与 `-`
+        // 运算实现，避免调用方频繁手动解引用。
         impl_binops_additive_specify_output!($lhs, $rhs, $lhs);
 
         impl SubAssign<$rhs> for $lhs {

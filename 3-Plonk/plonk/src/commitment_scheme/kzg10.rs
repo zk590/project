@@ -1,7 +1,5 @@
 // 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10.rs）。
 
-//
-
 cfg_if::cfg_if!(
 if #[cfg(feature = "alloc")]
 {

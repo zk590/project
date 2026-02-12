@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/composer/constraint_system.rs）。
-
-//
-
 pub(crate) mod constraint;
 pub(crate) mod ecc;
 pub(crate) mod witness;

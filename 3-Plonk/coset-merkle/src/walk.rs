@@ -1,14 +1,11 @@
-
 use core::cell::Ref;
 
 use crate::{Aggregate, Node, Tree};
-
 
 #[derive(Debug, Clone)]
 pub struct Walk<'a, T, W, const H: usize, const A: usize> {
     root: &'a Node<T, H, A>,
     walker: W,
-
 
     path: [Option<&'a Node<T, H, A>>; H],
     indices: [usize; H],
@@ -29,19 +26,14 @@ where
         }
     }
 
-
     /// 深度优先推进到下一个满足谓词的叶子项。
     pub(crate) fn advance_depth_first(
         &mut self,
         node: &'a Node<T, H, A>,
         level_index: usize,
     ) -> Option<Ref<'a, T>> {
-
-
         if level_index == H - 1 {
             let child_cursor = &mut self.indices[level_index];
-
-
 
             for child_index in *child_cursor..A {
                 *child_cursor = child_index + 1;
@@ -53,14 +45,9 @@ where
                 }
             }
 
-
-
             *child_cursor = 0;
             return None;
         }
-
-
-
 
         if self.path[level_index].is_none() {
             for child_index in 0..A {
@@ -75,14 +62,10 @@ where
             }
         }
 
-
-
         //
 
-
         if let Some(child) = self.path[level_index] {
-            if let Some(item) =
-                self.advance_depth_first(child, level_index + 1)
+            if let Some(item) = self.advance_depth_first(child, level_index + 1)
             {
                 return Some(item);
             }
@@ -94,9 +77,7 @@ where
                     let child = child.as_ref();
                     if (self.walker)(&*child.aggregated_item()) {
                         self.path[level_index] = Some(child);
-                        match self
-                            .advance_depth_first(child, level_index + 1)
-                        {
+                        match self.advance_depth_first(child, level_index + 1) {
                             Some(item) => return Some(item),
                             None => continue,
                         }
@@ -119,6 +100,9 @@ where
 {
     type Item = Ref<'a, T>;
 
+    /// 返回下一个满足谓词的叶子项。
+    /// 每次调用都会从当前游标状态继续深度优先遍历，而不是从根重新扫描。
+    /// 当没有更多匹配项时返回 `None`，符合标准迭代器终止语义。
     fn next(&mut self) -> Option<Self::Item> {
         self.advance_depth_first(self.root, 0)
     }

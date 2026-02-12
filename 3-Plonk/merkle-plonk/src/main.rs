@@ -31,6 +31,9 @@ pub struct OpeningCircuit {
 }
 
 impl Default for OpeningCircuit {
+    /// 构造用于编译/测试的默认电路实例。
+    /// 该实例使用单叶节点树生成一条合法 opening，确保约束系统可被完整构建。
+    /// 默认值不依赖外部文件，便于在纯代码路径下初始化 prover/verifier。
     fn default() -> Self {
         let empty = Item::<()> {
             hash: BlsScalar::zero(),
@@ -95,7 +98,9 @@ struct ZKProofData {
     data: Vec<u8>,
 }
 
-// 从文件读取并使用rkyv反序列化
+/// 从指定文件路径读取全部字节并做存在性检查。
+/// 该函数将文件访问错误统一映射为 `IoError`，便于上层链式传播。
+/// 返回值仅负责字节加载，不承担具体结构化反序列化职责。
 fn read_file_bytes_checked(file_path: &str) -> Result<Vec<u8>, IoError> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
@@ -111,6 +116,9 @@ fn read_file_bytes_checked(file_path: &str) -> Result<Vec<u8>, IoError> {
 }
 
 /// 使用rkyv从文件中加载Merkle树的证明数据
+/// 该函数会解析叶子哈希、根哈希与 opening 路径，并执行根一致性预检查。
+/// 若任一环节失败会立即返回错误，避免后续证明流程建立在损坏输入之上。
+/// 成功时返回“位置 + 叶子 + 根 + opening”的完整验证上下文。
 fn load_merkle_opening_from_file()
 -> Result<(u64, BlsScalar, BlsScalar, Opening<(), { TREE_HEIGHT }>), IoError> {
     // 使用rkyv反序列化MerkleProofData
@@ -165,6 +173,9 @@ fn load_merkle_opening_from_file()
 }
 
 /// 加载或编译 prover/verifier
+/// 该函数优先从缓存文件恢复 prover/verifier，并校验容量参数是否匹配。
+/// 当缓存缺失或不一致时，会重新编译电路并回写缓存，保证运行稳定性。
+/// 返回的对象可直接用于后续 `prove` 与 `verify` 流程，避免重复初始化开销。
 fn load_or_compile_opening_circuit()
 -> Result<(Prover, Verifier), Box<dyn std::error::Error>> {
     // 检查CIRCUIT_PROVE_FILE和VERIFIER_FILE是否存在
@@ -298,6 +309,9 @@ fn generate_and_store_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// 验证零知识证明
+/// 该函数会读取证明、公开输入与验证器，并执行 PLONK 证明校验。
+/// 校验通过后还会复用 opening 对叶子成员关系再做一次业务一致性验证。
+/// 这种“双重验证”可同时覆盖电路正确性与输入数据绑定正确性。
 pub fn verify_proof() -> Result<(), IoError> {
     // 加载证明数据
     let (_leaf_position, leaf_hash, _root_hash, opening) =

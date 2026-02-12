@@ -27,7 +27,9 @@ use rkyv::{
     Archive, Deserialize as RkyvDeserialize, Serialize as RkyvSerialize,
 };
 
-///
+/// G1 群元素的仿射坐标表示。
+/// 在该表示下点由 `(x, y, infinity)` 三元组描述，便于编码与比较。
+/// 计算密集路径通常先转射影坐标以减少逆元开销。
 
 #[cfg_attr(docsrs, doc(cfg(feature = "groups")))]
 #[derive(Copy, Clone, Debug)]
@@ -206,6 +208,8 @@ const B: Fp = Fp::from_raw_unchecked([
 
 impl G1Affine {
     /// 返回 G1 仿射无穷远点。
+    /// 该点是群加法单位元，在编码与边界分支中经常作为默认值。
+    /// 约定使用 `(x=0, y=1, infinity=1)` 表示该特殊点。
     pub fn identity() -> G1Affine {
         G1Affine {
             x: Fp::zero(),
@@ -215,6 +219,8 @@ impl G1Affine {
     }
 
     /// 返回 G1 仿射生成元。
+    /// 该常量点用于构造公开参数和测试向量。
+    /// 其坐标来自 BLS12-381 标准定义，跨实现保持一致。
     pub fn generator() -> G1Affine {
         G1Affine {
             x: Fp::from_raw_unchecked([
@@ -238,6 +244,8 @@ impl G1Affine {
     }
 
     /// 将 G1 仿射点压缩为 48 字节编码。
+    /// 编码会写入压缩位、无穷远点位和符号位。
+    /// 这是协议传输与磁盘持久化的推荐表示。
     pub fn to_compressed(&self) -> [u8; 48] {
         let mut res =
             Fp::conditional_select(&self.x, &Fp::zero(), self.infinity.into())
@@ -258,6 +266,8 @@ impl G1Affine {
     }
 
     /// 将 G1 仿射点编码为 96 字节非压缩格式。
+    /// 非压缩格式直接包含 `x/y` 两个坐标分量。
+    /// 该表示更直观，适合调试和中间态检查。
     pub fn to_uncompressed(&self) -> [u8; 96] {
         let mut res = [0; 96];
 
@@ -277,12 +287,17 @@ impl G1Affine {
     }
 
     /// 从非压缩编码反序列化，并校验曲线方程与子群约束。
+    /// 该入口用于不可信输入场景，安全性优先。
+    /// 若任一约束不满足，返回 `CtOption::none()`。
     pub fn from_uncompressed(bytes: &[u8; 96]) -> CtOption<Self> {
         Self::from_uncompressed_unchecked(bytes).and_then(|p| {
             CtOption::new(p, p.is_on_curve() & p.is_torsion_free())
         })
     }
 
+    /// 仅执行格式层面的非压缩反序列化，不做完整群约束校验。
+    /// 该函数主要用于对可信输入做快速解码，减少重复检查开销。
+    /// 若输入来自不可信环境，调用方应改用 `from_uncompressed`。
     pub fn from_uncompressed_unchecked(bytes: &[u8; 96]) -> CtOption<Self> {
         let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
         let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
@@ -328,11 +343,16 @@ impl G1Affine {
     }
 
     /// 从压缩编码反序列化，并校验子群约束。
+    /// 该函数是外部输入解码的安全入口。
+    /// 它会在宽松解码后追加 torsion-free 校验。
     pub fn from_compressed(bytes: &[u8; 48]) -> CtOption<Self> {
         Self::from_compressed_unchecked(bytes)
             .and_then(|p| CtOption::new(p, p.is_torsion_free()))
     }
 
+    /// 仅按压缩编码规则恢复点，不强制检查是否在正确子群内。
+    /// 该流程会处理无穷远点标记以及 y 符号位，恢复候选曲线点。
+    /// 在验证场景中应优先使用 `from_compressed` 进行安全校验。
     pub fn from_compressed_unchecked(bytes: &[u8; 48]) -> CtOption<Self> {
         let compression_flag_set = Choice::from((bytes[0] >> 7) & 1);
         let infinity_flag_set = Choice::from((bytes[0] >> 6) & 1);
@@ -348,7 +368,7 @@ impl G1Affine {
         };
 
         x.and_then(|x| {
-            //
+            // 先处理“无穷远点编码”这个特例，再处理常规曲线点恢复路径。
 
             CtOption::new(
                 G1Affine::identity(),
@@ -378,14 +398,19 @@ impl G1Affine {
         })
     }
 
+    /// 返回仿射点是否为无穷远点。
+    /// 该判断只读取内部标志位，不触发额外域运算。
+    /// 常用于编码、分支屏蔽与边界条件处理。
     #[inline]
     pub fn is_identity(&self) -> Choice {
         self.infinity.into()
     }
 
     /// 判断点是否位于目标素数阶子群（无扭点）。
+    /// 该检查可防止小子群攻击与无效点注入。
+    /// 对验签与证明验证路径是必要安全步骤。
     pub fn is_torsion_free(&self) -> Choice {
-        //
+        // 利用高效自同态与 BLS 参数 x 的关系做子群判定，避免昂贵 full check。
 
         let minus_x_squared_times_p =
             G1Projective::from(self).mul_by_x().mul_by_x().neg();
@@ -394,6 +419,8 @@ impl G1Affine {
     }
 
     /// 判断仿射点是否满足曲线方程。
+    /// 无穷远点按群定义视为“在曲线上”。
+    /// 该接口常用于解码后防御式校验。
     pub fn is_on_curve(&self) -> Choice {
         let infinity = Choice::from(self.infinity);
         (self.y.square() - (self.x.square() * self.x)).ct_eq(&B) | infinity
@@ -409,6 +436,9 @@ pub const BETA: Fp = Fp::from_raw_unchecked([
     0x051b_a4ab_241b_6160,
 ]);
 
+/// G1 上的高效自同态映射：`(x, y) -> (beta * x, y)`。
+/// 该映射保持群结构，可用于子群检测与快速标量运算优化。
+/// 实现上只需一次域乘法，成本显著低于完整点乘。
 fn endomorphism(p: &G1Affine) -> G1Affine {
     let mut res = *p;
     res.x *= BETA;
@@ -580,6 +610,9 @@ impl_binops_multiplicative_mixed!(G1Affine, BlsScalar, G1Projective);
 impl_binops_multiplicative_mixed!(BlsScalar, G1Affine, G1Projective);
 impl_binops_multiplicative_mixed!(BlsScalar, G1Projective, G1Projective);
 
+/// 计算 `3 * B * a` 的快捷路径。
+/// 这里的 `B` 是曲线常量，固定为 4，因此可降为加法链计算。
+/// 通过避免通用乘法，可降低倍点和加法公式中的常数开销。
 #[inline(always)]
 fn mul_by_curve_b3(a: Fp) -> Fp {
     let a = a + a; // 2
@@ -589,6 +622,8 @@ fn mul_by_curve_b3(a: Fp) -> Fp {
 
 impl G1Projective {
     /// 返回 G1 射影无穷远点。
+    /// 在射影坐标中该点通过 `z = 0` 表示。
+    /// 该表示可在运算中避免仿射除法开销。
     pub fn identity() -> G1Projective {
         G1Projective {
             x: Fp::zero(),
@@ -598,6 +633,8 @@ impl G1Projective {
     }
 
     /// 返回 G1 射影生成元。
+    /// 该函数与仿射生成元语义一致，仅坐标表示不同。
+    /// 在高频运算中，射影表示通常更高效。
     pub fn generator() -> G1Projective {
         G1Projective {
             x: Fp::from_raw_unchecked([
@@ -621,6 +658,8 @@ impl G1Projective {
     }
 
     /// 射影坐标点倍加（point doubling）。
+    /// 该公式避免了逆元运算，适合密集迭代场景。
+    /// 标量乘中每一位轮次都会调用该步骤。
     pub fn double(&self) -> G1Projective {
         let t0 = self.y.square();
         let z3 = t0 + t0;
@@ -655,6 +694,8 @@ impl G1Projective {
     }
 
     /// 射影坐标点加法（projective + projective）。
+    /// 该实现使用完整射影加法公式处理一般情况。
+    /// 适用于双方都处于射影表示的累加路径。
     pub fn add(&self, rhs: &G1Projective) -> G1Projective {
         let t0 = self.x * rhs.x;
         let t1 = self.y * rhs.y;
@@ -698,6 +739,8 @@ impl G1Projective {
     }
 
     /// 混合点加法（projective + affine）。
+    /// 该路径比纯射影加法更省运算，常用于预处理表累加。
+    /// 当右值是仿射点时优先使用该接口。
     pub fn add_mixed(&self, rhs: &G1Affine) -> G1Projective {
         let t0 = self.x * rhs.x;
         let t1 = self.y * rhs.y;
@@ -735,10 +778,12 @@ impl G1Projective {
         G1Projective::conditional_select(&tmp, self, rhs.is_identity())
     }
 
+    /// 使用双倍-加法链进行常时标量乘。
+    /// 从高位到低位扫描标量比特，并通过条件选择消除分支泄漏。
+    /// 该实现用于内部基础算子，供 trait 乘法封装复用。
     fn multiply(&self, by: &[u8; 32]) -> G1Projective {
         let mut acc = G1Projective::identity();
-
-        //
+        // 跳过最高位是因为累积器从恒等元开始，首位已隐式吸收在循环结构里。
 
         for bit in by
             .iter()
@@ -755,6 +800,9 @@ impl G1Projective {
         acc
     }
 
+    /// 按 BLS 参数 `x` 执行专用标量乘。
+    /// 该过程被协因子清除和子群判定逻辑复用，以减少重复代码。
+    /// 当 `x` 为负参数时，末尾统一执行一次取负处理。
     fn mul_by_x(&self) -> G1Projective {
         let mut xself = G1Projective::identity();
 
@@ -776,11 +824,15 @@ impl G1Projective {
     }
 
     /// 清除协因子，将点映射到 r 阶子群。
+    /// 这是从曲线大群投影到安全子群的标准步骤。
+    /// 对 hash-to-curve 输出和外部输入尤其重要。
     pub fn clear_cofactor(&self) -> G1Projective {
         self - self.mul_by_x()
     }
 
     /// 批量将射影点归一化为仿射点，复用一次逆元计算。
+    /// 通过前后缀积技巧，把多个逆元降为一次逆元。
+    /// 在批处理场景下可显著降低总成本。
     pub fn batch_normalize(p: &[Self], q: &mut [G1Affine]) {
         assert_eq!(p.len(), q.len());
 
@@ -808,11 +860,17 @@ impl G1Projective {
         }
     }
 
+    /// 判断射影点是否为无穷远点（`z == 0`）。
+    /// 这是 Jacobian/射影坐标中的标准判定方式。
+    /// 该检查被加法、归一化和编码逻辑广泛复用。
     #[inline]
     pub fn is_identity(&self) -> Choice {
         self.z.is_zero()
     }
 
+    /// 判断射影点是否满足曲线方程。
+    /// 对无穷远点按定义直接视为“在曲线上”。
+    /// 该函数用于测试、防御式检查与解码后的快速验证。
     pub fn is_on_curve(&self) -> Choice {
         (self.y.square() * self.z)
             .ct_eq(&(self.x.square() * self.x + self.z.square() * self.z * B))
@@ -921,6 +979,9 @@ impl PartialEq for G1Uncompressed {
 impl Group for G1Projective {
     type Scalar = BlsScalar;
 
+    /// 随机采样一个 G1 子群点。
+    /// 先随机取 `x` 并尝试恢复 y，再通过协因子清除映射到 r 阶子群。
+    /// 若结果为无穷远点则重试，确保返回有效随机群元素。
     fn random(mut rng: impl RngCore) -> Self {
         loop {
             let x = Fp::random(&mut rng);
@@ -961,6 +1022,9 @@ impl Group for G1Projective {
 
 #[cfg(feature = "alloc")]
 impl WnafGroup for G1Projective {
+    /// 根据批量标量数量推荐 wNAF 窗口大小。
+    /// 标量越多，窗口可适当增大以平衡预计算与主循环成本。
+    /// 该经验表来自常见曲线实现实践，用于给上层提供默认参数。
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize {
         const RECOMMENDATIONS: [usize; 12] =
             [1, 3, 7, 20, 43, 120, 273, 563, 1630, 3128, 7933, 62569];
@@ -983,10 +1047,16 @@ impl PrimeGroup for G1Projective {}
 impl Curve for G1Projective {
     type AffineRepr = G1Affine;
 
+    /// 将一批射影点统一归一化到仿射坐标。
+    /// trait 层只是转发到本模块的高效实现，维持统一行为。
+    /// 该接口让泛型算法可通过 `Curve` trait 直接调用批归一化。
     fn batch_normalize(p: &[Self], q: &mut [Self::AffineRepr]) {
         Self::batch_normalize(p, q);
     }
 
+    /// 将单个射影点转换为仿射点。
+    /// 该接口满足 `Curve` trait 语义，便于泛型上下文复用。
+    /// 内部使用已有 `From` 实现保持转换逻辑一致。
     fn to_affine(&self) -> Self::AffineRepr {
         self.into()
     }
@@ -1020,14 +1090,23 @@ impl PrimeCurveAffine for G1Affine {
 impl GroupEncoding for G1Projective {
     type Repr = G1Compressed;
 
+    /// 从压缩编码解码射影点，并执行安全校验路径。
+    /// 该实现先解码为仿射点，再转为射影表示。
+    /// 统一入口可保证 `GroupEncoding` 与仿射解码语义一致。
     fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
         <G1Affine as GroupEncoding>::from_bytes(bytes).map(Self::from)
     }
 
+    /// 从压缩编码解码射影点，但跳过部分安全约束检查。
+    /// 该接口适用于可信输入或内部性能敏感路径。
+    /// 若输入来源不可信，应优先使用 `from_bytes`。
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
         G1Affine::from_bytes_unchecked(bytes).map(Self::from)
     }
 
+    /// 将射影点编码为压缩字节表示。
+    /// 先归一化到仿射，再复用仿射编码逻辑。
+    /// 这样可避免重复维护两套编码规则。
     fn to_bytes(&self) -> Self::Repr {
         <G1Affine as GroupEncoding>::to_bytes(&G1Affine::from(self))
     }

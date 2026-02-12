@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/composer/constraint_system/ecc.rs）。
-
-//
-
 use crate::prelude::Witness;
 use coset_bls12_381::BlsScalar;
 
@@ -13,33 +9,35 @@ pub struct WitnessPoint {
 
 impl WitnessPoint {
     #[allow(dead_code)]
+    /// 由 x/y 两个 witness 构造曲线点句柄。
+    /// 该类型仅保存 witness 引用关系，不直接保存具体曲线坐标值。
+    /// 常用于 composer 中的点运算组件接口传递。
     pub(crate) const fn new(x: Witness, y: Witness) -> Self {
         Self { x, y }
     }
 
+    /// 返回点的 x 坐标 witness。
+    /// 调用方可据此继续构造算术或群运算约束。
+    /// 返回引用可避免不必要复制。
     pub const fn x(&self) -> &Witness {
         &self.x
     }
 
+    /// 返回点的 y 坐标 witness。
+    /// 与 `x()` 对称，用于读取点句柄的另一坐标通道。
+    /// 返回引用可避免不必要复制。
     pub const fn y(&self) -> &Witness {
         &self.y
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-
 pub(crate) struct WnafRound<T: Into<Witness>> {
-    pub acc_x: T,
-
-    pub acc_y: T,
-
-    pub accumulated_bit: T,
-
-    pub xy_alpha: T,
-
-    pub x_beta: BlsScalar,
-
-    pub y_beta: BlsScalar,
-
-    pub xy_beta: BlsScalar,
+    pub accumulator_x: T,
+    pub accumulator_y: T,
+    pub accumulated_scalar: T,
+    pub addend_xy_product: T,
+    pub precomputed_x: BlsScalar,
+    pub precomputed_y: BlsScalar,
+    pub precomputed_xy_product: BlsScalar,
 }

@@ -1,9 +1,4 @@
-
-
-
 //
-
-
 
 #![no_std]
 #![deny(clippy::pedantic)]
@@ -18,91 +13,45 @@ use coset_poseidon::{Domain, Hash};
 
 pub const ARITY: usize = 4;
 
-
 /// Poseidon-Merkle 四叉树类型别名。
 pub type Tree<T, const H: usize> = coset_merkle::Tree<Item<T>, H, ARITY>;
-
 
 /// Poseidon-Merkle 开证明类型别名。
 pub type Opening<T, const H: usize> = coset_merkle::Opening<Item<T>, H, ARITY>;
 
-
-
 ///
 
-
-
 ///
-
-
-
-///
-
-
-
 
 ///
 
 ///
 
-
-
+///
 
 /// }
-///
-
-
-
-
 
 /// }
-///
-
-
-
-
 
 ///     };
-///
-
 
 ///
-
-
-
 
 ///                 }
-
-
 
 ///             };
 
-
-
 ///                 }
-
-
 
 ///             }
 ///         }
-///
 
 ///     }
 /// }
-///
-
-
 
 ///
-
-
 
 /// };
-///
-
-
-
-
 
 ///     },
 /// };
@@ -142,7 +91,6 @@ where
         let mut level_hashes = [BlsScalar::zero(); ARITY];
         let mut level_data = [empty_data; ARITY];
 
-
         items
             .into_iter()
             .enumerate()
@@ -150,8 +98,6 @@ where
                 level_hashes[item_index] = item.hash;
                 level_data[item_index] = &item.data;
             });
-
-
 
         Item {
             hash: Hash::digest(Domain::Merkle4, &level_hashes)[0],

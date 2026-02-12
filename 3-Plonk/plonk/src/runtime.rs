@@ -1,5 +1,3 @@
-//
-
 use coset_bls12_381::BlsScalar;
 
 use crate::prelude::{Constraint, Witness};
@@ -9,10 +7,11 @@ use crate::debugger::Debugger;
 
 #[derive(Debug, Clone, Copy)]
 #[allow(clippy::large_enum_variant)]
+#[allow(dead_code)]
 pub enum RuntimeEvent {
-    WitnessAppended { w: Witness, v: BlsScalar },
+    WitnessAppended { witness: Witness, value: BlsScalar },
 
-    ConstraintAppended { c: Constraint },
+    ConstraintAppended { constraint: Constraint },
 
     ProofFinished,
 }
@@ -24,6 +23,9 @@ pub struct Runtime {
 }
 
 impl Default for Runtime {
+    /// 返回默认运行时实例。
+    /// 语义等价于 `Runtime::new()`，便于在上层结构体中直接派生默认值。
+    /// 在启用 `debug` 特性时会连同调试器一并初始化。
     fn default() -> Self {
         Self::new()
     }

@@ -1,4 +1,3 @@
-
 use crate::{init_fixed_array, Aggregate, Node, Tree};
 
 use alloc::vec::Vec;
@@ -8,7 +7,6 @@ use bytecheck::CheckBytes;
 use coset_bytes::{DeserializableSlice, Error as BytesError, Serializable};
 #[cfg(feature = "rkyv-impl")]
 use rkyv::{Archive, Deserialize, Serialize};
-
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
@@ -26,8 +24,6 @@ impl<T, const H: usize, const A: usize> Opening<T, H, A>
 where
     T: Aggregate<A> + Clone,
 {
-
-
     /// 基于树和目标位置构造 opening。
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
         let opening_positions = [0; H];
@@ -44,25 +40,26 @@ where
         opening
     }
 
-
-    /// 返回 opening 对应的根值。
+    /// 返回 opening 对应的根值引用。
+    /// 该值是在生成 opening 时从树根快照得到，用于最终一致性校验。
+    /// 外部验证时会将重算后的聚合值与此处根值比较。
     pub fn root(&self) -> &T {
         &self.root
     }
 
-
-    /// 返回每一层的分支节点值。
+    /// 返回每一层记录的兄弟分支集合。
+    /// 结构维度为 `[H][A]`：高度 `H` 层，每层保存 `A` 个子位点的聚合值。
+    /// 验证过程会按 `positions` 指示选择路径节点并重构父层值。
     pub fn branch(&self) -> &[[T; A]; H] {
         &self.branch
     }
 
-
-    /// 返回每一层路径中的子索引。
+    /// 返回路径在每一层的子索引位置。
+    /// `positions[level]` 表示该层真实路径落在 `branch[level]` 的哪个槽位。
+    /// 结合 `branch` 数据即可在脱离原树结构时完成独立验证。
     pub fn positions(&self) -> &[usize; H] {
         &self.positions
     }
-
-
 
     /// 校验给定叶子是否匹配该 opening。
     pub fn verify(&self, item: impl Into<T>) -> bool
@@ -75,8 +72,6 @@ where
             let level_branch = &self.branch[level_index];
             let level_position = self.positions[level_index];
 
-
-
             if item != level_branch[level_position] {
                 return false;
             }
@@ -84,21 +79,18 @@ where
             let empty_subtree = &T::EMPTY_SUBTREE;
 
             let mut item_refs = [empty_subtree; A];
-            item_refs.iter_mut().zip(level_branch).for_each(
-                |(r, item_ref)| {
+            item_refs
+                .iter_mut()
+                .zip(level_branch)
+                .for_each(|(r, item_ref)| {
                     *r = item_ref;
-                },
-            );
+                });
 
             item = T::aggregate(item_refs);
         }
 
         self.root == item
     }
-
-
-
-
 
     /// 将 opening 编码为变长字节串。
     pub fn to_var_bytes<const T_SIZE: usize>(&self) -> Vec<u8>
@@ -109,9 +101,7 @@ where
             (1 + H * A) * T_SIZE + H * (u32::BITS as usize / 8),
         );
 
-
         bytes.extend(&self.root.to_bytes());
-
 
         for level in &self.branch {
             for item in level {
@@ -119,17 +109,13 @@ where
             }
         }
 
-
         for position_index in self.positions {
-
-
             #[allow(clippy::cast_possible_truncation)]
             bytes.extend(&(position_index as u32).to_bytes());
         }
 
         bytes
     }
-
 
     /// 从字节切片解码 opening，并校验长度。
     pub fn from_slice<const T_SIZE: usize>(
@@ -150,9 +136,7 @@ where
 
         let mut reader = bytes;
 
-
         let root = T::from_reader(&mut reader)?;
-
 
         let mut branch: [[T; A]; H] =
             init_fixed_array(|_| init_fixed_array(|_| T::EMPTY_SUBTREE));
@@ -161,7 +145,6 @@ where
                 *item = T::from_reader(&mut reader)?;
             }
         }
-
 
         let mut positions = [0usize; H];
         for position_slot in &mut positions {
@@ -177,6 +160,8 @@ where
 }
 
 /// 递归填充 opening 的分支与路径信息。
+/// 该函数沿目标叶子路径向下递归，再回溯写入每层的分支快照。
+/// 回溯阶段会复制同层可用子节点聚合值，并记录当前路径索引位置。
 fn populate_opening_path<T, const H: usize, const A: usize>(
     opening: &mut Opening<T, H, A>,
     node: &Node<T, H, A>,
@@ -214,8 +199,6 @@ mod tests {
     const A: usize = 2;
     const TREE_CAP: usize = A.pow(H as u32);
 
-
-
     #[derive(Clone, Copy, PartialEq)]
     struct String {
         chars: [char; TREE_CAP],
@@ -234,7 +217,6 @@ mod tests {
         chars: ['0'; TREE_CAP],
         len: 0,
     };
-
 
     impl Aggregate<A> for String {
         const EMPTY_SUBTREE: Self = EMPTY_ITEM;

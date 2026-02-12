@@ -363,6 +363,9 @@ const SSWU_RV1: Fp2 = Fp2 {
 impl HashToField for Fp2 {
     type InputLength = U128;
 
+    /// 将 128 字节 OKM 映射为 Fp2 元素。
+    /// 按规范将输入均分为两段 64 字节，分别映射到 `c0` 与 `c1`。
+    /// 该拆分方式保证 Fp2 映射过程可组合且与 hash_to_field 定义一致。
     fn from_okm(okm: &GenericArray<u8, U128>) -> Fp2 {
         let c0 = <Fp as HashToField>::from_okm(
             GenericArray::<u8, U64>::from_slice(&okm[..64]),
@@ -375,6 +378,9 @@ impl HashToField for Fp2 {
 }
 
 impl Sgn0 for Fp2 {
+    /// 计算 Fp2 的 `sgn0`，采用“先看 c0，若 c0=0 再看 c1”的词典序规则。
+    /// 该规则与 RFC 9380 中扩域元素符号定义一致，用于规范化符号选择。
+    /// 在 SWU 映射中它决定 y 的符号分支，直接影响跨实现一致性。
     fn sgn0(&self) -> Choice {
         let sign_0 = self.c0.sgn0();
         let zero_0 = self.c0.is_zero();
@@ -383,6 +389,9 @@ impl Sgn0 for Fp2 {
     }
 }
 
+/// 对 G2 的基域扩域元素执行 Simplified SWU 映射。
+/// 该函数在 Fp2 上构造候选点，并通过平方根候选与 ETA 集合挑选有效 y。
+/// 输出为同源前曲线上的射影点，后续需经过 isogeny 与 cofactor 清理。
 fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
     let usq = u.square();
     let xi_usq = SSWU_XI * usq;
@@ -447,6 +456,9 @@ fn map_to_curve_simple_swu(u: &Fp2) -> G2Projective {
 }
 
 fn iso_map(u: &G2Projective) -> G2Projective {
+    /// 通过 3-同源映射把 SWU 输出点变换到目标 G2 曲线模型。
+    /// 实现使用有理函数分子/分母多项式在射影坐标下评估，避免显式求逆。
+    /// 该步骤对 hash-to-curve 的正确落曲线与跨实现兼容性至关重要。
     const COEFFS: [&[Fp2]; 4] =
         [&ISO3_XNUM, &ISO3_XDEN, &ISO3_YNUM, &ISO3_YDEN];
 
@@ -482,17 +494,26 @@ fn iso_map(u: &G2Projective) -> G2Projective {
 impl MapToCurve for G2Projective {
     type Field = Fp2;
 
+    /// G2 的 map-to-curve 入口：执行 SWU 映射后再做 isogeny 变换。
+    /// 该流程完成“映射到目标曲线模型”，但尚未确保在目标素数子群。
+    /// 因此应继续调用 `clear_h` 进行 cofactor 清理。
     fn map_to_curve(u: &Fp2) -> G2Projective {
         let pt = map_to_curve_simple_swu(u);
         iso_map(&pt)
     }
 
+    /// 对 G2 点执行 cofactor 清理，投影到 r 阶子群。
+    /// 子群清理是配对安全模型下的必要步骤，可防止小子群攻击面。
+    /// 在签名与验证协议中，这一步通常不可省略。
     fn clear_h(&self) -> Self {
         self.clear_cofactor()
     }
 }
 
 #[cfg(test)]
+/// 测试辅助：检查射影点是否满足 G2 曲线方程。
+/// 该函数用于验证 SWU 与 isogeny 输出的几何正确性。
+/// 它不直接证明子群性，仅用于曲线方程层面的回归断言。
 fn check_g2_prime(pt: &G2Projective) -> bool {
     let zsq = pt.z.square();
     (pt.y.square() * pt.z)
@@ -502,6 +523,9 @@ fn check_g2_prime(pt: &G2Projective) -> bool {
 }
 
 #[test]
+/// 半随机回归测试：验证 G2 SWU 与同源映射路径稳定性。
+/// 采用固定种子保证测试可重复，同时覆盖一定输入分布范围。
+/// 用例目标是捕获边界输入下的曲线方程与映射一致性问题。
 fn test_osswu_semirandom() {
     use rand_core::SeedableRng;
     let mut rng = rand_xorshift::XorShiftRng::from_seed([
@@ -519,6 +543,9 @@ fn test_osswu_semirandom() {
 }
 
 #[test]
+/// 对照 RFC 向量验证 `encode_to_curve` 在 G2 上的输出。
+/// 该路径使用单次采样语义，重点检查标准测试向量逐字节一致。
+/// 通过固定向量可快速识别 DST、映射或编码流程偏差。
 fn test_encode_to_curve_10() {
     use crate::{
         g2::G2Affine,
@@ -531,6 +558,9 @@ fn test_encode_to_curve_10() {
         expected: [&'static str; 4],
     }
     impl TestCase {
+        /// 拼接四段十六进制字符串得到完整未压缩点编码。
+        /// 向量按分段存储有助于控制源码行宽并保持可读性。
+        /// 该辅助函数仅服务测试断言，不参与任何密码学逻辑。
         fn expected(&self) -> String {
             self.expected[0].to_string()
                 + self.expected[1]
@@ -611,6 +641,9 @@ fn test_encode_to_curve_10() {
 }
 
 #[test]
+/// 对照 RFC 向量验证 `hash_to_curve` 在 G2 上的输出。
+/// 与 encode 路径不同，该函数覆盖 random-oracle 风格双采样流程。
+/// 逐字节向量比对可确保实现与规范以及其他实现保持互操作一致。
 fn test_hash_to_curve_10() {
     use crate::{
         g2::G2Affine,
@@ -623,6 +656,9 @@ fn test_hash_to_curve_10() {
         expected: [&'static str; 4],
     }
     impl TestCase {
+        /// 拼接四段十六进制字符串以构造完整期望输出。
+        /// 这种封装减少测试主体中的模板重复，提高可维护性。
+        /// 分段拼接不影响语义，仅用于源码组织和阅读友好性。
         fn expected(&self) -> String {
             self.expected[0].to_string()
                 + self.expected[1]
@@ -703,6 +739,9 @@ fn test_hash_to_curve_10() {
 }
 
 #[test]
+/// 验证 Fp2 上 `sgn0` 在边界与组合样例上的行为。
+/// 用例覆盖 c0/c1 不同零值组合，检查“先 c0 后 c1”的规则实现。
+/// 该测试直接关系到 G2 SWU 中 y 符号规范化分支的一致性。
 fn test_sgn0() {
     use super::map_g1::P_M1_OVER2;
 

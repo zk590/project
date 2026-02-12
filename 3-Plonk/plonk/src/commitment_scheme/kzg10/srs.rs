@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/srs.rs）。
-
-//
-
 use super::key::{CommitKey, OpeningKey};
 use crate::{error::Error, util};
 use alloc::vec::Vec;
@@ -37,6 +33,9 @@ pub struct PublicParameters {
 impl PublicParameters {
     const ADDED_BLINDING_DEGREE: usize = 6;
 
+    /// 生成 KZG 公共参数（SRS）。
+    /// 该过程随机采样隐藏标量 `x`，并构造 `g, g^x, ...` 与 `h, h^x` 结构。
+    /// 为支持盲化多项式，内部会在请求度数基础上追加固定盲化余量。
     pub fn setup<R: RngCore + CryptoRng>(
         mut max_degree: usize,
         mut rng: &mut R,
@@ -47,29 +46,39 @@ impl PublicParameters {
 
         max_degree += Self::ADDED_BLINDING_DEGREE;
 
-        let x = BlsScalar::random(&mut rng);
+        let toxic_waste = BlsScalar::random(&mut rng);
 
-        let powers_of_x = util::powers_of(&x, max_degree);
+        let powers_of_toxic_waste = util::powers_of(&toxic_waste, max_degree);
 
-        let g = util::random_g1_point(&mut rng);
+        let g1_generator = util::random_g1_point(&mut rng);
         let powers_of_g: Vec<G1Projective> =
-            util::slow_multiscalar_mul_single_base(&powers_of_x, g);
+            util::slow_multiscalar_mul_single_base(
+                &powers_of_toxic_waste,
+                g1_generator,
+            );
         assert_eq!(powers_of_g.len(), max_degree + 1);
 
         let mut normalized_g = vec![G1Affine::identity(); max_degree + 1];
         G1Projective::batch_normalize(&powers_of_g, &mut normalized_g);
 
-        let h: G2Affine = util::random_g2_point(&mut rng).into();
-        let x_2: G2Affine = (h * x).into();
+        let g2_generator: G2Affine = util::random_g2_point(&mut rng).into();
+        let x_h: G2Affine = (g2_generator * toxic_waste).into();
 
         Ok(PublicParameters {
             commit_key: CommitKey {
                 powers_of_g: normalized_g,
             },
-            opening_key: OpeningKey::new(g.into(), h, x_2),
+            opening_key: OpeningKey::new(
+                g1_generator.into(),
+                g2_generator,
+                x_h,
+            ),
         })
     }
 
+    /// 将公共参数编码为“原始字节”格式。
+    /// 该格式优先追求体积与速度，不保证对非法输入的健壮校验能力。
+    /// 适合受信任环境下的缓存落盘与快速加载场景。
     pub fn to_raw_var_bytes(&self) -> Vec<u8> {
         let mut bytes = self.opening_key.to_bytes().to_vec();
         bytes.extend(&self.commit_key.to_raw_var_bytes());
@@ -77,13 +86,16 @@ impl PublicParameters {
         bytes
     }
 
+    /// 从原始字节恢复公共参数（不做完整合法性检查）。
+    /// 调用方必须保证输入字节来源可信且格式正确，否则可能导致未定义行为风险。
+    /// 该接口应仅在受控边界内使用，并优先搭配 `to_raw_var_bytes` 输出。
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
-        let opening_key = &bytes[..OpeningKey::SIZE];
-        let opening_key = OpeningKey::from_slice(opening_key)
+        let serialized_opening_key = &bytes[..OpeningKey::SIZE];
+        let opening_key = OpeningKey::from_slice(serialized_opening_key)
             .expect("Error at OpeningKey deserialization");
 
-        let commit_key = &bytes[OpeningKey::SIZE..];
-        let commit_key = CommitKey::from_slice_unchecked(commit_key);
+        let serialized_commit_key = &bytes[OpeningKey::SIZE..];
+        let commit_key = CommitKey::from_slice_unchecked(serialized_commit_key);
 
         Self {
             commit_key,
@@ -91,19 +103,25 @@ impl PublicParameters {
         }
     }
 
+    /// 将公共参数编码为安全可解析的可变长字节序列。
+    /// 该格式与 `from_slice` 一一对应，优先保证可移植性和解析稳定性。
+    /// 推荐用于跨进程传输或持久化到不完全受信任的介质。
     pub fn to_var_bytes(&self) -> Vec<u8> {
         let mut bytes = self.opening_key.to_bytes().to_vec();
         bytes.extend(self.commit_key.to_var_bytes().iter());
         bytes
     }
 
+    /// 从可变长字节切片恢复公共参数。
+    /// 该函数会先解析 opening key，再解析 commit key，并检查基础长度约束。
+    /// 解析失败返回错误，调用方可据此回退到重新生成参数流程。
     pub fn from_slice(bytes: &[u8]) -> Result<PublicParameters, Error> {
         if bytes.len() <= OpeningKey::SIZE {
             return Err(Error::NotEnoughBytes);
         }
-        let mut byte_reader = bytes;
-        let opening_key = OpeningKey::from_reader(&mut byte_reader)?;
-        let commit_key = CommitKey::from_slice(byte_reader)?;
+        let mut remaining_bytes = bytes;
+        let opening_key = OpeningKey::from_reader(&mut remaining_bytes)?;
+        let commit_key = CommitKey::from_slice(remaining_bytes)?;
 
         let public_parameters = PublicParameters {
             commit_key,
@@ -113,17 +131,23 @@ impl PublicParameters {
         Ok(public_parameters)
     }
 
+    /// 按目标度数裁剪提交键，并返回对应 opening key。
+    /// 裁剪过程会自动考虑盲化附加度数，确保后续证明流程可正常工作。
+    /// 该接口常用于“先生成大 SRS，再按电路规模动态截取”的部署模式。
     pub(crate) fn trim(
         &self,
         truncated_degree: usize,
     ) -> Result<(CommitKey, OpeningKey), Error> {
-        let truncated_prover_key = self
+        let truncated_commit_key = self
             .commit_key
             .truncate(truncated_degree + Self::ADDED_BLINDING_DEGREE)?;
         let opening_key = self.opening_key.clone();
-        Ok((truncated_prover_key, opening_key))
+        Ok((truncated_commit_key, opening_key))
     }
 
+    /// 返回当前公共参数可支持的最大多项式度数。
+    /// 该值来自 commit key 长度，与电路最大约束规模直接相关。
+    /// 上层在编译电路前可用它做容量上界检查。
     pub fn max_degree(&self) -> usize {
         self.commit_key.max_degree()
     }
@@ -138,17 +162,17 @@ mod test {
 
     #[test]
     fn test_powers_of() {
-        let x = BlsScalar::from(10u64);
+        let scalar = BlsScalar::from(10u64);
         let degree = 100u64;
 
-        let powers_of_x = util::powers_of(&x, degree as usize);
+        let powers_of_scalar = util::powers_of(&scalar, degree as usize);
 
-        for (power_index, power_value) in powers_of_x.iter().enumerate() {
-            assert_eq!(*power_value, x.pow(&[power_index as u64, 0, 0, 0]))
+        for (power_index, power_value) in powers_of_scalar.iter().enumerate() {
+            assert_eq!(*power_value, scalar.pow(&[power_index as u64, 0, 0, 0]))
         }
 
-        let last_element = powers_of_x.last().unwrap();
-        assert_eq!(*last_element, x.pow(&[degree, 0, 0, 0]))
+        let last_element = powers_of_scalar.last().unwrap();
+        assert_eq!(*last_element, scalar.pow(&[degree, 0, 0, 0]))
     }
 
     #[test]

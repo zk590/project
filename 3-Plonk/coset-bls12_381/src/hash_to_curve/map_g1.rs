@@ -499,6 +499,9 @@ const SQRT_M_XI_CUBED: Fp = Fp::from_raw_unchecked([
 impl HashToField for Fp {
     type InputLength = U64;
 
+    /// 将 64 字节 OKM 映射为 Fp 元素。
+    /// 实现采用“高 32 字节 + 低 32 字节”分段构造，再用常量 `2^256` 组合。
+    /// 该流程与 RFC 9380 的 hash_to_field 约简语义一致，保证跨实现兼容性。
     fn from_okm(okm: &GenericArray<u8, U64>) -> Fp {
         const F_2_256: Fp = Fp::from_raw_unchecked([
             0x075b_3cd7_c5ce_820f,
@@ -521,6 +524,9 @@ impl HashToField for Fp {
 }
 
 impl Sgn0 for Fp {
+    /// 计算 Fp 元素的 `sgn0`（最低有效位符号）。
+    /// 为避免表示差异，先经 Montgomery 归约得到规范表示再取最低位。
+    /// 该符号在 SWU 映射中用于选择 y 的符号，确保输出确定性。
     fn sgn0(&self) -> Choice {
         let tmp = Fp::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], self.0[4], self.0[5],
@@ -530,10 +536,10 @@ impl Sgn0 for Fp {
     }
 }
 
-///
-
-///
-
+/// 对 G1 曲线执行 Simplified SWU 映射（映射到等价曲线模型）。
+/// 该函数把域元素 `u` 变换为曲线点的射影坐标，核心包含候选 x/y
+/// 构造与平方根选择。 输出点随后还需经过 isogeny 与 cofactor
+/// 清理，才能得到目标曲线子群点。
 fn map_to_curve_simple_swu(u: &Fp) -> G1Projective {
     let usq = u.square();
     let xi_usq = SSWU_XI * usq;
@@ -573,6 +579,10 @@ fn map_to_curve_simple_swu(u: &Fp) -> G1Projective {
 }
 
 fn iso_map(u: &G1Projective) -> G1Projective {
+    /// 通过 11-同源映射（isogeny）把 SWU 曲线点映射到目标 BLS12-381 G1 曲线。
+    /// 映射按有理函数 `x_num/x_den`、`y_num/y_den`
+    /// 评估，并在射影坐标下避免显式除法。 该步骤是 hash-to-curve
+    /// 标准流程的关键桥接环节，保证落在正确曲线模型上。
     const COEFFS: [&[Fp]; 4] =
         [&ISO11_XNUM, &ISO11_XDEN, &ISO11_YNUM, &ISO11_YDEN];
 
@@ -614,17 +624,26 @@ fn iso_map(u: &G1Projective) -> G1Projective {
 impl MapToCurve for G1Projective {
     type Field = Fp;
 
+    /// G1 的 map-to-curve 入口：先做 SWU，再做 isogeny 映射。
+    /// 这一步仅完成“映射到曲线”，不保证已经位于目标素数子群。
+    /// 后续应结合 `clear_h` 执行 cofactor 清理得到安全子群点。
     fn map_to_curve(u: &Fp) -> G1Projective {
         let pt = map_to_curve_simple_swu(u);
         iso_map(&pt)
     }
 
+    /// 对 G1 点执行 cofactor 清理。
+    /// 清理后点被投影到 r-阶子群，可安全用于配对、签名与验证流程。
+    /// 这是 hash-to-curve 从“曲线点”到“密码学可用群点”的必要收尾步骤。
     fn clear_h(&self) -> Self {
         self.clear_cofactor()
     }
 }
 
 #[cfg(test)]
+/// 检查给定射影点是否满足曲线方程（测试辅助函数）。
+/// 该函数用于验证 SWU/同源映射输出在代数上确实位于目标曲线。
+/// 它只做方程层面的几何一致性检查，不替代子群性验证。
 fn check_g1_prime(pt: &G1Projective) -> bool {
     let zsq = pt.z.square();
     (pt.y.square() * pt.z)
@@ -634,6 +653,9 @@ fn check_g1_prime(pt: &G1Projective) -> bool {
 }
 
 #[test]
+/// 验证 SWU 映射在规范测试输入上的期望输出。
+/// 用多个固定向量覆盖零值、特殊值与普通值，确保映射分支稳定。
+/// 该测试可有效捕获符号选择、分母退化与平方根路径错误。
 fn test_simple_swu_expected() {
     let p = map_to_curve_simple_swu(&Fp::zero());
     let G1Projective { x, y, z } = &p;
@@ -738,6 +760,9 @@ fn test_simple_swu_expected() {
 }
 
 #[test]
+/// 半随机回归：验证 SWU + isogeny 结果持续在曲线上。
+/// 测试用固定种子生成随机输入，兼顾可重复性与覆盖面。
+/// 它用于发现仅在特定输入分布触发的边界错误。
 fn test_osswu_semirandom() {
     use rand_core::SeedableRng;
     let mut rng = rand_xorshift::XorShiftRng::from_seed([
@@ -755,6 +780,9 @@ fn test_osswu_semirandom() {
 }
 
 #[test]
+/// 对照 RFC 向量验证 `encode_to_curve` 结果（G1, XMD:SHA-256）。
+/// 该测试确保单采样编码路径在字节输出上与标准一致。
+/// 适合作为互操作回归基准，防止实现细节偏离规范。
 fn test_encode_to_curve_10() {
     use crate::{
         g1::G1Affine,
@@ -767,6 +795,9 @@ fn test_encode_to_curve_10() {
         expected: [&'static str; 2],
     }
     impl TestCase {
+        /// 拼接双段十六进制字符串得到完整期望值。
+        /// 向量数据拆段存放可保持源码行长可读性。
+        /// 该辅助方法只服务测试断言，不参与算法逻辑。
         fn expected(&self) -> String {
             self.expected[0].to_string() + self.expected[1]
         }
@@ -835,6 +866,9 @@ fn test_encode_to_curve_10() {
 }
 
 #[test]
+/// 对照 RFC 向量验证 `hash_to_curve` 结果（G1, XMD:SHA-256）。
+/// 相比 encode 路径，这里覆盖双采样 random-oracle 语义。
+/// 测试通过固定向量比对，确保跨实现输出逐字节一致。
 fn test_hash_to_curve_10() {
     use crate::{
         g1::G1Affine,
@@ -847,6 +881,9 @@ fn test_hash_to_curve_10() {
         expected: [&'static str; 2],
     }
     impl TestCase {
+        /// 拼接双段十六进制字符串得到完整期望值。
+        /// 与 encode 测试共用同一辅助模式，减少重复模板代码。
+        /// 这样可使向量维护更集中、断言表达更清晰。
         fn expected(&self) -> String {
             self.expected[0].to_string() + self.expected[1]
         }
@@ -925,6 +962,9 @@ pub const P_M1_OVER2: Fp = Fp::from_raw_unchecked([
 ]);
 
 #[test]
+/// 验证 `sgn0` 在若干边界值上的行为符合定义。
+/// 覆盖 0、1、-1、(p-1)/2 等关键点，检查奇偶判定一致性。
+/// 该测试直接关系到 SWU 中符号选择分支的确定性与互操作性。
 fn test_sgn0() {
     assert_eq!(bool::from(Fp::zero().sgn0()), false);
     assert_eq!(bool::from(Fp::one().sgn0()), true);

@@ -99,6 +99,9 @@ impl ConstantTimeEq for Fp6 {
 }
 
 impl Fp6 {
+    /// 返回 Fp6 的加法单位元。
+    /// 在三项表示 `c0 + c1*v + c2*v^2` 中，所有分量均为零。
+    /// 该值常用于累加初始化与错误恢复路径。
     #[inline]
     pub fn zero() -> Self {
         Fp6 {
@@ -108,6 +111,9 @@ impl Fp6 {
         }
     }
 
+    /// 返回 Fp6 的乘法单位元。
+    /// 仅 `c0 = 1`，其余分量为 0，对应扩域中的常数 1。
+    /// 该常量用于幂运算与逆元算法的初始状态。
     #[inline]
     pub fn one() -> Self {
         Fp6 {
@@ -118,6 +124,9 @@ impl Fp6 {
     }
 
     #[cfg(feature = "pairings")]
+    /// 生成一个 Fp6 随机元素。
+    /// 三个 Fp2 分量分别独立随机采样，组成扩域元素。
+    /// 该函数主要用于测试、基准与配对相关随机流程。
     pub(crate) fn random(mut rng: impl RngCore) -> Self {
         Fp6 {
             c0: Fp2::random(&mut rng),
@@ -126,6 +135,9 @@ impl Fp6 {
         }
     }
 
+    /// 与只含 `c1*v` 项的稀疏元素相乘。
+    /// 该特化路径避免通用乘法中的冗余乘加，减少开销。
+    /// 常见于配对最终指数或 Miller 循环中的稀疏乘法场景。
     pub fn mul_by_1(&self, c1: &Fp2) -> Fp6 {
         Fp6 {
             c0: (self.c2 * c1).mul_by_nonresidue(),
@@ -134,6 +146,9 @@ impl Fp6 {
         }
     }
 
+    /// 与稀疏元素 `c0 + c1*v` 相乘的特化实现。
+    /// 通过复用中间量 `a_a/b_b` 降低乘法次数并减少临时对象。
+    /// 该函数在配对运算中可显著降低扩域乘法成本。
     pub fn mul_by_01(&self, c0: &Fp2, c1: &Fp2) -> Fp6 {
         let a_a = self.c0 * c0;
         let b_b = self.c1 * c1;
@@ -151,6 +166,9 @@ impl Fp6 {
         }
     }
 
+    /// 乘以 Fp6 构造中的非剩余元 `v`。
+    /// 在表示上等价于循环移位并对最高项做一次 `mul_by_nonresidue`。
+    /// 这是扩域约化步骤的基础操作，被平方与乘法频繁复用。
     pub fn mul_by_nonresidue(&self) -> Self {
         Fp6 {
             c0: self.c2.mul_by_nonresidue(),
@@ -159,6 +177,9 @@ impl Fp6 {
         }
     }
 
+    /// 对 Fp6 元素应用 Frobenius 自同构。
+    /// 每个 Fp2 分量先做 Frobenius，再乘以对应预计算系数。
+    /// 该映射在配对算法和子群判定中是核心工具。
     #[inline(always)]
     pub fn frobenius_map(&self) -> Self {
         let c0 = self.c0.frobenius_map();
@@ -194,27 +215,19 @@ impl Fp6 {
         Fp6 { c0, c1, c2 }
     }
 
+    /// 常时间判断当前 Fp6 元素是否为零。
+    /// 通过合并三个分量的零判定得到最终结果。
+    /// 该接口适用于密码学上下文中的条件分支控制。
     #[inline(always)]
     pub fn is_zero(&self) -> Choice {
         self.c0.is_zero() & self.c1.is_zero() & self.c2.is_zero()
     }
 
-    ///
-
+    /// Fp6 通用乘法的交织实现（interleaved multiplication）。
+    /// 该写法把 Fp2 运算拆成 Fp 级 `sum_of_products`，提升流水并行性。
+    /// 在保持代数等价的同时，通常比朴素分层乘法更高效。
     #[inline]
     fn mul_interleaved(&self, b: &Self) -> Self {
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
         let a = self;
         let b10_p_b11 = b.c1.c0 + b.c1.c1;
         let b10_m_b11 = b.c1.c0 - b.c1.c1;
@@ -261,6 +274,9 @@ impl Fp6 {
         }
     }
 
+    /// Fp6 平方特化实现。
+    /// 利用平方对称性和中间量复用，减少相对通用乘法的成本。
+    /// 该函数在幂运算中出现频率高，是重要的性能热点。
     #[inline]
     pub fn square(&self) -> Self {
         let s0 = self.c0.square();
@@ -278,6 +294,9 @@ impl Fp6 {
         }
     }
 
+    /// 计算 Fp6 乘法逆元。
+    /// 通过构造伴随系数 `c0/c1/c2`，把问题降到一次 Fp2 逆元。
+    /// 若判别项不可逆（仅零元素情况），返回 `CtOption::none()`。
     #[inline]
     pub fn invert(&self) -> CtOption<Self> {
         let c0 = (self.c1 * self.c2).mul_by_nonresidue();

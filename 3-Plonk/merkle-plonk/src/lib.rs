@@ -8,8 +8,8 @@ use poseidon_merkle::{Item, Opening, Tree};
 use rand::SeedableRng;
 use rand::rngs::StdRng;
 use rkyv::{Archive, Deserialize, Serialize};
-use std::fs::File;
 use std::ffi::CStr;
+use std::fs::File;
 use std::io::{Error as IoError, ErrorKind};
 use std::io::{Read, Write};
 use std::os::raw::c_char;
@@ -35,6 +35,9 @@ pub struct BatchProofConfig {
 }
 
 impl Default for BatchProofConfig {
+    /// 提供一组可直接运行的默认批处理配置。
+    /// 默认值优先复用 `common::constants` 中的路径约定，减少迁移改造成本。
+    /// 外部集成时可基于该配置按需覆盖路径、容量与输出文件名前缀。
     fn default() -> Self {
         Self {
             merkle_input_file: PathBuf::from(
@@ -94,6 +97,9 @@ pub struct OpeningCircuit {
 }
 
 impl Default for OpeningCircuit {
+    /// 构造一个可用于“电路编译/参数生成”的最小默认电路实例。
+    /// 默认实例使用单叶节点树，保证所有约束路径可被完整构建。
+    /// 该值主要用于 `Compiler::compile` 阶段，不依赖真实业务输入。
     fn default() -> Self {
         let empty = Item::<()> {
             hash: BlsScalar::zero(),
@@ -132,7 +138,9 @@ impl Circuit for OpeningCircuit {
     }
 }
 
-// 从文件读取并使用rkyv反序列化数据
+/// 从磁盘读取原始字节并做存在性检查。
+/// 该函数是输入装载的统一入口，确保“文件不存在”与“读取失败”可区分。
+/// 返回值只负责字节级载入，具体反序列化由上层按数据结构完成。
 fn read_file_bytes_checked(
     file_path: impl AsRef<Path>,
 ) -> Result<Vec<u8>, IoError> {
@@ -275,7 +283,11 @@ pub fn process_batch_proofs_with_config(
     for (leaf_index, leaf_info) in
         all_leaves_data.leaves_info.iter().enumerate()
     {
-        println!("\n处理叶子节点 {} （位置: {}）", leaf_index + 1,leaf_info.position);
+        println!(
+            "\n处理叶子节点 {} （位置: {}）",
+            leaf_index + 1,
+            leaf_info.position
+        );
         if leaf_index == 0 {
             println!(
                 "Plonk Public_input.leaf = {}",
@@ -384,9 +396,9 @@ pub fn process_batch_proofs_with_config(
 
         println!("  成功保存证明数据");
         // println!("   ├── 证明文件: {}", proof_file_path.display());
-        // println!("   ├── 证明数据大小: {} 字节", proof_bytes_serialized.len());
-        // println!("   ├── 公开输入文件: {}", public_inputs_file_path.display());
-        // println!(
+        // println!("   ├── 证明数据大小: {} 字节",
+        // proof_bytes_serialized.len()); println!("   ├── 公开输入文件:
+        // {}", public_inputs_file_path.display()); println!(
         //     "   └── 公开输入数据大小: {} 字节",
         //     public_inputs_bytes_serialized.len()
         // );
@@ -428,6 +440,9 @@ pub fn run_batch_cli_with_config(config: &BatchProofConfig) {
     }
 }
 
+/// 将 C 侧传入的 `char*` 路径转换为 Rust `PathBuf`。
+/// 该函数统一处理空指针与 UTF-8 解码失败，避免 FFI 边界出现未定义行为。
+/// 成功返回后，调用方可按普通本地路径参与后续配置构建与 I/O 操作。
 fn parse_c_string_path(raw: *const c_char) -> Result<PathBuf, ()> {
     if raw.is_null() {
         return Err(());
@@ -443,6 +458,7 @@ fn parse_c_string_path(raw: *const c_char) -> Result<PathBuf, ()> {
 /// 返回值：
 /// - `0` 成功
 /// - `1` 失败
+/// 该接口适合“零配置”接入场景，调用方无需关心路径细节即可触发全流程。
 #[unsafe(no_mangle)]
 pub extern "C" fn merkle_plonk_process_batch_default() -> i32 {
     match process_batch_proofs() {
@@ -457,6 +473,7 @@ pub extern "C" fn merkle_plonk_process_batch_default() -> i32 {
 /// - `0` 成功
 /// - `1` 业务处理失败
 /// - `2` 参数无效（空指针或非 UTF-8）
+/// 该接口用于外部系统按需注入路径与容量参数，实现与宿主工程的目录解耦。
 #[unsafe(no_mangle)]
 pub extern "C" fn merkle_plonk_process_batch_with_paths(
     merkle_input_file: *const c_char,

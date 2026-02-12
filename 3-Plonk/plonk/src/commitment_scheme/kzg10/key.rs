@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/key.rs）。
-
-//
-
 use super::{proof::Proof, Commitment};
 use crate::{
     error::Error, fft::Polynomial, transcript::TranscriptProtocol, util,
@@ -35,36 +31,47 @@ pub struct CommitKey {
 }
 
 impl CommitKey {
+    /// 将提交键编码为原始字节格式。
+    /// 输出包含点数量前缀与每个 G1 点的原始字节表示，适合高性能缓存场景。
+    /// 该格式假设输入受信任，不提供强健的结构化错误恢复能力。
     pub fn to_raw_var_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(
             u64::SIZE + self.powers_of_g.len() * G1Affine::RAW_SIZE,
         );
 
-        let len = self.powers_of_g.len() as u64;
-        let len = len.to_le_bytes();
-        bytes.extend_from_slice(&len);
+        let powers_len = self.powers_of_g.len() as u64;
+        let powers_len_bytes = powers_len.to_le_bytes();
+        bytes.extend_from_slice(&powers_len_bytes);
 
         self.powers_of_g
             .iter()
-            .for_each(|g| bytes.extend_from_slice(&g.to_raw_bytes()));
+            .for_each(|power| bytes.extend_from_slice(&power.to_raw_bytes()));
 
         bytes
     }
 
+    /// 从原始字节恢复提交键（不做完整校验）。
+    /// 调用方需保证字节来源可信且与编码格式严格匹配。
+    /// 推荐仅在受控环境中与 `to_raw_var_bytes` 配套使用。
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
-        let mut len = [0u8; u64::SIZE];
-        len.copy_from_slice(&bytes[..u64::SIZE]);
-        let len = u64::from_le_bytes(len);
+        let mut powers_len_bytes = [0u8; u64::SIZE];
+        powers_len_bytes.copy_from_slice(&bytes[..u64::SIZE]);
+        let powers_len = u64::from_le_bytes(powers_len_bytes);
 
         let powers_of_g = bytes[u64::SIZE..]
             .chunks_exact(G1Affine::RAW_SIZE)
-            .zip(0..len)
-            .map(|(c, _)| G1Affine::from_slice_unchecked(c))
+            .zip(0..powers_len)
+            .map(|(serialized_power, _)| {
+                G1Affine::from_slice_unchecked(serialized_power)
+            })
             .collect();
 
         Self { powers_of_g }
     }
 
+    /// 将提交键编码为安全可解析格式。
+    /// 该格式按点序列顺序写入标准压缩字节，便于跨端传输。
+    /// 对应的 `from_slice` 会逐点解析并返回结构化错误。
     pub fn to_var_bytes(&self) -> Vec<u8> {
         self.powers_of_g
             .iter()
@@ -72,6 +79,9 @@ impl CommitKey {
             .collect()
     }
 
+    /// 从字节切片解析提交键。
+    /// 输入按固定点大小分块，每块解析为一个 `G1Affine`。
+    /// 任意块解析失败都会中止并返回错误，避免半有效键被误用。
     pub fn from_slice(bytes: &[u8]) -> Result<CommitKey, Error> {
         let powers_of_g = bytes
             .chunks(G1Affine::SIZE)
@@ -81,10 +91,16 @@ impl CommitKey {
         Ok(CommitKey { powers_of_g })
     }
 
+    /// 返回提交键支持的最大多项式度数。
+    /// 该上界由 `powers_of_g` 长度决定，是提交算法的容量约束核心参数。
+    /// 调用方可在提交前用该值进行输入多项式度数预检查。
     pub(crate) fn max_degree(&self) -> usize {
         self.powers_of_g.len() - 1
     }
 
+    /// 裁剪提交键到指定度数范围。
+    /// 裁剪后仅保留所需幂次点，减少内存占用并限制可提交多项式规模。
+    /// 当目标度数非法（过小或过大）时返回明确错误。
     pub(crate) fn truncate(
         &self,
         mut truncated_degree: usize,
@@ -97,14 +113,17 @@ impl CommitKey {
                 if i == 1 {
                     truncated_degree += 1
                 };
-                let truncated_powers = Self {
+                let truncated_commit_key = Self {
                     powers_of_g: self.powers_of_g[..=truncated_degree].to_vec(),
                 };
-                Ok(truncated_powers)
+                Ok(truncated_commit_key)
             }
         }
     }
 
+    /// 校验提交多项式度数是否在提交键支持范围内。
+    /// 该检查用于在昂贵 MSM 前快速失败，避免不必要计算开销。
+    /// 返回值区分“零度非法”与“超过上界”两类错误，便于上层诊断。
     fn check_commit_degree_is_within_bounds(
         &self,
         poly_degree: usize,
@@ -116,6 +135,9 @@ impl CommitKey {
         }
     }
 
+    /// 对多项式执行 KZG 提交。
+    /// 该过程将多项式系数与 SRS 幂次点做 MSM，得到单个承诺点。
+    /// 在执行提交前会先进行度数边界校验以保证参数合法。
     pub(crate) fn commit(
         &self,
         polynomial: &Polynomial,
@@ -128,19 +150,23 @@ impl CommitKey {
         )))
     }
 
+    /// 计算批量打开所需的聚合见证多项式。
+    /// 做法是按挑战值幂次线性组合多个多项式，再对目标点执行 Ruffini 除法。
+    /// 返回结果可用于一次性生成批量等价见证，降低验证开销。
     pub(crate) fn compute_aggregate_witness(
         polynomials: &[Polynomial],
         point: &BlsScalar,
         v_challenge: &BlsScalar,
     ) -> Polynomial {
-        let powers = util::powers_of(v_challenge, polynomials.len() - 1);
+        let challenge_powers =
+            util::powers_of(v_challenge, polynomials.len() - 1);
 
-        assert_eq!(powers.len(), polynomials.len());
+        assert_eq!(challenge_powers.len(), polynomials.len());
 
         let numerator: Polynomial = polynomials
             .iter()
-            .zip(powers.iter())
-            .map(|(poly, v_challenge)| poly * v_challenge)
+            .zip(challenge_powers.iter())
+            .map(|(polynomial, challenge_power)| polynomial * challenge_power)
             .sum();
         numerator.ruffini(*point)
     }
@@ -174,6 +200,9 @@ pub struct OpeningKey {
 impl Serializable<{ G1Affine::SIZE + G2Affine::SIZE * 2 }> for OpeningKey {
     type Error = coset_bytes::Error;
     #[allow(unused_must_use)]
+    /// 将 opening key 编码为定长字节。
+    /// 编码内容包含 `g`、`h` 与 `x_h`，不包含预处理后的配对辅助结构。
+    /// 反序列化时会通过 `new` 自动重建预处理字段。
     fn to_bytes(&self) -> [u8; Self::SIZE] {
         use coset_bytes::Write;
         let mut serialized_opening_key = [0u8; Self::SIZE];
@@ -186,19 +215,25 @@ impl Serializable<{ G1Affine::SIZE + G2Affine::SIZE * 2 }> for OpeningKey {
         serialized_opening_key
     }
 
+    /// 从定长字节恢复 opening key。
+    /// 该过程逐项解析群元素并重新构建配对预处理缓存。
+    /// 若任一群元素字节无效则返回错误，防止错误密钥进入验证流程。
     fn from_bytes(
         serialized_opening_key: &[u8; Self::SIZE],
     ) -> Result<Self, Self::Error> {
-        let mut opening_key_reader = &serialized_opening_key[..];
-        let g = G1Affine::from_reader(&mut opening_key_reader)?;
-        let h = G2Affine::from_reader(&mut opening_key_reader)?;
-        let beta_h = G2Affine::from_reader(&mut opening_key_reader)?;
+        let mut opening_key_bytes = &serialized_opening_key[..];
+        let generator_g1 = G1Affine::from_reader(&mut opening_key_bytes)?;
+        let generator_g2 = G2Affine::from_reader(&mut opening_key_bytes)?;
+        let x_h = G2Affine::from_reader(&mut opening_key_bytes)?;
 
-        Ok(Self::new(g, h, beta_h))
+        Ok(Self::new(generator_g1, generator_g2, x_h))
     }
 }
 
 impl OpeningKey {
+    /// 构造 opening key 并预计算配对加速结构。
+    /// 预处理后的 `prepared_h` 与 `prepared_x_h` 可显著降低批量验证开销。
+    /// 该构造是反序列化与参数生成路径共享的统一入口。
     pub(crate) fn new(g: G1Affine, h: G2Affine, x_h: G2Affine) -> OpeningKey {
         let prepared_h = G2Prepared::from(h);
         let prepared_x_h = G2Prepared::from(x_h);
@@ -212,6 +247,9 @@ impl OpeningKey {
     }
 
     #[allow(dead_code)]
+    /// 对一组证明执行批量配对校验。
+    /// 该算法通过挑战值将多条等式压缩为两次配对的单条关系。
+    /// 若配对结果不是单位元则返回校验失败错误。
     pub(crate) fn batch_check(
         &self,
         points: &[BlsScalar],
@@ -222,20 +260,21 @@ impl OpeningKey {
         let mut total_w = G1Projective::identity();
 
         let u_challenge = transcript.challenge_scalar(b"batch");
-        let powers = util::powers_of(&u_challenge, proofs.len() - 1);
+        let challenge_powers = util::powers_of(&u_challenge, proofs.len() - 1);
 
         let mut g_multiplier = BlsScalar::zero();
 
-        for ((proof, u_challenge), point) in
-            proofs.iter().zip(powers).zip(points)
+        for ((proof, challenge_power), point) in
+            proofs.iter().zip(challenge_powers).zip(points)
         {
-            let mut c = G1Projective::from(proof.commitment_to_polynomial.0);
-            let w = proof.commitment_to_witness.0;
-            c += w * point;
-            g_multiplier += u_challenge * proof.evaluated_point;
+            let mut polynomial_commitment =
+                G1Projective::from(proof.commitment_to_polynomial.0);
+            let witness_commitment = proof.commitment_to_witness.0;
+            polynomial_commitment += witness_commitment * point;
+            g_multiplier += challenge_power * proof.evaluated_point;
 
-            total_c += c * u_challenge;
-            total_w += w * u_challenge;
+            total_c += polynomial_commitment * challenge_power;
+            total_w += witness_commitment * challenge_power;
         }
         total_c -= self.g * g_multiplier;
 
@@ -349,8 +388,8 @@ mod test {
 
         let proof = open_single(&ck, &poly, &value, &point)?;
 
-        let ok = check(&opening_key, point, proof);
-        assert!(ok);
+        let is_valid = check(&opening_key, point, proof);
+        assert!(is_valid);
         Ok(())
     }
     #[test]
@@ -402,14 +441,14 @@ mod test {
             )?
         };
 
-        let ok = {
+        let is_valid = {
             let transcript = &mut Transcript::new(b"agg_flatten");
             let v_challenge = transcript.challenge_scalar(b"v_challenge");
             let flattened_proof = aggregated_proof.flatten(&v_challenge);
             check(&opening_key, point, flattened_proof)
         };
 
-        assert!(ok);
+        assert!(is_valid);
         Ok(())
     }
 

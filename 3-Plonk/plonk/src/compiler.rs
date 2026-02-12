@@ -1,5 +1,3 @@
-//
-
 use coset_bls12_381::BlsScalar;
 
 use crate::commitment_scheme::{CommitKey, OpeningKey, PublicParameters};
@@ -65,9 +63,9 @@ impl Compiler {
         label: &[u8],
         composer: &Composer,
     ) -> Result<(Prover, Verifier), Error> {
-        let n = (composer.constraints() + 6).next_power_of_two();
+        let evaluation_size = (composer.constraints() + 6).next_power_of_two();
 
-        let (commit, opening) = pp.trim(n)?;
+        let (commit, opening) = pp.trim(evaluation_size)?;
 
         let (prover, verifier) =
             Self::preprocess(label, commit, opening, composer)?;
@@ -75,34 +73,39 @@ impl Compiler {
         Ok((prover, verifier))
     }
 
+    /// 预处理电路并构造 prover/verifier 键材料。
+    /// 该流程会提取 selector、构建 sigma 多项式、计算承诺并生成各 widget 键。
+    /// 同时会预计算 coset 评估表，供后续证明阶段高频复用。
     fn preprocess(
         label: &[u8],
         commit_key: CommitKey,
         opening_key: OpeningKey,
-        prover: &Composer,
+        composer: &Composer,
     ) -> Result<(Prover, Verifier), Error> {
-        let mut perm = prover.perm.clone();
+        let mut permutation_map = composer.perm.clone();
 
-        let constraints = prover.constraints();
-        let size = constraints.next_power_of_two();
+        let constraint_count = composer.constraints();
+        let padded_circuit_size = constraint_count.next_power_of_two();
 
-        let domain = EvaluationDomain::new(size - 1)?;
+        let domain = EvaluationDomain::new(padded_circuit_size - 1)?;
 
         //
 
-        let mut q_m = vec![BlsScalar::zero(); size];
-        let mut q_l = vec![BlsScalar::zero(); size];
-        let mut q_r = vec![BlsScalar::zero(); size];
-        let mut q_o = vec![BlsScalar::zero(); size];
-        let mut q_f = vec![BlsScalar::zero(); size];
-        let mut q_c = vec![BlsScalar::zero(); size];
-        let mut q_arith = vec![BlsScalar::zero(); size];
-        let mut q_range = vec![BlsScalar::zero(); size];
-        let mut q_logic = vec![BlsScalar::zero(); size];
-        let mut q_fixed_group_add = vec![BlsScalar::zero(); size];
-        let mut q_variable_group_add = vec![BlsScalar::zero(); size];
+        let mut q_m = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_l = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_r = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_o = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_f = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_c = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_arith = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_range = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_logic = vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_fixed_group_add =
+            vec![BlsScalar::zero(); padded_circuit_size];
+        let mut q_variable_group_add =
+            vec![BlsScalar::zero(); padded_circuit_size];
 
-        prover
+        composer
             .constraints
             .iter()
             .enumerate()
@@ -147,7 +150,8 @@ impl Compiler {
             Polynomial::from_coefficients_vec(q_variable_group_add_poly);
 
         let [s_sigma_1_poly, s_sigma_2_poly, s_sigma_3_poly, s_sigma_4_poly] =
-            perm.compute_sigma_polynomials(size, &domain);
+            permutation_map
+                .compute_sigma_polynomials(padded_circuit_size, &domain);
 
         let q_m_comm = commit_key.commit(&q_m_poly).unwrap_or_default();
         let q_l_comm = commit_key.commit(&q_l_poly).unwrap_or_default();
@@ -209,7 +213,7 @@ impl Compiler {
         };
 
         let verifier_key = widget::VerifierKey {
-            n: constraints,
+            n: constraint_count,
             arithmetic: arithmetic_verifier_key,
             logic: logic_verifier_key,
             range: range_verifier_key,
@@ -364,7 +368,7 @@ impl Compiler {
             v_h_coset_8n,
         };
 
-        let public_input_indexes = prover.public_input_indexes();
+        let public_input_indexes = composer.public_input_indexes();
 
         let label = label.to_vec();
 
@@ -373,8 +377,8 @@ impl Compiler {
             prover_key,
             commit_key,
             verifier_key,
-            size,
-            constraints,
+            padded_circuit_size,
+            constraint_count,
         );
 
         let verifier = Verifier::new(
@@ -382,8 +386,8 @@ impl Compiler {
             verifier_key,
             opening_key,
             public_input_indexes,
-            size,
-            constraints,
+            padded_circuit_size,
+            constraint_count,
         );
 
         Ok((prover, verifier))

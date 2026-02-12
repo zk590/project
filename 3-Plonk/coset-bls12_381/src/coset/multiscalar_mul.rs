@@ -6,6 +6,9 @@ use crate::{
 use alloc::vec::*;
 
 #[cfg(feature = "byteorder")]
+/// 使用 Pippenger 算法执行多标量乘法（MSM），计算 \sum s_i * P_i。
+/// 该算法通过窗口分桶把标量分解到多个列，再以桶前缀和减少群加法次数。
+/// 在批量点乘场景中，相比逐项标量乘法，Pippenger 通常具有更优吞吐性能。
 pub fn pippenger<P, I>(points: P, scalars: I) -> G1Projective
 where
     P: Iterator<Item = G1Projective>,
@@ -67,6 +70,9 @@ where
 }
 
 #[cfg(feature = "byteorder")]
+/// 通过重复倍点计算 point * 2^k。
+/// 在 Pippenger 的列折叠阶段，需要频繁执行按窗口位宽的 2 次幂扩展。
+/// 这里使用群上的 `double` 运算，避免通用标量乘法带来的额外开销。
 pub(crate) fn mul_by_pow_2(point: &G1Projective, k: u32) -> G1Projective {
     debug_assert!(k > 0);
     let mut doubled_point: G1Projective;
@@ -80,6 +86,9 @@ pub(crate) fn mul_by_pow_2(point: &G1Projective, k: u32) -> G1Projective {
 }
 
 #[cfg(feature = "byteorder")]
+/// 估算给定位宽 `w` 时，256 位标量需要的窗口数字个数。
+/// 该函数用于提前分配固定大小数组，减少运行时动态扩容。
+/// 对 `w=8` 需要额外一位处理进位，因此返回值与其他位宽不同。
 fn to_radix_2w_size_hint(w: usize) -> usize {
     debug_assert!(w >= 6);
     debug_assert!(w <= 8);
@@ -97,6 +106,9 @@ fn to_radix_2w_size_hint(w: usize) -> usize {
 }
 
 #[cfg(feature = "byteorder")]
+/// 将标量重编码为带符号窗口表示（radix-2^w）。
+/// 重编码目标是把每个窗口数字限制在较小区间，便于映射到加/减桶操作。
+/// 带符号窗口可降低非零数字密度，从而减少 MSM 中实际群运算次数。
 fn to_radix_2w(scalar: &Scalar, w: usize) -> [i8; 43] {
     debug_assert!(w >= 6);
     debug_assert!(w <= 8);
@@ -140,6 +152,9 @@ fn to_radix_2w(scalar: &Scalar, w: usize) -> [i8; 43] {
     digits
 }
 
+/// 变量基 MSM：输入不同基点与标量，输出线性组合结果。
+/// 实现思路是按窗口切片标量，构造桶并做反向累加，再执行窗口折叠。
+/// 该方法在证明系统中常用于承诺验证和多点约束聚合等核心路径。
 pub fn msm_variable_base(
     points: &[G1Affine],
     scalars: &[Scalar],
@@ -219,9 +234,16 @@ pub fn msm_variable_base(
         + lowest
 }
 
+/// 计算 `ln(value)` 的整数近似值（避免浮点依赖）。
+/// 近似公式基于 `ln(x) ≈ log2(x) * ln(2)`，其中 ln(2) 约为 0.69。
+/// 该近似主要用于启发式窗口大小选择，不要求高精度数学误差界。
 fn ln_without_floats(value: usize) -> usize {
     (log2(value) * 69 / 100) as usize
 }
+
+/// 计算无符号整数的二进制对数阶（向下取整语义附近）。
+/// 该函数使用前导零计数实现，时间复杂度为 O(1)。
+/// 在 MSM 中它用来估计问题规模，从而选择更合适的窗口参数。
 fn log2(value: usize) -> u32 {
     if value <= 1 {
         return 0;
@@ -237,6 +259,9 @@ mod tests {
 
     #[cfg(feature = "byteorder")]
     #[test]
+    /// 回归测试：验证 Pippenger 结果与逐项标量乘法求和一致。
+    /// 该测试覆盖不同样本规模，确保窗口分桶和列折叠逻辑无偏差。
+    /// 密码学库中的算法替换必须保持代数等价，本测试用于守住该不变量。
     fn pippenger_test() {
         let mut sample_size = 512;
         let arithmetic_start = Scalar::from(2128506u64).invert().unwrap();
@@ -269,6 +294,9 @@ mod tests {
     }
 
     #[test]
+    /// 回归测试：验证变量基 MSM 实现与朴素基准计算一致。
+    /// 测试对同一输入执行两种实现，比较结果点是否完全相同。
+    /// 该策略可有效捕获窗口切片、桶索引和折叠顺序等实现错误。
     fn msm_variable_base_test() {
         let points = alloc::vec![G1Affine::generator()];
         let scalars = alloc::vec![Scalar::from(100u64)];

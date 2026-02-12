@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/commitment_scheme/kzg10/proof.rs）。
-
-//
-
 use super::Commitment;
 use coset_bls12_381::BlsScalar;
 
@@ -37,6 +33,9 @@ pub(crate) mod alloc {
 
     #[allow(dead_code)]
     impl AggregateProof {
+        /// 使用见证承诺初始化聚合证明容器。
+        /// 初始状态仅包含共享 witness 承诺，评估点与多项式承诺留空待追加。
+        /// 该构造通常在批量打开流程中作为累加器起点使用。
         pub(crate) fn with_witness(witness: Commitment) -> AggregateProof {
             AggregateProof {
                 commitment_to_witness: witness,
@@ -45,41 +44,53 @@ pub(crate) mod alloc {
             }
         }
 
-        pub(crate) fn add_part(&mut self, part: (BlsScalar, Commitment)) {
-            self.evaluated_points.push(part.0);
-            self.commitments_to_polynomials.push(part.1);
+        /// 追加一个待聚合证明片段。
+        /// 输入包含单点评估值与对应多项式承诺，顺序会影响最终线性组合。
+        /// 所有片段应来自同一批次上下文，确保挑战幂次对齐。
+        pub(crate) fn add_part(&mut self, proof_part: (BlsScalar, Commitment)) {
+            self.evaluated_points.push(proof_part.0);
+            self.commitments_to_polynomials.push(proof_part.1);
         }
 
-        pub(crate) fn flatten(&self, v_challenge: &BlsScalar) -> Proof {
-            let powers = powers_of(
-                v_challenge,
-                self.commitments_to_polynomials.len() - 1,
-            );
+        /// 按挑战值幂次将聚合容器压平为单个证明。
+        /// 该步骤分别对承诺与评估值做同构线性组合，得到可一次校验的等价证明。
+        /// 挑战值必须与转录器上下文绑定，否则会破坏批量验证的安全性。
+        pub(crate) fn flatten(&self, challenge: &BlsScalar) -> Proof {
+            let challenge_powers =
+                powers_of(challenge, self.commitments_to_polynomials.len() - 1);
 
             #[cfg(not(feature = "std"))]
-            let flattened_poly_commitments_iter =
-                self.commitments_to_polynomials.iter().zip(powers.iter());
+            let flattened_poly_commitments_iter = self
+                .commitments_to_polynomials
+                .iter()
+                .zip(challenge_powers.iter());
             #[cfg(not(feature = "std"))]
             let flattened_poly_evaluations_iter =
-                self.evaluated_points.iter().zip(powers.iter());
+                self.evaluated_points.iter().zip(challenge_powers.iter());
 
             #[cfg(feature = "std")]
             let flattened_poly_commitments_iter = self
                 .commitments_to_polynomials
                 .par_iter()
-                .zip(powers.par_iter());
+                .zip(challenge_powers.par_iter());
             #[cfg(feature = "std")]
-            let flattened_poly_evaluations_iter =
-                self.evaluated_points.par_iter().zip(powers.par_iter());
+            let flattened_poly_evaluations_iter = self
+                .evaluated_points
+                .par_iter()
+                .zip(challenge_powers.par_iter());
 
             let flattened_poly_commitments: G1Projective =
                 flattened_poly_commitments_iter
-                    .map(|(poly, v_challenge)| poly.0 * v_challenge)
+                    .map(|(polynomial_commitment, challenge_power)| {
+                        polynomial_commitment.0 * challenge_power
+                    })
                     .sum();
 
             let flattened_poly_evaluations: BlsScalar =
                 flattened_poly_evaluations_iter
-                    .map(|(eval, v_challenge)| eval * v_challenge)
+                    .map(|(evaluation, challenge_power)| {
+                        evaluation * challenge_power
+                    })
                     .sum();
 
             Proof {

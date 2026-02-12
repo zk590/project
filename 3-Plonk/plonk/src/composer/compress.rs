@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/composer/compress.rs）。
-
-//
-
 use coset_bytes::Serializable;
 use hashbrown::HashMap;
 use msgpacker::{MsgPacker, Packable, Unpackable};
@@ -40,7 +36,12 @@ pub struct CompressedPolynomial {
     pub q_variable_group_add: usize,
 }
 
-fn scalar_map(hades_optimization: bool) -> HashMap<BlsScalar, usize> {
+/// 构建“标量值 -> 索引”的压缩字典。
+/// 默认预置 `0/1/-1` 三个高频常量；启用 Hades 优化时额外注入轮常量与 MDS 常量。
+/// 该字典用于把约束中的标量系数离散化，降低序列化体积。
+fn build_scalar_index_map(
+    hades_optimization: bool,
+) -> HashMap<BlsScalar, usize> {
     let mut scalars: HashMap<BlsScalar, usize> = {
         [BlsScalar::zero(), BlsScalar::one(), -BlsScalar::one()]
             .into_iter()
@@ -74,20 +75,23 @@ pub struct CompressedCircuit {
 }
 
 impl CompressedCircuit {
+    /// 将 `Composer` 压缩编码为字节流。
+    /// 该过程会抽取公开输入索引、去重标量/多项式并重写约束为索引形式。
+    /// 最终输出经过 `msgpacker` 打包与 `miniz` 压缩，便于持久化与传输。
     pub fn from_composer(
         hades_optimization: bool,
         composer: Composer,
     ) -> Vec<u8> {
-        let mut public_input_indices: Vec<_> =
+        let mut sorted_public_input_indices: Vec<_> =
             composer.public_inputs.keys().copied().collect();
-        public_input_indices.sort();
+        sorted_public_input_indices.sort();
 
-        let witnesses = composer.witnesses.len();
-        let constraint_gates = composer.constraints;
+        let witness_count = composer.witnesses.len();
+        let gate_constraints = composer.constraints;
 
-        let constraints = constraint_gates.into_iter();
-        let mut scalars = scalar_map(hades_optimization);
-        let base_scalars_len = scalars.len();
+        let constraints = gate_constraints.into_iter();
+        let mut scalar_index_map = build_scalar_index_map(hades_optimization);
+        let preloaded_scalar_count = scalar_index_map.len();
         let mut polynomial_index_map = HashMap::new();
         let constraints = constraints
             .map(
@@ -108,30 +112,50 @@ impl CompressedCircuit {
                      c,
                      d,
                  }| {
-                    let len = scalars.len();
-                    let q_m = *scalars.entry(q_m).or_insert(len);
-                    let len = scalars.len();
-                    let q_l = *scalars.entry(q_l).or_insert(len);
-                    let len = scalars.len();
-                    let q_r = *scalars.entry(q_r).or_insert(len);
-                    let len = scalars.len();
-                    let q_o = *scalars.entry(q_o).or_insert(len);
-                    let len = scalars.len();
-                    let q_f = *scalars.entry(q_f).or_insert(len);
-                    let len = scalars.len();
-                    let q_c = *scalars.entry(q_c).or_insert(len);
-                    let len = scalars.len();
-                    let q_arith = *scalars.entry(q_arith).or_insert(len);
-                    let len = scalars.len();
-                    let q_range = *scalars.entry(q_range).or_insert(len);
-                    let len = scalars.len();
-                    let q_logic = *scalars.entry(q_logic).or_insert(len);
-                    let len = scalars.len();
-                    let q_fixed_group_add =
-                        *scalars.entry(q_fixed_group_add).or_insert(len);
-                    let len = scalars.len();
-                    let q_variable_group_add =
-                        *scalars.entry(q_variable_group_add).or_insert(len);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_m = *scalar_index_map
+                        .entry(q_m)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_l = *scalar_index_map
+                        .entry(q_l)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_r = *scalar_index_map
+                        .entry(q_r)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_o = *scalar_index_map
+                        .entry(q_o)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_f = *scalar_index_map
+                        .entry(q_f)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_c = *scalar_index_map
+                        .entry(q_c)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_arith = *scalar_index_map
+                        .entry(q_arith)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_range = *scalar_index_map
+                        .entry(q_range)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_logic = *scalar_index_map
+                        .entry(q_logic)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_fixed_group_add = *scalar_index_map
+                        .entry(q_fixed_group_add)
+                        .or_insert(next_scalar_index);
+                    let next_scalar_index = scalar_index_map.len();
+                    let q_variable_group_add = *scalar_index_map
+                        .entry(q_variable_group_add)
+                        .or_insert(next_scalar_index);
                     let polynomial = CompressedPolynomial {
                         q_m,
                         q_l,
@@ -161,27 +185,29 @@ impl CompressedCircuit {
             )
             .collect();
 
-        let scalar_index_map = scalars;
-        let mut scalars = vec![[0u8; BlsScalar::SIZE]; scalar_index_map.len()];
-        scalar_index_map
-            .into_iter()
-            .for_each(|(scalar, index)| scalars[index] = scalar.to_bytes());
+        let mut serialized_scalars =
+            vec![[0u8; BlsScalar::SIZE]; scalar_index_map.len()];
+        scalar_index_map.into_iter().for_each(|(scalar, index)| {
+            serialized_scalars[index] = scalar.to_bytes()
+        });
 
-        let scalars = scalars.split_off(base_scalars_len);
+        let serialized_scalars =
+            serialized_scalars.split_off(preloaded_scalar_count);
 
-        let polynomials_map = polynomial_index_map;
-        let mut polynomials =
-            vec![CompressedPolynomial::default(); polynomials_map.len()];
-        polynomials_map
+        let mut deduplicated_polynomials =
+            vec![CompressedPolynomial::default(); polynomial_index_map.len()];
+        polynomial_index_map
             .into_iter()
-            .for_each(|(polynomial, index)| polynomials[index] = polynomial);
+            .for_each(|(polynomial, index)| {
+                deduplicated_polynomials[index] = polynomial
+            });
 
         let compressed = Self {
             hades_optimization,
-            public_inputs: public_input_indices,
-            witnesses,
-            scalars,
-            polynomials,
+            public_inputs: sorted_public_input_indices,
+            witnesses: witness_count,
+            scalars: serialized_scalars,
+            polynomials: deduplicated_polynomials,
             constraints,
         };
         let mut packed_bytes = Vec::with_capacity(
@@ -193,9 +219,13 @@ impl CompressedCircuit {
         miniz_oxide::deflate::compress_to_vec(&packed_bytes, 10)
     }
 
+    /// 从压缩字节恢复 `Composer`。
+    /// 该函数会先解压与反打包，再重建标量表、约束门和公开输入映射。
+    /// 输入非法时返回 `InvalidCompressedCircuit` 或标量解析错误。
     pub fn from_bytes(compressed: &[u8]) -> Result<Composer, Error> {
-        let compressed = miniz_oxide::inflate::decompress_to_vec(compressed)
-            .map_err(|_| Error::InvalidCompressedCircuit)?;
+        let decompressed_bytes =
+            miniz_oxide::inflate::decompress_to_vec(compressed)
+                .map_err(|_| Error::InvalidCompressedCircuit)?;
         let (
             _,
             Self {
@@ -206,39 +236,39 @@ impl CompressedCircuit {
                 polynomials,
                 constraints,
             },
-        ) = Self::unpack(&compressed)
+        ) = Self::unpack(&decompressed_bytes)
             .map_err(|_| Error::InvalidCompressedCircuit)?;
 
-        let scalar_index_map = scalar_map(hades_optimization);
-        let mut all_scalars = vec![BlsScalar::zero(); scalar_index_map.len()];
+        let scalar_index_map = build_scalar_index_map(hades_optimization);
+        let mut all_scalar_values =
+            vec![BlsScalar::zero(); scalar_index_map.len()];
         scalar_index_map
             .into_iter()
-            .for_each(|(scalar, index)| all_scalars[index] = scalar);
+            .for_each(|(scalar, index)| all_scalar_values[index] = scalar);
         for serialized_scalar in scalars {
             let scalar: BlsScalar =
                 match BlsScalar::from_bytes(&serialized_scalar).into() {
                     Some(scalar) => scalar,
                     None => return Err(Error::BlsScalarMalformed),
                 };
-            all_scalars.push(scalar);
+            all_scalar_values.push(scalar);
         }
-        let scalars = all_scalars;
 
         let mut composer = Composer::uninitialized();
 
-        let mut public_input_cursor = 0;
+        let mut next_public_input_position = 0;
         (0..witnesses).for_each(|_| {
             composer.append_witness(BlsScalar::zero());
         });
 
         for (
-            constraint_index,
+            gate_index,
             CompressedConstraint {
-                polynomial,
-                a,
-                b,
-                c,
-                d,
+                polynomial: polynomial_index,
+                a: witness_a_index,
+                b: witness_b_index,
+                c: witness_c_index,
+                d: witness_d_index,
             },
         ) in constraints.into_iter().enumerate()
         {
@@ -255,59 +285,34 @@ impl CompressedCircuit {
                 q_fixed_group_add,
                 q_variable_group_add,
             } = polynomials
-                .get(polynomial)
+                .get(polynomial_index)
                 .copied()
                 .ok_or(Error::InvalidCompressedCircuit)?;
 
-            let q_m = scalars
-                .get(q_m)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_l = scalars
-                .get(q_l)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_r = scalars
-                .get(q_r)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_o = scalars
-                .get(q_o)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_f = scalars
-                .get(q_f)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_c = scalars
-                .get(q_c)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_arith = scalars
-                .get(q_arith)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_range = scalars
-                .get(q_range)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_logic = scalars
-                .get(q_logic)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_fixed_group_add = scalars
-                .get(q_fixed_group_add)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
-            let q_variable_group_add = scalars
-                .get(q_variable_group_add)
-                .copied()
-                .ok_or(Error::InvalidCompressedCircuit)?;
+            let read_scalar_by_index = |scalar_index: usize| {
+                all_scalar_values
+                    .get(scalar_index)
+                    .copied()
+                    .ok_or(Error::InvalidCompressedCircuit)
+            };
 
-            let a = Witness::new(a);
-            let b = Witness::new(b);
-            let c = Witness::new(c);
-            let d = Witness::new(d);
+            let q_m = read_scalar_by_index(q_m)?;
+            let q_l = read_scalar_by_index(q_l)?;
+            let q_r = read_scalar_by_index(q_r)?;
+            let q_o = read_scalar_by_index(q_o)?;
+            let q_f = read_scalar_by_index(q_f)?;
+            let q_c = read_scalar_by_index(q_c)?;
+            let q_arith = read_scalar_by_index(q_arith)?;
+            let q_range = read_scalar_by_index(q_range)?;
+            let q_logic = read_scalar_by_index(q_logic)?;
+            let q_fixed_group_add = read_scalar_by_index(q_fixed_group_add)?;
+            let q_variable_group_add =
+                read_scalar_by_index(q_variable_group_add)?;
+
+            let witness_a = Witness::new(witness_a_index);
+            let witness_b = Witness::new(witness_b_index);
+            let witness_c = Witness::new(witness_c_index);
+            let witness_d = Witness::new(witness_d_index);
 
             let mut constraint = Constraint::default()
                 .set(Selector::Multiplication, q_m)
@@ -321,16 +326,16 @@ impl CompressedCircuit {
                 .set(Selector::Logic, q_logic)
                 .set(Selector::GroupAddFixedBase, q_fixed_group_add)
                 .set(Selector::GroupAddVariableBase, q_variable_group_add)
-                .a(a)
-                .b(b)
-                .c(c)
-                .d(d);
+                .a(witness_a)
+                .b(witness_b)
+                .c(witness_c)
+                .d(witness_d);
 
-            if let Some(public_input_index) =
-                public_inputs.get(public_input_cursor)
+            if let Some(public_input_gate_index) =
+                public_inputs.get(next_public_input_position)
             {
-                if public_input_index == &constraint_index {
-                    public_input_cursor += 1;
+                if public_input_gate_index == &gate_index {
+                    next_public_input_position += 1;
                     constraint = constraint.public(BlsScalar::zero());
                 }
             }

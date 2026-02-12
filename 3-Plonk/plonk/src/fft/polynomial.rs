@@ -1,7 +1,3 @@
-// 模块说明：本文件实现 PLONK 组件（src/fft/polynomial.rs）。
-
-//
-
 use super::{EvaluationDomain, Evaluations};
 use crate::error::Error;
 use crate::util;
@@ -54,15 +50,24 @@ impl IntoIterator for Polynomial {
 }
 
 impl Polynomial {
+    /// 构造零多项式。
+    /// 零多项式以空系数向量表示，便于后续操作快速判零。
+    /// 该表示约定在本模块内保持一致。
     pub(crate) const fn zero() -> Self {
         Self { coeffs: Vec::new() }
     }
 
+    /// 判断当前多项式是否为零多项式。
+    /// 除空向量外，也兼容“全零系数但未截断”的输入形式。
+    /// 该检查被度数、加减法等逻辑复用。
     pub(crate) fn is_zero(&self) -> bool {
         self.coeffs.is_empty()
             || self.coeffs.iter().all(|coeff| coeff == &BlsScalar::zero())
     }
 
+    /// 由系数向量构造多项式并裁剪高位零系数。
+    /// 规范化步骤保证最高位非零（或为空），减少后续度数判断分支。
+    /// 该函数是外部输入进入多项式表示的主要入口。
     pub(crate) fn from_coefficients_vec(coeffs: Vec<BlsScalar>) -> Self {
         let mut result = Self { coeffs };
 
@@ -76,13 +81,16 @@ impl Polynomial {
         result
     }
 
+    /// 返回多项式度数。
+    /// 对零多项式约定返回 0，以简化上层边界处理。
+    /// 计算会从高位向低位扫描第一个非零系数位置。
     pub(crate) fn degree(&self) -> usize {
         match self.is_zero() {
             true => 0,
             false => {
                 let len = self.len();
-                for i in 0..len {
-                    let index = len - 1 - i;
+                for reverse_offset in 0..len {
+                    let index = len - 1 - reverse_offset;
                     if self[index] != BlsScalar::zero() {
                         return index;
                     }
@@ -92,6 +100,9 @@ impl Polynomial {
         }
     }
 
+    /// 移除末尾连续零系数。
+    /// 该规范化过程避免“语义等价但表示不同”的多项式状态。
+    /// 在序列化、比较与算术操作后通常需要调用。
     fn truncate_leading_zeros(&mut self) {
         while self
             .coeffs
@@ -102,22 +113,30 @@ impl Polynomial {
         }
     }
 
+    /// 在给定点上评估多项式值。
+    /// 实现通过预计算幂次并逐项累加完成，保持语义直观。
+    /// 对零多项式会直接返回 0。
     pub(crate) fn evaluate(&self, value: &BlsScalar) -> BlsScalar {
         if self.is_zero() {
             return BlsScalar::zero();
         }
 
-        let powers = util::powers_of(value, self.len());
-
-        let mul_coeff = self.iter().zip(powers).map(|(c, p)| p * c);
+        let power_terms = util::powers_of(value, self.len());
+        let scaled_coefficients = self
+            .iter()
+            .zip(power_terms)
+            .map(|(coefficient, power)| power * coefficient);
 
         let mut sum = BlsScalar::zero();
-        for value in mul_coeff {
-            sum += &value;
+        for scaled_coefficient in scaled_coefficients {
+            sum += &scaled_coefficient;
         }
         sum
     }
 
+    /// 将多项式编码为可变长字节（截断到实际度数）。
+    /// 输出仅包含 `0..=degree` 的有效系数，避免冗余尾部零值。
+    /// 该格式与 `from_slice` 对应，适合轻量持久化。
     pub fn to_var_bytes(&self) -> Vec<u8> {
         let degree = self.degree();
         self.coeffs
@@ -128,6 +147,9 @@ impl Polynomial {
             .collect()
     }
 
+    /// 从字节切片恢复多项式。
+    /// 按标量大小分块解析系数并在末尾执行零裁剪规范化。
+    /// 任意系数字节非法会返回错误。
     pub fn from_slice(bytes: &[u8]) -> Result<Polynomial, Error> {
         let coeffs = bytes
             .chunks(BlsScalar::SIZE)
@@ -141,6 +163,9 @@ impl Polynomial {
         Ok(polynomial)
     }
 
+    /// 返回内部系数迭代器。
+    /// 该辅助接口用于模块内通用迭代场景，避免直接暴露底层容器。
+    /// 迭代顺序为低阶到高阶系数顺序。
     fn iter(&self) -> impl Iterator<Item = &BlsScalar> {
         self.coeffs.iter()
     }
@@ -153,10 +178,11 @@ impl Sum for Polynomial {
     where
         I: Iterator<Item = Self>,
     {
-        let sum: Polynomial = iter.fold(Polynomial::zero(), |mut res, val| {
-            res = &res + &val;
-            res
-        });
+        let sum: Polynomial =
+            iter.fold(Polynomial::zero(), |mut accumulator, polynomial| {
+                accumulator = &accumulator + &polynomial;
+                accumulator
+            });
         sum
     }
 }
@@ -340,12 +366,15 @@ impl Polynomial {
         self.iter().cloned().enumerate().collect()
     }
 
+    /// 执行 Ruffini 除法，计算 `self / (x - divisor_root)` 的商多项式。
+    /// 算法按高次到低次递推，时间复杂度线性于系数长度。
+    /// 该函数常用于构造 KZG witness 多项式。
     pub fn ruffini(&self, divisor_root: BlsScalar) -> Polynomial {
         let mut quotient: Vec<BlsScalar> = Vec::with_capacity(self.degree());
         let mut running_term = BlsScalar::zero();
 
-        for coeff in self.coeffs.iter().rev() {
-            let updated_coefficient = coeff + running_term;
+        for coefficient in self.coeffs.iter().rev() {
+            let updated_coefficient = coefficient + running_term;
             quotient.push(updated_coefficient);
             running_term = divisor_root * updated_coefficient;
         }
@@ -404,13 +433,13 @@ impl<'a, 'b> Add<&'a BlsScalar> for &'b Polynomial {
         if self.is_zero() {
             return Polynomial::from_coefficients_vec(vec![*constant]);
         }
-        let mut result = self.clone();
+        let mut shifted_polynomial = self.clone();
         if constant == &BlsScalar::zero() {
-            return result;
+            return shifted_polynomial;
         }
 
-        result[0] += constant;
-        result
+        shifted_polynomial[0] += constant;
+        shifted_polynomial
     }
 }
 
@@ -434,11 +463,11 @@ mod test {
 
     impl Polynomial {
         pub(crate) fn rand<R: RngCore + CryptoRng>(
-            d: usize,
+            degree: usize,
             mut rng: &mut R,
         ) -> Self {
-            let mut random_coeffs = Vec::with_capacity(d + 1);
-            for _ in 0..=d {
+            let mut random_coeffs = Vec::with_capacity(degree + 1);
+            for _ in 0..=degree {
                 random_coeffs.push(BlsScalar::random(&mut rng));
             }
             Self::from_coefficients_vec(random_coeffs)
@@ -551,48 +580,54 @@ mod test {
 
     #[test]
     fn test_add_assign() {
-        let mut p1 = Polynomial::from_coefficients_vec(vec![
+        let mut polynomial_a = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(21),
             BlsScalar::from(4),
             BlsScalar::zero(),
             BlsScalar::from(1),
         ]);
-        let p2 = Polynomial::from_coefficients_vec(vec![
+        let polynomial_b = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(21),
             -BlsScalar::from(4),
             BlsScalar::zero(),
             -BlsScalar::from(1),
         ]);
 
-        p1 += &p2;
+        polynomial_a += &polynomial_b;
 
-        assert_eq!(p1.leading_coefficient(), Some(&BlsScalar::from(42)));
         assert_eq!(
-            p1,
+            polynomial_a.leading_coefficient(),
+            Some(&BlsScalar::from(42))
+        );
+        assert_eq!(
+            polynomial_a,
             Polynomial::from_coefficients_vec(vec![BlsScalar::from(42)])
         );
     }
 
     #[test]
     fn test_sub_assign() {
-        let mut p1 = Polynomial::from_coefficients_vec(vec![
+        let mut polynomial_a = Polynomial::from_coefficients_vec(vec![
             BlsScalar::from(21),
             BlsScalar::from(4),
             BlsScalar::zero(),
             BlsScalar::from(1),
         ]);
-        let p2 = Polynomial::from_coefficients_vec(vec![
+        let polynomial_b = Polynomial::from_coefficients_vec(vec![
             -BlsScalar::from(21),
             BlsScalar::from(4),
             BlsScalar::zero(),
             BlsScalar::from(1),
         ]);
 
-        p1 -= &p2;
+        polynomial_a -= &polynomial_b;
 
-        assert_eq!(p1.leading_coefficient(), Some(&BlsScalar::from(42)));
         assert_eq!(
-            p1,
+            polynomial_a.leading_coefficient(),
+            Some(&BlsScalar::from(42))
+        );
+        assert_eq!(
+            polynomial_a,
             Polynomial::from_coefficients_vec(vec![BlsScalar::from(42)])
         );
     }

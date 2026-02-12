@@ -1,6 +1,13 @@
+//! coset-bls12_381 的跨模块回归测试集合。
+//! 本文件聚焦编码向量一致性与配对结果对照验证。
+//! 目标是在重构后快速检测协议兼容与代数正确性回归。
+
 use super::*;
 use coset_bytes::Serializable;
 
+/// 统一测试向量校验宏。
+/// 宏会按固定步数生成点序列，执行编码/解码并与外部向量文件逐段比对。
+/// 该模式可避免重复样板代码，同时保证 G1/G2 路径测试逻辑一致。
 macro_rules! test_vectors {
     ($projective:ident, $affine:ident, $serialize:ident, $deserialize:ident, $expected:ident) => {
         let mut e = $projective::identity();
@@ -30,6 +37,9 @@ macro_rules! test_vectors {
 }
 
 #[test]
+/// 验证 G1 压缩编码测试向量的可逆性与一致性。
+/// 测试会迭代生成点序列，逐个执行编码、解码并与官方向量比对。
+/// 该用例可有效发现序列化格式回归或端序处理错误。
 fn g1_compressed_valid_test_vectors() {
     let bytes: &'static [u8] =
         include_bytes!("g1_compressed_valid_test_vectors.dat");
@@ -37,6 +47,9 @@ fn g1_compressed_valid_test_vectors() {
 }
 
 #[test]
+/// 验证 G2 压缩编码测试向量的可逆性与一致性。
+/// 逻辑与 G1 向量测试相同，但覆盖 Fp2 坐标与 96 字节编码路径。
+/// 该测试对跨实现互操作和协议兼容非常关键。
 fn g2_compressed_valid_test_vectors() {
     let bytes: &'static [u8] =
         include_bytes!("g2_compressed_valid_test_vectors.dat");
@@ -45,6 +58,9 @@ fn g2_compressed_valid_test_vectors() {
 
 #[test]
 #[cfg(all(feature = "alloc", feature = "pairing"))]
+/// 与参考实现（relic）结果做配对输出一致性对照。
+/// 同时验证 `pairing` 与 `multi_miller_loop + final_exponentiation` 的等价性。
+/// 该测试可作为配对核心路径正确性的强校验样例。
 fn test_pairing_result_against_relic() {
     let a = G1Affine::generator();
     let b = G2Affine::generator();
