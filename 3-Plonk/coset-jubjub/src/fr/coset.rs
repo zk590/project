@@ -14,6 +14,36 @@ use crate::util::sbb;
 impl zeroize::DefaultIsZeroes for Fr {}
 
 impl Fr {
+    /// 将 64 字节切片按小端拆成 8 个 `u64` limb。
+    #[inline]
+    fn u64_words_from_64_bytes(bytes: &[u8]) -> [u64; 8] {
+        core::array::from_fn(|index| {
+            let offset = index * 8;
+            u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
+        })
+    }
+
+    /// 将 32 字节切片按小端拆成 4 个 `u64` limb。
+    #[inline]
+    fn u64_words_from_32_bytes(bytes: &[u8]) -> [u64; 4] {
+        core::array::from_fn(|index| {
+            let offset = index * 8;
+            u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
+        })
+    }
+
+    /// 将 4 个 `u64` limb 编码为 32 字节小端序列。
+    #[inline]
+    fn bytes32_from_u64_words(words: [u64; 4]) -> [u8; 32] {
+        let mut encoded_bytes = [0u8; 32];
+        for (index, word) in words.into_iter().enumerate() {
+            let offset = index * 8;
+            encoded_bytes[offset..offset + 8]
+                .copy_from_slice(&word.to_le_bytes());
+        }
+        encoded_bytes
+    }
+
     /// ```
     pub fn hash_to_scalar(input: &[u8]) -> Self {
         let state = blake2b_simd::Params::new()
@@ -24,16 +54,7 @@ impl Fr {
 
         let bytes = state.as_bytes();
 
-        Self::reduce_u512_words([
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[0..8]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[8..16]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[16..24]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[24..32]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[32..40]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[40..48]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[48..56]).unwrap()),
-            u64::from_le_bytes(<[u8; 8]>::try_from(&bytes[56..64]).unwrap()),
-        ])
+        Self::reduce_u512_words(Self::u64_words_from_64_bytes(bytes))
     }
 
     #[inline]
@@ -171,12 +192,7 @@ impl Serializable<32> for Fr {
     type Error = BytesError;
 
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
-        let mut scalar = Fr([0, 0, 0, 0]);
-
-        scalar.0[0] = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
-        scalar.0[1] = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
-        scalar.0[2] = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
-        scalar.0[3] = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
+        let mut scalar = Fr(Self::u64_words_from_32_bytes(bytes));
 
         let (_, borrow) = sbb(scalar.0[0], MODULUS.0[0], 0);
         let (_, borrow) = sbb(scalar.0[1], MODULUS.0[1], borrow);
@@ -198,18 +214,7 @@ impl Serializable<32> for Fr {
         let canonical_scalar = Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
-
-        let mut encoded_bytes = [0; Self::SIZE];
-        encoded_bytes[0..8]
-            .copy_from_slice(&canonical_scalar.0[0].to_le_bytes());
-        encoded_bytes[8..16]
-            .copy_from_slice(&canonical_scalar.0[1].to_le_bytes());
-        encoded_bytes[16..24]
-            .copy_from_slice(&canonical_scalar.0[2].to_le_bytes());
-        encoded_bytes[24..32]
-            .copy_from_slice(&canonical_scalar.0[3].to_le_bytes());
-
-        encoded_bytes
+        Self::bytes32_from_u64_words(canonical_scalar.0)
     }
 }
 

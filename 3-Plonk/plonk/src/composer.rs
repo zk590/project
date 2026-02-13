@@ -80,43 +80,9 @@ impl Composer {
 
     fn append_custom_gate_internal(&mut self, constraint: Constraint) {
         let gate_index = self.constraints.len();
-
-        let left_witness = constraint.witness(WiredWitness::A);
-        let right_witness = constraint.witness(WiredWitness::B);
-        let output_witness = constraint.witness(WiredWitness::C);
-        let fourth_witness = constraint.witness(WiredWitness::D);
-
-        let q_m = *constraint.coeff(Selector::Multiplication);
-        let q_l = *constraint.coeff(Selector::Left);
-        let q_r = *constraint.coeff(Selector::Right);
-        let q_o = *constraint.coeff(Selector::Output);
-        let q_f = *constraint.coeff(Selector::Fourth);
-        let q_c = *constraint.coeff(Selector::Constant);
-
-        let q_arith = *constraint.coeff(Selector::Arithmetic);
-        let q_range = *constraint.coeff(Selector::Range);
-        let q_logic = *constraint.coeff(Selector::Logic);
-        let q_fixed_group_add = *constraint.coeff(Selector::GroupAddFixedBase);
-        let q_variable_group_add =
-            *constraint.coeff(Selector::GroupAddVariableBase);
-
-        let gate = Gate {
-            q_m,
-            q_l,
-            q_r,
-            q_o,
-            q_f,
-            q_c,
-            q_arith,
-            q_range,
-            q_logic,
-            q_fixed_group_add,
-            q_variable_group_add,
-            a: left_witness,
-            b: right_witness,
-            c: output_witness,
-            d: fourth_witness,
-        };
+        let gate = Self::gate_from_constraint(&constraint);
+        let (left_witness, right_witness, output_witness, fourth_witness) =
+            gate.wires();
 
         self.constraints.push(gate);
 
@@ -133,6 +99,29 @@ impl Composer {
             fourth_witness,
             gate_index,
         );
+    }
+
+    /// 将约束对象转换为门记录。
+    /// 该辅助函数集中处理 selector/witness 的字段映射，避免重复提取逻辑分散。
+    fn gate_from_constraint(constraint: &Constraint) -> Gate {
+        Gate {
+            q_m: *constraint.coeff(Selector::Multiplication),
+            q_l: *constraint.coeff(Selector::Left),
+            q_r: *constraint.coeff(Selector::Right),
+            q_o: *constraint.coeff(Selector::Output),
+            q_f: *constraint.coeff(Selector::Fourth),
+            q_c: *constraint.coeff(Selector::Constant),
+            q_arith: *constraint.coeff(Selector::Arithmetic),
+            q_range: *constraint.coeff(Selector::Range),
+            q_logic: *constraint.coeff(Selector::Logic),
+            q_fixed_group_add: *constraint.coeff(Selector::GroupAddFixedBase),
+            q_variable_group_add: *constraint
+                .coeff(Selector::GroupAddVariableBase),
+            a: constraint.witness(WiredWitness::A),
+            b: constraint.witness(WiredWitness::B),
+            c: constraint.witness(WiredWitness::C),
+            d: constraint.witness(WiredWitness::D),
+        }
     }
 
     pub(crate) fn runtime(&mut self) -> &mut Runtime {
@@ -275,21 +264,17 @@ impl Composer {
         for quad_index in 0..quad_count {
             let bit_index = quad_index * 2;
 
-            let left_most_bit = (left_bits[bit_index] as u8) << 1;
-            let right_most_bit = left_bits[bit_index + 1] as u8;
-            let left_quad = left_most_bit + right_most_bit;
+            let left_quad = Self::pack_quad(&left_bits, bit_index);
             let left_quad_bls = BlsScalar::from(left_quad as u64);
 
-            let left_most_bit = (right_bits[bit_index] as u8) << 1;
-            let right_most_bit = right_bits[bit_index + 1] as u8;
-            let right_quad = left_most_bit + right_most_bit;
+            let right_quad = Self::pack_quad(&right_bits, bit_index);
             let right_quad_bls = BlsScalar::from(right_quad as u64);
 
-            let out_quad_bls = if is_component_xor {
-                left_quad ^ right_quad
-            } else {
-                left_quad & right_quad
-            } as u64;
+            let out_quad_bls = Self::logic_quad_result(
+                left_quad,
+                right_quad,
+                is_component_xor,
+            ) as u64;
             let out_quad_bls = BlsScalar::from(out_quad_bls);
 
             let prod_quad_bls = (left_quad * right_quad) as u64;
@@ -323,6 +308,22 @@ impl Composer {
         self.append_custom_gate(constraint);
 
         fourth_witness
+    }
+
+    /// 将两个相邻 bit 打包成一个 2-bit 值（范围 0..=3）。
+    #[inline]
+    fn pack_quad(bits: &[bool], bit_index: usize) -> u8 {
+        ((bits[bit_index] as u8) << 1) + bits[bit_index + 1] as u8
+    }
+
+    /// 计算逻辑组件单个 2-bit 单元的输出。
+    #[inline]
+    fn logic_quad_result(left_quad: u8, right_quad: u8, is_xor: bool) -> u8 {
+        if is_xor {
+            left_quad ^ right_quad
+        } else {
+            left_quad & right_quad
+        }
     }
 
     pub fn component_mul_generator<P: Into<JubJubExtended>>(

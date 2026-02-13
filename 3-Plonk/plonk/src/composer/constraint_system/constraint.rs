@@ -127,6 +127,14 @@ impl Constraint {
         self.witnesses[witness_index as usize] = witness;
     }
 
+    /// 以消费式接口绑定指定线位 witness。
+    /// 该辅助函数用于统一 `a/b/c/d` 的实现，减少重复样板代码。
+    /// 不改变外部 API，仅改善内部可维护性。
+    fn bind_witness(mut self, wire: WiredWitness, witness: Witness) -> Self {
+        self.set_witness(wire, witness);
+        self
+    }
+
     /// 读取指定 selector 的系数引用。
     /// 该方法为 `const` 访问器，便于在验证逻辑中高频读取。
     /// 返回不可变引用，防止外部绕过构造 API 修改约束。
@@ -195,37 +203,29 @@ impl Constraint {
     /// 绑定 A 线 witness。
     /// 该方法用于把电路变量接入约束左线位置。
     /// 返回新约束以支持链式配置。
-    pub fn a(mut self, witness: Witness) -> Self {
-        self.set_witness(WiredWitness::A, witness);
-
-        self
+    pub fn a(self, witness: Witness) -> Self {
+        self.bind_witness(WiredWitness::A, witness)
     }
 
     /// 绑定 B 线 witness。
     /// 该方法用于把电路变量接入约束右线位置。
     /// 返回新约束以支持链式配置。
-    pub fn b(mut self, witness: Witness) -> Self {
-        self.set_witness(WiredWitness::B, witness);
-
-        self
+    pub fn b(self, witness: Witness) -> Self {
+        self.bind_witness(WiredWitness::B, witness)
     }
 
     /// 绑定 C 线 witness。
     /// 该方法用于把电路变量接入约束输出线位置。
     /// 返回新约束以支持链式配置。
-    pub fn c(mut self, witness: Witness) -> Self {
-        self.set_witness(WiredWitness::C, witness);
-
-        self
+    pub fn c(self, witness: Witness) -> Self {
+        self.bind_witness(WiredWitness::C, witness)
     }
 
     /// 绑定 D 线 witness。
     /// 该方法用于扩展门场景中的第四输入线绑定。
     /// 返回新约束以支持链式配置。
-    pub fn d(mut self, witness: Witness) -> Self {
-        self.set_witness(WiredWitness::D, witness);
-
-        self
+    pub fn d(self, witness: Witness) -> Self {
+        self.bind_witness(WiredWitness::D, witness)
     }
 
     /// 判断当前约束是否包含公开输入项。

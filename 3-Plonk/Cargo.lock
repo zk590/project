@@ -877,7 +877,6 @@ dependencies = [
  "bytecheck",
  "coset-bls12_381",
  "coset-bytes",
- "criterion 0.3.6",
  "csv",
  "ff",
  "group",

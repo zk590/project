@@ -24,6 +24,19 @@ impl<T, const H: usize, const A: usize> Opening<T, H, A>
 where
     T: Aggregate<A> + Clone,
 {
+    /// 基于某一层的分支快照重算父层聚合值。
+    #[inline]
+    fn aggregate_branch_level(level_branch: &[T; A]) -> T {
+        let empty_subtree = &T::EMPTY_SUBTREE;
+        let mut item_refs = [empty_subtree; A];
+        item_refs.iter_mut().zip(level_branch).for_each(
+            |(item_ref_slot, level_item)| {
+                *item_ref_slot = level_item;
+            },
+        );
+        T::aggregate(item_refs)
+    }
+
     /// 基于树和目标位置构造 opening。
     pub(crate) fn new(tree: &Tree<T, H, A>, position: u64) -> Self {
         let opening_positions = [0; H];
@@ -66,30 +79,20 @@ where
     where
         T: PartialEq,
     {
-        let mut item = item.into();
+        let mut current_item = item.into();
 
-        for level_index in (0..H).rev() {
-            let level_branch = &self.branch[level_index];
-            let level_position = self.positions[level_index];
+        for depth in (0..H).rev() {
+            let level_branch = &self.branch[depth];
+            let path_index = self.positions[depth];
 
-            if item != level_branch[level_position] {
+            if current_item != level_branch[path_index] {
                 return false;
             }
 
-            let empty_subtree = &T::EMPTY_SUBTREE;
-
-            let mut item_refs = [empty_subtree; A];
-            item_refs
-                .iter_mut()
-                .zip(level_branch)
-                .for_each(|(r, item_ref)| {
-                    *r = item_ref;
-                });
-
-            item = T::aggregate(item_refs);
+            current_item = Self::aggregate_branch_level(level_branch);
         }
 
-        self.root == item
+        self.root == current_item
     }
 
     /// 将 opening 编码为变长字节串。
@@ -165,30 +168,30 @@ where
 fn populate_opening_path<T, const H: usize, const A: usize>(
     opening: &mut Opening<T, H, A>,
     node: &Node<T, H, A>,
-    height: usize,
+    depth: usize,
     position: u64,
 ) where
     T: Aggregate<A> + Clone,
 {
-    if height == H {
+    if depth == H {
         return;
     }
 
     let (child_index, child_position) =
-        Node::<T, H, A>::child_index_and_offset(height, position);
+        Node::<T, H, A>::child_index_and_offset(depth, position);
     let child = node.children[child_index]
         .as_ref()
         .expect("There should be a child at this position");
 
-    populate_opening_path(opening, child, height + 1, child_position);
+    populate_opening_path(opening, child, depth + 1, child_position);
 
-    for child_index in 0..A {
-        if let Some(child) = &node.children[child_index] {
-            opening.branch[height][child_index] =
+    for branch_index in 0..A {
+        if let Some(child) = &node.children[branch_index] {
+            opening.branch[depth][branch_index] =
                 child.aggregated_item().clone();
         }
     }
-    opening.positions[height] = child_index;
+    opening.positions[depth] = child_index;
 }
 
 #[cfg(test)]
@@ -242,24 +245,24 @@ mod tests {
         ];
 
         let mut tree = TestTree::new();
-        let cap = tree.capacity();
+        let capacity = tree.capacity();
 
-        for i in 0..cap {
-            tree.insert(i, LETTERS[i as usize]);
+        for position in 0..capacity {
+            tree.insert(position, LETTERS[position as usize]);
         }
 
-        for pos in 0..cap {
+        for position in 0..capacity {
             let opening = tree
-                .opening(pos)
+                .opening(position)
                 .expect("There must be an opening for an existing item");
 
             assert!(
-                opening.verify(LETTERS[pos as usize]),
+                opening.verify(LETTERS[position as usize]),
                 "The opening should be for the item that was inserted at the given position"
             );
 
             assert!(
-                !opening.verify(LETTERS[((pos + 1)%cap) as usize]),
+                !opening.verify(LETTERS[((position + 1) % capacity) as usize]),
                 "The opening should *only* be for the item that was inserted at the given position"
             );
         }

@@ -1,17 +1,17 @@
-use rand::rngs::StdRng;
-use rand::{RngCore, SeedableRng};
-use rand::prelude::SliceRandom;
 use coset_bls12_381::BlsScalar;
 use coset_poseidon::{Domain, Hash};
 use poseidon_merkle::{Item as PoseidonItem, Opening, Tree as PoseidonTree};
+use rand::prelude::SliceRandom;
+use rand::rngs::StdRng;
+use rand::{RngCore, SeedableRng};
 
-use rkyv::{Archive, Serialize, Deserialize};
-use common::constants::{TREE_HEIGHT, MERKLE_FILE, MERKLE_TREE_STATE_FILE};
+use common::constants::{MERKLE_FILE, MERKLE_TREE_STATE_FILE, TREE_HEIGHT};
+use rkyv::{Archive, Deserialize, Serialize};
 use std::fs::File;
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::path::Path;
-use std::time::Instant;
 use std::sync::Mutex;
+use std::time::Instant;
 
 use lazy_static::lazy_static;
 
@@ -33,37 +33,45 @@ struct MultipleLeavesData {
 }
 
 // 使用rkyv将MultipleLeavesData序列化并写入文件
-fn serialize_multiple_leaves_to_file(data: &MultipleLeavesData, file_path: &str) -> Result<(), std::io::Error> {
+fn serialize_multiple_leaves_to_file(
+    data: &MultipleLeavesData,
+    file_path: &str,
+) -> Result<(), std::io::Error> {
     // 使用rkyv序列化结果
     let bytes = rkyv::to_bytes::<_, 256>(data)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "序列化失败"))?;
-    
+
     // 打开或创建文件
     let mut file = File::create(file_path)?;
-    
+
     // 写入序列化后的字节
-    file.write_all(&bytes)?;    
+    file.write_all(&bytes)?;
     // println!("序列化字节大小: {} 字节", bytes.len());
-    
+
     Ok(())
 }
 
 /// 从文件读取并使用rkyv反序列化MultipleLeavesData
-fn read_and_deserialize_multiple_leaves(file_path: &str) -> Result<MultipleLeavesData, std::io::Error> {
+fn read_and_deserialize_multiple_leaves(
+    file_path: &str,
+) -> Result<MultipleLeavesData, std::io::Error> {
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "文件不存在"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "文件不存在",
+        ));
     }
-    
+
     // 打开文件并读取所有字节
     let mut file = File::open(file_path)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
-    
+
     // 使用rkyv反序列化
     let deserialized = rkyv::from_bytes(&bytes)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "反序列化失败"))?;
-    
+
     Ok(deserialized)
 }
 
@@ -86,32 +94,35 @@ lazy_static! {
 }
 
 ///// 获取全局Merkle树的访问函数
-fn get_global_merkle_tree() -> &'static Mutex<PoseidonTree::<(), { TREE_HEIGHT }>> {
+fn get_global_merkle_tree() -> &'static Mutex<PoseidonTree<(), { TREE_HEIGHT }>> {
     &GLOBAL_MERKLE_TREE
 }
 
 /// 从文件加载Merkle树状态
-fn load_tree_state() -> Result<PoseidonTree::<(), { TREE_HEIGHT }>, std::io::Error> {
+fn load_tree_state() -> Result<PoseidonTree<(), { TREE_HEIGHT }>, std::io::Error> {
     use std::fs::File;
     use std::io::Read;
     use std::path::Path;
-    
+
     let file_path = MERKLE_TREE_STATE_FILE;
-    
+
     // 检查文件是否存在
     if !Path::new(file_path).exists() {
-        return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "树状态文件不存在"));
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "树状态文件不存在",
+        ));
     }
-    
+
     // 打开文件并读取所有字节
     let mut file = File::open(file_path)?;
     let mut bytes = Vec::new();
     file.read_to_end(&mut bytes)?;
-    
+
     // 使用rkyv反序列化树状态
-    let tree = rkyv::from_bytes::<PoseidonTree::<(), { TREE_HEIGHT }>>(&bytes)
+    let tree = rkyv::from_bytes::<PoseidonTree<(), { TREE_HEIGHT }>>(&bytes)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "反序列化失败"))?;
-    
+
     Ok(tree)
 }
 
@@ -119,21 +130,21 @@ fn load_tree_state() -> Result<PoseidonTree::<(), { TREE_HEIGHT }>, std::io::Err
 fn save_tree_state(tree: &PoseidonTree<(), { TREE_HEIGHT }>) -> Result<(), std::io::Error> {
     use std::fs::File;
     use std::io::Write;
-    
+
     let file_path = MERKLE_TREE_STATE_FILE;
-    
+
     // 使用rkyv序列化树状态
     let bytes = rkyv::to_bytes::<_, 256>(tree)
         .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "序列化失败"))?;
-    
+
     // 打开或创建文件
     let mut file = File::create(file_path)?;
-    
+
     // 写入序列化后的字节
     file.write_all(&bytes)?;
-    
+
     // println!("Merkle树状态已保存到文件: {}", file_path);
-    
+
     Ok(())
 }
 
@@ -141,21 +152,22 @@ fn save_tree_state(tree: &PoseidonTree<(), { TREE_HEIGHT }>) -> Result<(), std::
 pub fn save_global_tree_state() -> Result<(), std::io::Error> {
     // 获取全局树的锁
     let tree_guard = get_global_merkle_tree().lock().unwrap();
-    
+
     // 调用接受已锁定树引用的版本
     save_tree_state(&*tree_guard)
 }
 
-
-
 /// 初始化Merkle树并插入指定数量的叶子节点（接受已锁定的树引用）
-fn initialize_merkle_tree(tree: &mut PoseidonTree<(), { TREE_HEIGHT }>, num_leaves: u64) -> Vec<u64> {
+fn initialize_merkle_tree(
+    tree: &mut PoseidonTree<(), { TREE_HEIGHT }>,
+    num_leaves: u64,
+) -> Vec<u64> {
     // 创建一个随机数生成器
     let mut rng = StdRng::seed_from_u64(0xdea1);
-    
+
     // 插入数据到树中
     let mut positions = Vec::with_capacity(num_leaves as usize);
-    
+
     for i in 0..num_leaves {
         // 生成一个随机的BlsScalar值
         let value = rng.next_u64();
@@ -167,7 +179,7 @@ fn initialize_merkle_tree(tree: &mut PoseidonTree<(), { TREE_HEIGHT }>, num_leav
         tree.insert(i as u64, leaf);
         positions.push(i as u64);
     }
-    
+
     positions
 }
 
@@ -175,13 +187,13 @@ fn initialize_merkle_tree(tree: &mut PoseidonTree<(), { TREE_HEIGHT }>, num_leav
 fn add_new_leaves(tree: &mut PoseidonTree<(), { TREE_HEIGHT }>, num_new_leaves: u64) -> Vec<u64> {
     // 创建一个随机数生成器
     let mut rng = StdRng::seed_from_u64(0xdea1);
-    
+
     // 获取当前树中的叶子节点数量
     let current_count = tree.len();
-    
+
     // 插入新数据到树中
     let mut positions = Vec::with_capacity(num_new_leaves as usize);
-    
+
     for i in 0..num_new_leaves {
         // 生成一个随机的BlsScalar值
         let value = rng.next_u64();
@@ -194,18 +206,55 @@ fn add_new_leaves(tree: &mut PoseidonTree<(), { TREE_HEIGHT }>, num_new_leaves: 
         tree.insert(new_position, leaf);
         positions.push(new_position);
     }
-    
+
+    positions
+}
+
+/// 将原始字符串哈希为可直接放入 Merkle 叶子的标量值。
+#[inline]
+fn hash_raw_string_to_leaf(raw_value: &str) -> BlsScalar {
+    let mut hash_output = [0u8; 64];
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(raw_value.as_bytes());
+    hasher.finalize_xof().fill(&mut hash_output);
+    BlsScalar::from_bytes_wide(&hash_output)
+}
+
+/// 将字符串列表哈希后追加插入到全局 Poseidon Merkle 树中。
+fn add_hashed_string_leaves(
+    tree: &mut PoseidonTree<(), { TREE_HEIGHT }>,
+    raw_values: &[String],
+) -> Vec<u64> {
+    let current_count = tree.len();
+    let mut positions = Vec::with_capacity(raw_values.len());
+
+    for (offset, raw_value) in raw_values.iter().enumerate() {
+        let leaf_hash = hash_raw_string_to_leaf(raw_value);
+        let leaf = PoseidonItem::new(leaf_hash, ());
+        let position = current_count + offset as u64;
+        tree.insert(position, leaf);
+        println!(
+            "   - 原始消息: {:?}, 叶子哈希: 0x{}",
+            raw_value,
+            hex::encode(leaf_hash.to_bytes())
+        );
+        positions.push(position);
+    }
+
     positions
 }
 
 /// 获取指定位置的叶子节点
-fn get_leaf_at_position(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64) -> PoseidonItem<()> {
+fn get_leaf_at_position(
+    tree: &PoseidonTree<(), { TREE_HEIGHT }>,
+    position: u64,
+) -> PoseidonItem<()> {
     if let Some(opening) = tree.opening(position) {
         // 获取叶子层（最后一层）的对应位置的叶子节点
         let branch = opening.branch();
         let positions = opening.positions();
         // 使用树高-1作为branch的索引，获取叶子层的节点
-        PoseidonItem::new(branch[TREE_HEIGHT-1][positions[TREE_HEIGHT-1]].hash, ())
+        PoseidonItem::new(branch[TREE_HEIGHT - 1][positions[TREE_HEIGHT - 1]].hash, ())
     } else {
         panic!("无法获取位置 {} 的叶子节点", position);
     }
@@ -215,7 +264,7 @@ fn get_leaf_at_position(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64)
 fn create_leaf_info(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64) -> LeafInfo {
     let leaf = get_leaf_at_position(tree, position);
     let opening = tree.opening(position).unwrap();
-    
+
     // 验证证明路径
     let is_valid = opening.verify(leaf.clone());
     if is_valid {
@@ -223,11 +272,11 @@ fn create_leaf_info(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64) -> 
     } else {
         println!("位置 {} 的叶子节点验证失败", position);
     }
-    
+
     // 准备证明路径
     const T_SIZE: usize = 32; // BlsScalar的大小是32字节
     let opening_bytes = opening.to_var_bytes::<T_SIZE>();
-    
+
     // 创建LeafInfo实例
     LeafInfo {
         position,
@@ -239,10 +288,10 @@ fn create_leaf_info(tree: &PoseidonTree<(), { TREE_HEIGHT }>, position: u64) -> 
 /// 模拟链上Merkle树生成环境
 pub fn simulate_chain_environment(num_leaves: u64) {
     println!("1. 使用全局Poseidon Merkle树模拟链上环境");
-    
+
     // 获取全局树的锁
     let mut tree_guard = get_global_merkle_tree().lock().unwrap();
-    
+
     // 检查树是否为空，如果为空则初始化
     if tree_guard.root().hash == BlsScalar::zero() {
         // 初始化全局树
@@ -250,22 +299,25 @@ pub fn simulate_chain_environment(num_leaves: u64) {
         let _positions = initialize_merkle_tree(&mut tree_guard, num_leaves);
         let end_time = Instant::now();
         let duration = end_time.duration_since(start_time);
-        println!("2. 全局Merkle树已初始化，包含{}个叶子节点，耗时: {:?}", num_leaves, duration);
+        println!(
+            "2. 全局Merkle树已初始化，包含{}个叶子节点，耗时: {:?}",
+            num_leaves, duration
+        );
     }
-    
+
     // 获取树的根节点哈希值并复制
     let root_hash = tree_guard.root().hash.clone();
     println!("3. Merkle树根节点哈希值: {:?}", root_hash);
-     
+
     // 创建随机数生成器用于选择叶子节点
     let mut rng = StdRng::seed_from_u64(0xdea1);
-    
+
     // 随机选择一个叶子节点位置
     let random_position = rng.next_u64() % num_leaves;
-       
+
     // 获取该位置的叶子节点
     let leaf_from_chain = get_leaf_at_position(&tree_guard, random_position);
-    
+
     // 验证证明路径
     let opening = tree_guard.opening(random_position).unwrap();
     let is_valid = opening.verify(leaf_from_chain.clone());
@@ -274,31 +326,30 @@ pub fn simulate_chain_environment(num_leaves: u64) {
     } else {
         println!("4. 自验证失败：节点路径无效");
     }
-    
+
     // 释放锁，因为create_and_save_leaves_data会重新获取锁
     drop(tree_guard);
-    
+
     // 使用新的create_and_save_leaves_data函数来保存单个叶子节点数据
     if let Err(e) = create_and_save_leaves_data(1, 1, MERKLE_FILE) {
         println!("错误：无法保存证明数据");
         println!(" └── 详细信息: {}", e);
     } else {
         println!("7. merkle数据已成功保存到文件");
-           
     }
 }
 
 /// 创建并保存Merkle树叶子节点数据（支持单个或多个叶子节点）
 pub fn create_and_save_leaves_data(
-    num_leaves: u64, 
-    selected_count: u64, 
-    output_file: &str
+    num_leaves: u64,
+    selected_count: u64,
+    output_file: &str,
 ) -> Result<(), std::io::Error> {
     // 获取全局树的锁
     let mut tree_guard = get_global_merkle_tree().lock().unwrap();
-    
+
     println!("1. 使用全局Poseidon Merkle树（高度为{})", TREE_HEIGHT);
-    
+
     // 保存实际添加的叶子节点位置
     let actual_positions: Vec<u64> = if tree_guard.root().hash == BlsScalar::zero() {
         // 初始化全局树
@@ -306,7 +357,10 @@ pub fn create_and_save_leaves_data(
         let positions = initialize_merkle_tree(&mut tree_guard, num_leaves);
         let end_time = Instant::now();
         let duration = end_time.duration_since(start_time);
-        println!("2. 全局Merkle树已初始化，包含{}个叶子节点，耗时: {:?}", num_leaves, duration);
+        println!(
+            "2. 全局Merkle树已初始化，包含{}个叶子节点，耗时: {:?}",
+            num_leaves, duration
+        );
         positions
     } else {
         // 添加新的叶子节点
@@ -314,15 +368,18 @@ pub fn create_and_save_leaves_data(
         let positions = add_new_leaves(&mut tree_guard, num_leaves);
         let end_time = Instant::now();
         let duration = end_time.duration_since(start_time);
-        println!("2. 已向全局Merkle树添加{}个新叶子节点，耗时: {:?}", num_leaves, duration);
+        println!(
+            "2. 已向全局Merkle树添加{}个新叶子节点，耗时: {:?}",
+            num_leaves, duration
+        );
         println!("   新叶子节点位置: {:?}", positions);
         positions
     };
-    
+
     // 获取树的根节点
     let root = tree_guard.root();
     println!("3. Merkle树根节点哈希值: {:?}", root.hash);
-    
+
     // 确定要生成证明的叶子节点位置
     let selected_positions: Vec<u64> = if num_leaves == 1 && selected_count == 1 {
         // 单个叶子节点情况
@@ -331,12 +388,15 @@ pub fn create_and_save_leaves_data(
         // 多个叶子节点情况，随机选择
         let mut rng = StdRng::seed_from_u64(0xdea1);
         if selected_count < num_leaves {
-            actual_positions.choose_multiple(&mut rng, selected_count as usize).copied().collect()
+            actual_positions
+                .choose_multiple(&mut rng, selected_count as usize)
+                .copied()
+                .collect()
         } else {
             actual_positions.clone()
         }
     };
-    
+
     // 为每个选定的叶子节点生成证明
     let start_time = Instant::now();
     let leaves_info: Vec<LeafInfo> = selected_positions
@@ -350,43 +410,103 @@ pub fn create_and_save_leaves_data(
     //     println!("position: {:?}", leaf_info.position);
     //     println!("leaf_hash: {:?}", leaf_info.leaf_hash);
     // }
-    println!("4. 已选择 {} 个叶子节点进行证明生成,耗时: {:?}", selected_positions.len(), duration);
-    
+    println!(
+        "4. 已选择 {} 个叶子节点进行证明生成,耗时: {:?}",
+        selected_positions.len(),
+        duration
+    );
+
     // 创建MultipleLeavesData实例
     let leaves_data = MultipleLeavesData {
         root_hash: root.hash.to_bytes(),
         leaves_info,
     };
-    
+
     // 使用rkyv序列化并写入文件
     serialize_multiple_leaves_to_file(&leaves_data, output_file)?;
-    
+
     println!("5. 叶子节点数据已成功保存到 '{}'", output_file);
-    
+
     // 保存树状态到文件
     save_tree_state(&tree_guard)?;
-    
+
+    Ok(())
+}
+
+/// 将输入字符串列表逐项哈希并插入 Poseidon Merkle 树，然后输出全部叶子的证明数据。
+pub fn create_and_save_leaves_from_strings(
+    raw_values: &[String],
+    output_file: &str,
+) -> Result<(), std::io::Error> {
+    if raw_values.is_empty() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "输入字符串列表不能为空",
+        ));
+    }
+
+    let mut tree_guard = get_global_merkle_tree().lock().unwrap();
+
+    println!("1. 使用全局Poseidon Merkle树（高度为{})", TREE_HEIGHT);
+    println!("2. 待插入原始字符串数量: {}", raw_values.len());
+
+    let start_time = Instant::now();
+    let inserted_positions = add_hashed_string_leaves(&mut tree_guard, raw_values);
+    let duration = start_time.elapsed();
+    println!(
+        "3. 已完成字符串哈希并插入{}个叶子节点，耗时: {:?}",
+        inserted_positions.len(),
+        duration
+    );
+
+    let root = tree_guard.root();
+    println!(
+        "4. 最终Merkle根哈希: 0x{}",
+        hex::encode(root.hash.to_bytes())
+    );
+
+    let proof_start_time = Instant::now();
+    let leaves_info: Vec<LeafInfo> = inserted_positions
+        .iter()
+        .map(|&position| create_leaf_info(&tree_guard, position))
+        .collect();
+    let proof_duration = proof_start_time.elapsed();
+    println!(
+        "5. 已为{}个叶子节点生成证明，耗时: {:?}",
+        leaves_info.len(),
+        proof_duration
+    );
+
+    let leaves_data = MultipleLeavesData {
+        root_hash: root.hash.to_bytes(),
+        leaves_info,
+    };
+
+    serialize_multiple_leaves_to_file(&leaves_data, output_file)?;
+    println!("6. 叶子节点数据已成功保存到 '{}'", output_file);
+
+    save_tree_state(&tree_guard)?;
     Ok(())
 }
 
 /// 验证叶子节点的证明（支持单个叶子节点或从文件验证所有叶子节点）
 pub fn verify_leaves(
-    file_path: Option<&str>, 
+    file_path: Option<&str>,
     position: Option<u64>,
     leaf_hash: Option<[u8; 32]>,
     root_hash: Option<[u8; 32]>,
-    proof_bytes: Option<&[u8]>
+    proof_bytes: Option<&[u8]>,
 ) -> Result<bool, std::io::Error> {
     // 从文件验证所有叶子节点
     if let Some(path) = file_path {
         // 读取并反序列化数据
         let data = read_and_deserialize_multiple_leaves(path)?;
-        
+
         println!("验证文件 '{}' 中的所有叶子节点证明:", path);
         println!("总共有 {} 个叶子节点需要验证", data.leaves_info.len());
-        
+
         let mut all_valid = true;
-        
+
         for (i, leaf_info) in data.leaves_info.iter().enumerate() {
             let is_valid = {
                 // 从bytes还原opening
@@ -396,37 +516,38 @@ pub fn verify_leaves(
                         let leaf_scalar = BlsScalar::from_bytes(&leaf_info.leaf_hash);
                         if let Some(leaf_scalar) = leaf_scalar.into_option() {
                             let leaf = PoseidonItem::new(leaf_scalar, ());
-                            
+
                             // 验证证明
                             let is_valid = opening.verify(leaf);
-                            
+
                             // 直接返回验证结果，因为compute_root方法不存在
                             is_valid
                         } else {
                             false
                         }
-                    },
-                    Err(_) => false
+                    }
+                    Err(_) => false,
                 }
             };
-            
+
             if is_valid {
-                println!("叶子节点 {} (位置: {}) 验证通过", i+1, leaf_info.position);
+                println!("叶子节点 {} (位置: {}) 验证通过", i + 1, leaf_info.position);
             } else {
-                println!("叶子节点 {} (位置: {}) 验证失败", i+1, leaf_info.position);
+                println!("叶子节点 {} (位置: {}) 验证失败", i + 1, leaf_info.position);
                 all_valid = false;
             }
         }
-        
+
         if all_valid {
             println!("所有叶子节点证明验证通过");
         } else {
             println!("存在验证失败的叶子节点证明");
         }
-        
+
         Ok(all_valid)
-    } else if let (Some(pos), Some(l_hash), Some(_r_hash), Some(p_bytes)) = 
-                 (position, leaf_hash, root_hash, proof_bytes) {
+    } else if let (Some(pos), Some(l_hash), Some(_r_hash), Some(p_bytes)) =
+        (position, leaf_hash, root_hash, proof_bytes)
+    {
         // 验证单个叶子节点的证明
         // 从bytes还原opening
         match Opening::<(), { TREE_HEIGHT }>::from_slice(p_bytes) {
@@ -435,24 +556,27 @@ pub fn verify_leaves(
                 let leaf_scalar = BlsScalar::from_bytes(&l_hash);
                 if let Some(leaf_scalar) = leaf_scalar.into_option() {
                     let leaf = PoseidonItem::new(leaf_scalar, ());
-                    
+
                     // 验证证明
                     let is_valid = opening.verify(leaf);
-                    
+
                     if is_valid {
                         // println!("位置 {} 的叶子节点验证通过", pos);
                     } else {
                         println!("位置 {} 的叶子节点验证失败", pos);
                     }
-                    
+
                     Ok(is_valid)
                 } else {
                     Ok(false)
                 }
-            },
-            Err(_) => Ok(false)
+            }
+            Err(_) => Ok(false),
         }
     } else {
-        Err(std::io::Error::new(std::io::ErrorKind::InvalidInput, "无效的验证参数"))
+        Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidInput,
+            "无效的验证参数",
+        ))
     }
 }

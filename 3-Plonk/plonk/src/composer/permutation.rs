@@ -1,7 +1,5 @@
 // 模块说明：本文件实现 PLONK 组件（src/composer/permutation.rs）。
 
-//
-
 use crate::composer::{WireData, Witness};
 use crate::fft::{EvaluationDomain, Polynomial};
 use alloc::vec::Vec;
@@ -599,10 +597,10 @@ mod test {
         let mut perm: Permutation = Permutation::new();
 
         let num_witnesses = 10u8;
-        for i in 0..num_witnesses {
+        for witness_index in 0..num_witnesses {
             let var = perm.new_witness();
-            assert_eq!(var.index(), i as usize);
-            assert_eq!(perm.witness_map.len(), (i as usize) + 1);
+            assert_eq!(var.index(), witness_index as usize);
+            assert_eq!(perm.witness_map.len(), (witness_index as usize) + 1);
         }
 
         let var_one = perm.new_witness();
@@ -610,8 +608,10 @@ mod test {
         let var_three = perm.new_witness();
 
         let gate_size = 100;
-        for i in 0..gate_size {
-            perm.add_witnesses_to_map(var_one, var_one, var_two, var_three, i);
+        for gate_index in 0..gate_size {
+            perm.add_witnesses_to_map(
+                var_one, var_one, var_two, var_three, gate_index,
+            );
         }
 
         for (_, wire_data) in perm.witness_map.iter() {
@@ -868,7 +868,7 @@ mod test {
         c: Vec<BlsScalar>,
         d: Vec<BlsScalar>,
     ) {
-        //
+        // 采样随机挑战，构造等式检查所需的 beta/gamma。
         let beta = BlsScalar::random(&mut OsRng);
         let gamma = BlsScalar::random(&mut OsRng);
         assert_ne!(gamma, beta);
@@ -909,43 +909,42 @@ mod test {
         );
         assert_eq!(fast_z_vec, z_vec);
 
-        //
-
         // `1`
         assert_eq!(z_vec.len(), n);
         assert_eq!(&z_vec[0], &BlsScalar::one());
-        //
 
-        let (mut a_0, mut b_0) = (BlsScalar::one(), BlsScalar::one());
-        for n in numerator_components.iter() {
-            a_0 *= n;
+        let (mut numerator_product, mut denominator_product) =
+            (BlsScalar::one(), BlsScalar::one());
+        for numerator_component in numerator_components.iter() {
+            numerator_product *= numerator_component;
         }
-        for n in denominator_components.iter() {
-            b_0 *= n;
+        for denominator_component in denominator_components.iter() {
+            denominator_product *= denominator_component;
         }
-        assert_eq!(a_0 * b_0.invert().unwrap(), BlsScalar::one());
+        assert_eq!(
+            numerator_product * denominator_product.invert().unwrap(),
+            BlsScalar::one()
+        );
 
         let z_poly = Polynomial::from_coefficients_vec(domain.ifft(&z_vec));
-        //
 
         assert_eq!(z_poly.evaluate(&BlsScalar::one()), BlsScalar::one());
         let n_plus_one = domain.elements().last().unwrap() * domain.group_gen;
         assert_eq!(z_poly.evaluate(&n_plus_one), BlsScalar::one());
-        //
 
         assert_eq!(z_poly.degree(), n - 1);
-        //
 
         let roots: Vec<_> = domain.elements().collect();
 
-        for i in 1..roots.len() {
-            let current_root = roots[i];
+        for root_index in 1..roots.len() {
+            let current_root = roots[root_index];
             let next_root = current_root * domain.group_gen;
 
-            let current_identity_perm_product = &numerator_components[i];
+            let current_identity_perm_product =
+                &numerator_components[root_index];
             assert_ne!(current_identity_perm_product, &BlsScalar::zero());
 
-            let current_copy_perm_product = &denominator_components[i];
+            let current_copy_perm_product = &denominator_components[root_index];
             assert_ne!(current_copy_perm_product, &BlsScalar::zero());
 
             assert_ne!(

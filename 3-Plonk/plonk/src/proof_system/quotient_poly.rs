@@ -1,7 +1,5 @@
 // 模块说明：本文件实现 PLONK 组件（src/proof_system/quotient_poly.rs）。
 
-//
-
 use crate::{
     error::Error,
     fft::{EvaluationDomain, Polynomial},
@@ -11,6 +9,84 @@ use alloc::vec::Vec;
 use coset_bls12_381::BlsScalar;
 #[cfg(feature = "std")]
 use rayon::prelude::*;
+
+/// 将向量前 `shift_window` 个元素追加到尾部，供“位移索引”访问。
+#[inline]
+fn extend_with_prefix(values: &mut Vec<BlsScalar>, shift_window: usize) {
+    values.extend_from_within(..shift_window);
+}
+
+/// 构造单点电路可满足项（算术/范围/逻辑/固定基/可变基 + 公共输入）。
+#[allow(clippy::too_many_arguments)]
+#[inline]
+fn circuit_term_at(
+    prover_key: &ProverKey,
+    index: usize,
+    range_challenge: &BlsScalar,
+    logic_challenge: &BlsScalar,
+    fixed_base_challenge: &BlsScalar,
+    var_base_challenge: &BlsScalar,
+    a_eval: &BlsScalar,
+    b_eval: &BlsScalar,
+    c_eval: &BlsScalar,
+    d_eval: &BlsScalar,
+    a_shift_eval: &BlsScalar,
+    b_shift_eval: &BlsScalar,
+    d_shift_eval: &BlsScalar,
+    public_eval: &BlsScalar,
+) -> BlsScalar {
+    let t_arith = prover_key
+        .arithmetic
+        .compute_quotient_i(index, a_eval, b_eval, c_eval, d_eval);
+
+    let t_range = prover_key.range.compute_quotient_i(
+        index,
+        range_challenge,
+        a_eval,
+        b_eval,
+        c_eval,
+        d_eval,
+        d_shift_eval,
+    );
+
+    let t_logic = prover_key.logic.compute_quotient_i(
+        index,
+        logic_challenge,
+        a_eval,
+        a_shift_eval,
+        b_eval,
+        b_shift_eval,
+        c_eval,
+        d_eval,
+        d_shift_eval,
+    );
+
+    let t_fixed = prover_key.fixed_base.compute_quotient_i(
+        index,
+        fixed_base_challenge,
+        a_eval,
+        a_shift_eval,
+        b_eval,
+        b_shift_eval,
+        c_eval,
+        d_eval,
+        d_shift_eval,
+    );
+
+    let t_var = prover_key.variable_base.compute_quotient_i(
+        index,
+        var_base_challenge,
+        a_eval,
+        a_shift_eval,
+        b_eval,
+        b_shift_eval,
+        c_eval,
+        d_eval,
+        d_shift_eval,
+    );
+
+    t_arith + t_range + t_logic + t_fixed + t_var + public_eval
+}
 
 pub(crate) fn build_quotient_polynomial(
     domain: &EvaluationDomain,
@@ -50,13 +126,10 @@ pub(crate) fn build_quotient_polynomial(
     let c_eval_8n = domain_8n.coset_fft(c_poly);
     let mut d_eval_8n = domain_8n.coset_fft(d_poly);
 
-    for i in 0..8 {
-        z_eval_8n.push(z_eval_8n[i]);
-        a_eval_8n.push(a_eval_8n[i]);
-        b_eval_8n.push(b_eval_8n[i]);
-
-        d_eval_8n.push(d_eval_8n[i]);
-    }
+    extend_with_prefix(&mut z_eval_8n, 8);
+    extend_with_prefix(&mut a_eval_8n, 8);
+    extend_with_prefix(&mut b_eval_8n, 8);
+    extend_with_prefix(&mut d_eval_8n, 8);
 
     let circuit_satisfiability_terms = build_circuit_satisfiability_terms(
         domain,
@@ -135,58 +208,22 @@ fn build_circuit_satisfiability_terms(
             let b_shift_eval = &b_eval_8n[index + 8];
             let d_shift_eval = &d_eval_8n[index + 8];
             let public_eval = &public_eval_8n[index];
-
-            let t_arith = prover_key
-                .arithmetic
-                .compute_quotient_i(index, a_eval, b_eval, c_eval, d_eval);
-
-            let t_range = prover_key.range.compute_quotient_i(
+            circuit_term_at(
+                prover_key,
                 index,
                 range_challenge,
-                a_eval,
-                b_eval,
-                c_eval,
-                d_eval,
-                d_shift_eval,
-            );
-
-            let t_logic = prover_key.logic.compute_quotient_i(
-                index,
                 logic_challenge,
-                a_eval,
-                a_shift_eval,
-                b_eval,
-                b_shift_eval,
-                c_eval,
-                d_eval,
-                d_shift_eval,
-            );
-
-            let t_fixed = prover_key.fixed_base.compute_quotient_i(
-                index,
                 fixed_base_challenge,
-                a_eval,
-                a_shift_eval,
-                b_eval,
-                b_shift_eval,
-                c_eval,
-                d_eval,
-                d_shift_eval,
-            );
-
-            let t_var = prover_key.variable_base.compute_quotient_i(
-                index,
                 var_base_challenge,
                 a_eval,
-                a_shift_eval,
                 b_eval,
-                b_shift_eval,
                 c_eval,
                 d_eval,
+                a_shift_eval,
+                b_shift_eval,
                 d_shift_eval,
-            );
-
-            t_arith + t_range + t_logic + t_fixed + t_var + public_eval
+                public_eval,
+            )
         })
         .collect();
     quotient_terms

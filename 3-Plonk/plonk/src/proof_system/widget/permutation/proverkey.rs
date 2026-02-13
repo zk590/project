@@ -36,6 +36,17 @@ pub(crate) struct ProverKey {
 }
 
 impl ProverKey {
+    /// 计算 `wire + beta * factor + gamma` 形式的置换项。
+    #[inline]
+    fn wire_term_with_factor(
+        wire_value: &BlsScalar,
+        beta: &BlsScalar,
+        factor: BlsScalar,
+        gamma: &BlsScalar,
+    ) -> BlsScalar {
+        wire_value + (beta * factor) + gamma
+    }
+
     pub(crate) fn compute_quotient_i(
         &self,
         index: usize,
@@ -75,10 +86,10 @@ impl ProverKey {
     ) -> BlsScalar {
         let domain_point = self.linear_evaluations[index];
 
-        (a_i + (beta * domain_point) + gamma)
-            * (b_i + (beta * K1 * domain_point) + gamma)
-            * (c_i + (beta * K2 * domain_point) + gamma)
-            * (d_i + (beta * K3 * domain_point) + gamma)
+        Self::wire_term_with_factor(a_i, beta, domain_point, gamma)
+            * Self::wire_term_with_factor(b_i, beta, K1 * domain_point, gamma)
+            * Self::wire_term_with_factor(c_i, beta, K2 * domain_point, gamma)
+            * Self::wire_term_with_factor(d_i, beta, K3 * domain_point, gamma)
             * z_i
             * alpha
     }
@@ -100,12 +111,13 @@ impl ProverKey {
         let s_sigma_3_eval = self.s_sigma_3.1[index];
         let s_sigma_4_eval = self.s_sigma_4.1[index];
 
-        let product = (a_i + (beta * s_sigma_1_eval) + gamma)
-            * (b_i + (beta * s_sigma_2_eval) + gamma)
-            * (c_i + (beta * s_sigma_3_eval) + gamma)
-            * (d_i + (beta * s_sigma_4_eval) + gamma)
-            * z_i_w
-            * alpha;
+        let product =
+            Self::wire_term_with_factor(a_i, beta, s_sigma_1_eval, gamma)
+                * Self::wire_term_with_factor(b_i, beta, s_sigma_2_eval, gamma)
+                * Self::wire_term_with_factor(c_i, beta, s_sigma_3_eval, gamma)
+                * Self::wire_term_with_factor(d_i, beta, s_sigma_4_eval, gamma)
+                * z_i_w
+                * alpha;
 
         -product
     }
@@ -176,22 +188,14 @@ impl ProverKey {
         (alpha, beta, gamma): (&BlsScalar, &BlsScalar, &BlsScalar),
         z_poly: &Polynomial,
     ) -> Polynomial {
-        let beta_z = beta * z_challenge;
-
-        let mut a_term = a_eval + beta_z;
-        a_term += gamma;
-
-        let beta_z_k1 = K1 * beta_z;
-        let mut b_term = b_eval + beta_z_k1;
-        b_term += gamma;
-
-        let beta_z_k2 = K2 * beta_z;
-        let mut c_term = c_eval + beta_z_k2;
-        c_term += gamma;
-
-        let beta_z_k3 = K3 * beta_z;
-        let mut d_term = d_eval + beta_z_k3;
-        d_term += gamma;
+        let a_term =
+            Self::wire_term_with_factor(a_eval, beta, *z_challenge, gamma);
+        let b_term =
+            Self::wire_term_with_factor(b_eval, beta, K1 * *z_challenge, gamma);
+        let c_term =
+            Self::wire_term_with_factor(c_eval, beta, K2 * *z_challenge, gamma);
+        let d_term =
+            Self::wire_term_with_factor(d_eval, beta, K3 * *z_challenge, gamma);
 
         let mut accumulator = a_term * b_term;
         accumulator *= c_term;
@@ -211,17 +215,12 @@ impl ProverKey {
         (alpha, beta, gamma): (&BlsScalar, &BlsScalar, &BlsScalar),
         s_sigma_4_poly: &Polynomial,
     ) -> Polynomial {
-        let beta_sigma_1 = beta * sigma_1_eval;
-        let mut a_term = a_eval + beta_sigma_1;
-        a_term += gamma;
-
-        let beta_sigma_2 = beta * sigma_2_eval;
-        let mut b_term = b_eval + beta_sigma_2;
-        b_term += gamma;
-
-        let beta_sigma_3 = beta * sigma_3_eval;
-        let mut c_term = c_eval + beta_sigma_3;
-        c_term += gamma;
+        let a_term =
+            Self::wire_term_with_factor(a_eval, beta, *sigma_1_eval, gamma);
+        let b_term =
+            Self::wire_term_with_factor(b_eval, beta, *sigma_2_eval, gamma);
+        let c_term =
+            Self::wire_term_with_factor(c_eval, beta, *sigma_3_eval, gamma);
 
         let beta_z_eval = beta * z_eval;
 

@@ -1,8 +1,6 @@
 // 模块说明：本文件实现 PLONK
 // 组件（src/proof_system/widget/ecc/curve_addition/verifierkey.rs）。
 
-//
-
 use crate::commitment_scheme::Commitment;
 
 #[cfg(feature = "rkyv-impl")]
@@ -52,7 +50,7 @@ mod alloc {
             let point_y_right = evaluations.d_eval;
             let x_left_mul_y_right = evaluations.d_w_eval;
 
-            //
+            // 依次检查 (x*y) 关系与曲线加法结果坐标一致性。
 
             let xy_consistency =
                 point_x_left * point_y_right - x_left_mul_y_right;

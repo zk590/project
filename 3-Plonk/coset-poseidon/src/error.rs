@@ -2,16 +2,22 @@ use coset_safe::Error as SafeError;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Error {
+    /// IO 模式与域约束不匹配（如 Merkle 固定输入长度被破坏）。
     IOPatternViolation,
 
+    /// IO 模式本身非法，通常由 absorb/squeeze 调用序列不一致触发。
     InvalidIOPattern,
 
+    /// 提供给 sponge 的输入元素数量不足，无法完成当前步骤。
     TooFewInputElements,
 
+    /// 加密流程失败（包含底层 safe 组件返回的加密错误）。
     EncryptionFailed,
 
+    /// 解密流程失败（包含底层 safe 组件返回的解密错误）。
     DecryptionFailed,
 
+    /// 点编码或曲线点合法性检查失败。
     InvalidPoint,
 }
 

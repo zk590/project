@@ -75,6 +75,30 @@ pub struct CompressedCircuit {
 }
 
 impl CompressedCircuit {
+    /// 返回标量在压缩字典中的索引；若不存在则插入新索引。
+    /// 该函数集中管理“按当前长度分配新索引”的策略，避免重复样板代码。
+    #[inline]
+    fn scalar_index(
+        scalar_index_map: &mut HashMap<BlsScalar, usize>,
+        scalar: BlsScalar,
+    ) -> usize {
+        let next_scalar_index = scalar_index_map.len();
+        *scalar_index_map.entry(scalar).or_insert(next_scalar_index)
+    }
+
+    /// 读取索引对应的标量值。
+    /// 当索引越界时统一返回 `InvalidCompressedCircuit`。
+    #[inline]
+    fn read_scalar(
+        all_scalar_values: &[BlsScalar],
+        scalar_index: usize,
+    ) -> Result<BlsScalar, Error> {
+        all_scalar_values
+            .get(scalar_index)
+            .copied()
+            .ok_or(Error::InvalidCompressedCircuit)
+    }
+
     /// 将 `Composer` 压缩编码为字节流。
     /// 该过程会抽取公开输入索引、去重标量/多项式并重写约束为索引形式。
     /// 最终输出经过 `msgpacker` 打包与 `miniz` 压缩，便于持久化与传输。
@@ -112,50 +136,26 @@ impl CompressedCircuit {
                      c,
                      d,
                  }| {
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_m = *scalar_index_map
-                        .entry(q_m)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_l = *scalar_index_map
-                        .entry(q_l)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_r = *scalar_index_map
-                        .entry(q_r)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_o = *scalar_index_map
-                        .entry(q_o)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_f = *scalar_index_map
-                        .entry(q_f)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_c = *scalar_index_map
-                        .entry(q_c)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_arith = *scalar_index_map
-                        .entry(q_arith)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_range = *scalar_index_map
-                        .entry(q_range)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_logic = *scalar_index_map
-                        .entry(q_logic)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_fixed_group_add = *scalar_index_map
-                        .entry(q_fixed_group_add)
-                        .or_insert(next_scalar_index);
-                    let next_scalar_index = scalar_index_map.len();
-                    let q_variable_group_add = *scalar_index_map
-                        .entry(q_variable_group_add)
-                        .or_insert(next_scalar_index);
+                    let q_m = Self::scalar_index(&mut scalar_index_map, q_m);
+                    let q_l = Self::scalar_index(&mut scalar_index_map, q_l);
+                    let q_r = Self::scalar_index(&mut scalar_index_map, q_r);
+                    let q_o = Self::scalar_index(&mut scalar_index_map, q_o);
+                    let q_f = Self::scalar_index(&mut scalar_index_map, q_f);
+                    let q_c = Self::scalar_index(&mut scalar_index_map, q_c);
+                    let q_arith =
+                        Self::scalar_index(&mut scalar_index_map, q_arith);
+                    let q_range =
+                        Self::scalar_index(&mut scalar_index_map, q_range);
+                    let q_logic =
+                        Self::scalar_index(&mut scalar_index_map, q_logic);
+                    let q_fixed_group_add = Self::scalar_index(
+                        &mut scalar_index_map,
+                        q_fixed_group_add,
+                    );
+                    let q_variable_group_add = Self::scalar_index(
+                        &mut scalar_index_map,
+                        q_variable_group_add,
+                    );
                     let polynomial = CompressedPolynomial {
                         q_m,
                         q_l,
@@ -289,25 +289,19 @@ impl CompressedCircuit {
                 .copied()
                 .ok_or(Error::InvalidCompressedCircuit)?;
 
-            let read_scalar_by_index = |scalar_index: usize| {
-                all_scalar_values
-                    .get(scalar_index)
-                    .copied()
-                    .ok_or(Error::InvalidCompressedCircuit)
-            };
-
-            let q_m = read_scalar_by_index(q_m)?;
-            let q_l = read_scalar_by_index(q_l)?;
-            let q_r = read_scalar_by_index(q_r)?;
-            let q_o = read_scalar_by_index(q_o)?;
-            let q_f = read_scalar_by_index(q_f)?;
-            let q_c = read_scalar_by_index(q_c)?;
-            let q_arith = read_scalar_by_index(q_arith)?;
-            let q_range = read_scalar_by_index(q_range)?;
-            let q_logic = read_scalar_by_index(q_logic)?;
-            let q_fixed_group_add = read_scalar_by_index(q_fixed_group_add)?;
+            let q_m = Self::read_scalar(&all_scalar_values, q_m)?;
+            let q_l = Self::read_scalar(&all_scalar_values, q_l)?;
+            let q_r = Self::read_scalar(&all_scalar_values, q_r)?;
+            let q_o = Self::read_scalar(&all_scalar_values, q_o)?;
+            let q_f = Self::read_scalar(&all_scalar_values, q_f)?;
+            let q_c = Self::read_scalar(&all_scalar_values, q_c)?;
+            let q_arith = Self::read_scalar(&all_scalar_values, q_arith)?;
+            let q_range = Self::read_scalar(&all_scalar_values, q_range)?;
+            let q_logic = Self::read_scalar(&all_scalar_values, q_logic)?;
+            let q_fixed_group_add =
+                Self::read_scalar(&all_scalar_values, q_fixed_group_add)?;
             let q_variable_group_add =
-                read_scalar_by_index(q_variable_group_add)?;
+                Self::read_scalar(&all_scalar_values, q_variable_group_add)?;
 
             let witness_a = Witness::new(witness_a_index);
             let witness_b = Witness::new(witness_b_index);

@@ -98,6 +98,55 @@ struct ZKProofData {
     data: Vec<u8>,
 }
 
+/// 将 32 字节哈希解析为 `BlsScalar`。
+#[inline]
+fn parse_scalar_from_hash(
+    hash_bytes: &[u8; 32],
+    context: &str,
+) -> Result<BlsScalar, IoError> {
+    BlsScalar::from_bytes(hash_bytes)
+        .into_option()
+        .ok_or_else(|| {
+            IoError::new(ErrorKind::Other, format!("{}失败", context))
+        })
+}
+
+/// 使用 rkyv 将字节载荷包装为 `ZKProofData` 并写入文件。
+#[inline]
+fn write_archived_data_file(
+    output_path: &str,
+    payload: Vec<u8>,
+) -> Result<usize, IoError> {
+    let archived_payload = ZKProofData { data: payload };
+    let serialized = rkyv::to_bytes::<_, 1024>(&archived_payload)
+        .map_err(|e| IoError::new(ErrorKind::Other, e.to_string()))?;
+    let mut output_file = File::create(output_path)?;
+    output_file.write_all(&serialized)?;
+    Ok(serialized.len())
+}
+
+/// 将扁平化字节数组按 32 字节切片恢复为公开输入标量向量。
+#[inline]
+fn parse_public_inputs(
+    public_inputs_data: &[u8],
+) -> Result<Vec<BlsScalar>, IoError> {
+    let scalar_size = 32usize;
+    if public_inputs_data.len() % scalar_size != 0 {
+        return Err(IoError::new(ErrorKind::Other, "公开输入数据长度不正确"));
+    }
+
+    let mut public_inputs =
+        Vec::with_capacity(public_inputs_data.len() / scalar_size);
+    for scalar_chunk in public_inputs_data.chunks(scalar_size) {
+        let mut scalar_bytes = [0u8; 32];
+        scalar_bytes.copy_from_slice(scalar_chunk);
+        let scalar = parse_scalar_from_hash(&scalar_bytes, "解析公开输入")?;
+        public_inputs.push(scalar);
+    }
+
+    Ok(public_inputs)
+}
+
 /// 从指定文件路径读取全部字节并做存在性检查。
 /// 该函数将文件访问错误统一映射为 `IoError`，便于上层链式传播。
 /// 返回值仅负责字节加载，不承担具体结构化反序列化职责。
@@ -131,20 +180,12 @@ fn load_merkle_opening_from_file()
     let position = proof_data.position;
 
     // 解析叶子节点哈希
-    let leaf_hash = match BlsScalar::from_bytes(&proof_data.leaf_hash)
-        .into_option()
-    {
-        Some(hash) => hash,
-        None => return Err(IoError::new(ErrorKind::Other, "解析叶子哈希失败")),
-    };
+    let leaf_hash =
+        parse_scalar_from_hash(&proof_data.leaf_hash, "解析叶子哈希")?;
 
     // 解析根哈希
-    let root_hash = match BlsScalar::from_bytes(&proof_data.root_hash)
-        .into_option()
-    {
-        Some(hash) => hash,
-        None => return Err(IoError::new(ErrorKind::Other, "解析根哈希失败")),
-    };
+    let root_hash =
+        parse_scalar_from_hash(&proof_data.root_hash, "解析根哈希")?;
 
     // 使用Opening::from_slice方法反序列化证明
     let opening: Opening<(), { TREE_HEIGHT }> =
@@ -278,31 +319,18 @@ fn generate_and_store_zk_proof() -> Result<(), Box<dyn std::error::Error>> {
         .flat_map(|scalar| scalar.to_bytes().to_vec())
         .collect();
 
-    // 使用rkyv保存证明数据
-    let proof_data = ZKProofData {
-        data: proof_bytes.to_vec(),
-    };
-
-    // 序列化并保存到文件
-    let mut proof_file = File::create(PLONK_PROOF_FILE)?;
-    let proof_bytes_serialized = rkyv::to_bytes::<_, 1024>(&proof_data)?;
-    proof_file.write_all(&proof_bytes_serialized)?;
-
-    // 使用rkyv保存公开输入数据
-    let public_inputs_data = ZKProofData {
-        data: public_inputs_flattened,
-    };
-
-    let mut public_inputs_file = File::create(PLONK_PUBLICINPUTS_FILE)?;
-    let public_inputs_bytes_serialized =
-        rkyv::to_bytes::<_, 1024>(&public_inputs_data)?;
-    public_inputs_file.write_all(&public_inputs_bytes_serialized)?;
+    let proof_bytes_serialized_len =
+        write_archived_data_file(PLONK_PROOF_FILE, proof_bytes.to_vec())?;
+    let public_inputs_bytes_serialized_len = write_archived_data_file(
+        PLONK_PUBLICINPUTS_FILE,
+        public_inputs_flattened,
+    )?;
 
     println!("4. 使用rkyv成功保存证明数据");
-    println!(" ├── 证明数据大小: {} 字节", proof_bytes_serialized.len());
+    println!(" ├── 证明数据大小: {} 字节", proof_bytes_serialized_len);
     println!(
         " └── 公开输入数据大小: {} 字节",
-        public_inputs_bytes_serialized.len()
+        public_inputs_bytes_serialized_len
     );
 
     Ok(())
@@ -339,36 +367,7 @@ pub fn verify_proof() -> Result<(), IoError> {
     let public_inputs_data =
         unsafe { rkyv::archived_root::<ZKProofData>(&public_inputs_bytes) };
 
-    // 解析公开输入
-    let mut public_inputs = Vec::new();
-    let scalar_size = 32; // BlsScalar的大小
-    let num_scalars = public_inputs_data.data.len() / scalar_size;
-
-    for scalar_index in 0..num_scalars {
-        let start = scalar_index * scalar_size;
-        let end = start + scalar_size;
-        let scalar_bytes = &public_inputs_data.data[start..end];
-
-        // 转换为[u8; 32]类型
-        let mut fixed_bytes = [0u8; 32];
-        if scalar_bytes.len() == 32 {
-            fixed_bytes.copy_from_slice(scalar_bytes);
-        } else {
-            return Err(IoError::new(
-                ErrorKind::Other,
-                "公开输入数据长度不正确",
-            ));
-        }
-
-        let scalar = match BlsScalar::from_bytes(&fixed_bytes).into_option() {
-            Some(scalar_value) => scalar_value,
-            None => {
-                return Err(IoError::new(ErrorKind::Other, "解析公开输入失败"));
-            }
-        };
-
-        public_inputs.push(scalar);
-    }
+    let public_inputs = parse_public_inputs(&public_inputs_data.data)?;
 
     // 验证零知识证明
     verifier.verify(&proof, &public_inputs).map_err(|e| {

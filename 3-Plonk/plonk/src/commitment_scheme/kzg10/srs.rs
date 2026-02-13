@@ -33,6 +33,15 @@ pub struct PublicParameters {
 impl PublicParameters {
     const ADDED_BLINDING_DEGREE: usize = 6;
 
+    /// 由提交键和开口键构造公共参数对象。
+    #[inline]
+    fn new(commit_key: CommitKey, opening_key: OpeningKey) -> Self {
+        Self {
+            commit_key,
+            opening_key,
+        }
+    }
+
     /// 生成 KZG 公共参数（SRS）。
     /// 该过程随机采样隐藏标量 `x`，并构造 `g, g^x, ...` 与 `h, h^x` 结构。
     /// 为支持盲化多项式，内部会在请求度数基础上追加固定盲化余量。
@@ -64,16 +73,12 @@ impl PublicParameters {
         let g2_generator: G2Affine = util::random_g2_point(&mut rng).into();
         let x_h: G2Affine = (g2_generator * toxic_waste).into();
 
-        Ok(PublicParameters {
-            commit_key: CommitKey {
+        Ok(PublicParameters::new(
+            CommitKey {
                 powers_of_g: normalized_g,
             },
-            opening_key: OpeningKey::new(
-                g1_generator.into(),
-                g2_generator,
-                x_h,
-            ),
-        })
+            OpeningKey::new(g1_generator.into(), g2_generator, x_h),
+        ))
     }
 
     /// 将公共参数编码为“原始字节”格式。
@@ -90,17 +95,12 @@ impl PublicParameters {
     /// 调用方必须保证输入字节来源可信且格式正确，否则可能导致未定义行为风险。
     /// 该接口应仅在受控边界内使用，并优先搭配 `to_raw_var_bytes` 输出。
     pub unsafe fn from_slice_unchecked(bytes: &[u8]) -> Self {
-        let serialized_opening_key = &bytes[..OpeningKey::SIZE];
+        let (serialized_opening_key, serialized_commit_key) =
+            Self::split_serialized_sections(bytes);
         let opening_key = OpeningKey::from_slice(serialized_opening_key)
             .expect("Error at OpeningKey deserialization");
-
-        let serialized_commit_key = &bytes[OpeningKey::SIZE..];
         let commit_key = CommitKey::from_slice_unchecked(serialized_commit_key);
-
-        Self {
-            commit_key,
-            opening_key,
-        }
+        Self::new(commit_key, opening_key)
     }
 
     /// 将公共参数编码为安全可解析的可变长字节序列。
@@ -122,13 +122,7 @@ impl PublicParameters {
         let mut remaining_bytes = bytes;
         let opening_key = OpeningKey::from_reader(&mut remaining_bytes)?;
         let commit_key = CommitKey::from_slice(remaining_bytes)?;
-
-        let public_parameters = PublicParameters {
-            commit_key,
-            opening_key,
-        };
-
-        Ok(public_parameters)
+        Ok(PublicParameters::new(commit_key, opening_key))
     }
 
     /// 按目标度数裁剪提交键，并返回对应 opening key。
@@ -150,6 +144,14 @@ impl PublicParameters {
     /// 上层在编译电路前可用它做容量上界检查。
     pub fn max_degree(&self) -> usize {
         self.commit_key.max_degree()
+    }
+
+    /// 切分序列化后的 opening key 与 commit key 字节区间。
+    #[inline]
+    fn split_serialized_sections(bytes: &[u8]) -> (&[u8], &[u8]) {
+        let opening_key_bytes = &bytes[..OpeningKey::SIZE];
+        let commit_key_bytes = &bytes[OpeningKey::SIZE..];
+        (opening_key_bytes, commit_key_bytes)
     }
 }
 

@@ -14,7 +14,6 @@ extern crate alloc;
 #[macro_use]
 extern crate std;
 
-use bitvec::{order::Lsb0, view::AsBits};
 use core::borrow::Borrow;
 use core::fmt;
 use core::iter::Sum;
@@ -34,7 +33,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "alloc")]
 use group::WnafGroup;
 
-//
+// 基础曲线常量与辅助 API（如 DH）由该模块导出。
 mod coset;
 pub use coset::{
     dhke, GENERATOR, GENERATOR_EXTENDED, GENERATOR_NUMS,
@@ -63,6 +62,30 @@ const FR_MODULUS_BYTES: [u8; 32] = [
     183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32, 104, 166,
     0, 59, 52, 1, 1, 59, 103, 6, 169, 175, 51, 101, 234, 180, 125, 14,
 ];
+
+/// 以“最高位到最低位”的顺序提取标量比特，并跳过最高 4 位。
+/// JubJub 标量有效位宽为 252 位，因此固定忽略 256-bit 表示中的顶层 4 位。
+/// 返回值长度恒为 252，可被点乘主循环直接消费。
+#[inline]
+fn scalar_bits_msb_skip_top_nibble(scalar_bytes: &[u8; 32]) -> [Choice; 252] {
+    let mut extracted_bits = [Choice::from(0u8); 252];
+    let mut skipped_bits = 0usize;
+    let mut write_index = 0usize;
+
+    for byte in scalar_bytes.iter().rev() {
+        for bit_index in (0..8).rev() {
+            if skipped_bits < 4 {
+                skipped_bits += 1;
+                continue;
+            }
+            extracted_bits[write_index] =
+                Choice::from((byte >> bit_index) & 1u8);
+            write_index += 1;
+        }
+    }
+
+    extracted_bits
+}
 
 #[derive(Clone, Copy, Debug, Eq)]
 #[cfg_attr(
@@ -228,6 +251,9 @@ pub struct AffineNielsPoint {
 }
 
 impl AffineNielsPoint {
+    /// 返回仿射 Niels 表示的单位元。
+    /// 该表示用于加速加法链中的中间点运算。
+    /// 单位元在该坐标系下具有固定常量形式。
     pub const fn identity() -> Self {
         AffineNielsPoint {
             v_plus_u: Fq::one(),
@@ -242,15 +268,8 @@ impl AffineNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-        //
-
-        for bit in by
-            .as_bits::<Lsb0>()
-            .iter()
-            .rev()
-            .skip(4)
-            .map(|bit| Choice::from(if *bit { 1 } else { 0 }))
-        {
+        // 双倍-加法（double-and-add）主循环：统一按标量高位到低位处理。
+        for bit in scalar_bits_msb_skip_top_nibble(by) {
             accumulated_point = accumulated_point.double();
             accumulated_point +=
                 AffineNielsPoint::conditional_select(&zero, self, bit);
@@ -259,6 +278,9 @@ impl AffineNielsPoint {
         accumulated_point
     }
 
+    /// 以 32 字节标量执行点乘（公开包装接口）。
+    /// 内部调用统一的双倍-加法实现，保持与 `Mul<Fr>` 相同语义。
+    /// 输入按小端字节存放，但按高位到低位进行比特扫描。
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
     }
@@ -317,6 +339,9 @@ impl ConditionallySelectable for ExtendedNielsPoint {
 }
 
 impl ExtendedNielsPoint {
+    /// 返回扩展 Niels 表示的单位元。
+    /// 扩展 Niels 会额外携带 `z` 分量，用于减少加法中的字段乘法。
+    /// 该常量常作为条件选择时的“零贡献项”。
     pub const fn identity() -> Self {
         ExtendedNielsPoint {
             v_plus_u: Fq::one(),
@@ -332,16 +357,8 @@ impl ExtendedNielsPoint {
 
         let mut accumulated_point = ExtendedPoint::identity();
 
-        //
-
-        for bit in by
-            .iter()
-            .rev()
-            .flat_map(|byte| {
-                (0..8).rev().map(move |i| Choice::from((byte >> i) & 1u8))
-            })
-            .skip(4)
-        {
+        // 与 AffineNielsPoint 保持同一比特调度，确保点乘语义一致。
+        for bit in scalar_bits_msb_skip_top_nibble(by) {
             accumulated_point = accumulated_point.double();
             accumulated_point +=
                 ExtendedNielsPoint::conditional_select(&zero, self, bit);
@@ -350,6 +367,9 @@ impl ExtendedNielsPoint {
         accumulated_point
     }
 
+    /// 以 32 字节标量执行点乘（公开包装接口）。
+    /// 该方法对调用方暴露显式字节接口，便于跨语言联调。
+    /// 计算路径与 `AffineNielsPoint::multiply_bits` 保持一致。
     pub fn multiply_bits(&self, by: &[u8; 32]) -> ExtendedPoint {
         self.multiply(by)
     }
@@ -380,6 +400,46 @@ const EDWARDS_D2: Fq = Fq::from_raw([
 ]);
 
 impl AffinePoint {
+    /// 从压缩编码中拆出符号位，并清除最高位得到规范化坐标字节。
+    /// 该步骤只做字节层面的处理，不涉及域元素合法性检查。
+    /// 返回 `(清除符号位后的 32 字节, 符号位)`。
+    #[inline]
+    fn split_sign_and_clear_high_bit(
+        mut encoded_bytes: [u8; 32],
+    ) -> ([u8; 32], u8) {
+        let sign_bit = encoded_bytes[31] >> 7;
+        encoded_bytes[31] &= 0b0111_1111;
+        (encoded_bytes, sign_bit)
+    }
+
+    /// 在已知 `v` 坐标和符号位时恢复 `u` 坐标。
+    /// 过程遵循 JubJub 曲线方程，通过平方根得到两个候选值后按符号位选取。
+    /// `zip_216_enabled` 控制对零点符号位的额外约束（ZIP-216 兼容行为）。
+    #[inline]
+    fn recover_u_from_v(
+        v: Fq,
+        sign_bit: u8,
+        zip_216_enabled: Choice,
+    ) -> CtOption<Fq> {
+        let v_squared = v.square();
+        let numerator = v_squared - Fq::one();
+        let denominator = Fq::one() + EDWARDS_D * v_squared;
+        let denominator_inverse = denominator.invert().unwrap_or(Fq::zero());
+
+        (numerator * denominator_inverse).sqrt().and_then(|u| {
+            let should_negate = Choice::from((u.to_bytes()[0] ^ sign_bit) & 1);
+            let negated_u = -u;
+            let selected_u =
+                Fq::conditional_select(&u, &negated_u, should_negate);
+            let u_is_zero = u.ct_eq(&Fq::zero());
+
+            CtOption::new(
+                selected_u,
+                !(zip_216_enabled & u_is_zero & should_negate),
+            )
+        })
+    }
+
     /// 返回仿射坐标单位元。
     pub const fn identity() -> Self {
         AffinePoint {
@@ -435,30 +495,15 @@ impl AffinePoint {
     }
 
     fn decode_from_bytes_with_zip216_flag(
-        mut b: [u8; 32],
+        encoded_bytes: [u8; 32],
         zip_216_enabled: Choice,
     ) -> CtOption<Self> {
-        let sign = b[31] >> 7;
+        let (v_bytes, sign_bit) =
+            Self::split_sign_and_clear_high_bit(encoded_bytes);
 
-        b[31] &= 0b0111_1111;
-
-        Fq::from_bytes(&b).and_then(|v| {
-            let v2 = v.square();
-
-            ((v2 - Fq::one())
-                * ((Fq::one() + EDWARDS_D * v2).invert().unwrap_or(Fq::zero())))
-            .sqrt()
-            .and_then(|u| {
-                let flip_sign = Choice::from((u.to_bytes()[0] ^ sign) & 1);
-                let u_negated = -u;
-                let final_u = Fq::conditional_select(&u, &u_negated, flip_sign);
-
-                let u_is_zero = u.ct_eq(&Fq::zero());
-                CtOption::new(
-                    AffinePoint { u: final_u, v },
-                    !(zip_216_enabled & u_is_zero & flip_sign),
-                )
-            })
+        Fq::from_bytes(&v_bytes).and_then(|v| {
+            Self::recover_u_from_v(v, sign_bit, zip_216_enabled)
+                .map(|u| AffinePoint { u, v })
         })
     }
 
@@ -497,17 +542,16 @@ impl AffinePoint {
         }
 
         let items: Vec<_> = items
-            .map(|mut b| {
-                let sign = b[31] >> 7;
+            .map(|encoded_bytes| {
+                let (v_bytes, sign_bit) =
+                    Self::split_sign_and_clear_high_bit(encoded_bytes);
 
-                b[31] &= 0b0111_1111;
-
-                Fq::from_bytes(&b).map(|v| {
+                Fq::from_bytes(&v_bytes).map(|v| {
                     let v2 = v.square();
 
                     Item {
                         v,
-                        sign,
+                        sign: sign_bit,
                         numerator: (v2 - Fq::one()),
                         denominator: Fq::one() + EDWARDS_D * v2,
                     }
@@ -549,10 +593,16 @@ impl AffinePoint {
             .collect()
     }
 
+    /// 读取仿射点的 `u` 坐标分量。
+    /// 该访问器为常量时间字段读取，不做额外计算。
+    /// 常用于序列化前的自定义编码拼接。
     pub fn get_u(&self) -> Fq {
         self.u
     }
 
+    /// 读取仿射点的 `v` 坐标分量。
+    /// 与 `get_u` 配套用于上层协议字段提取。
+    /// 返回值为标量域类型 `Fq` 的按值拷贝。
     pub fn get_v(&self) -> Fq {
         self.v
     }
@@ -640,30 +690,7 @@ impl ExtendedPoint {
 
     /// 点倍加（extended coordinates doubling）。
     pub fn double(&self) -> ExtendedPoint {
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
-        //
-
+        // 该公式来自 twisted Edwards 扩展坐标倍点公式，避免显式求逆。
         let u_squared = self.u.square();
         let v_squared = self.v.square();
         let zz2 = self.z.square().double();
@@ -683,6 +710,74 @@ impl ExtendedPoint {
     #[inline]
     fn multiply(self, by: &[u8; 32]) -> Self {
         self.to_niels().multiply(by)
+    }
+
+    /// 与扩展 Niels 点执行一次加/减法核心公式。
+    /// `is_subtraction = false` 表示加法，`true` 表示减法。
+    /// 该辅助函数用于收敛重复公式，避免两套实现长期漂移。
+    #[inline]
+    fn combine_with_extended_niels(
+        &self,
+        other: &ExtendedNielsPoint,
+        is_subtraction: bool,
+    ) -> ExtendedPoint {
+        let (left_selector, right_selector, z_t_sign) = if is_subtraction {
+            (other.v_plus_u, other.v_minus_u, -1i8)
+        } else {
+            (other.v_minus_u, other.v_plus_u, 1i8)
+        };
+
+        let v_minus_u_term = (self.v - self.u) * left_selector;
+        let v_plus_u_term = (self.v + self.u) * right_selector;
+        let t_term = self.t1 * self.t2 * other.t2d;
+        let z_term = (self.z * other.z).double();
+        let (z_out, t_out) = if z_t_sign > 0 {
+            (z_term + t_term, z_term - t_term)
+        } else {
+            (z_term - t_term, z_term + t_term)
+        };
+
+        CompletedPoint {
+            u: v_plus_u_term - v_minus_u_term,
+            v: v_plus_u_term + v_minus_u_term,
+            z: z_out,
+            t: t_out,
+        }
+        .into_extended()
+    }
+
+    /// 与仿射 Niels 点执行一次加/减法核心公式。
+    /// 与扩展版本差异在于 `z` 侧只需 `self.z.double()`。
+    /// 该函数将仿射 Niels 的加法与减法路径统一管理。
+    #[inline]
+    fn combine_with_affine_niels(
+        &self,
+        other: &AffineNielsPoint,
+        is_subtraction: bool,
+    ) -> ExtendedPoint {
+        let (left_selector, right_selector, z_t_sign) = if is_subtraction {
+            (other.v_plus_u, other.v_minus_u, -1i8)
+        } else {
+            (other.v_minus_u, other.v_plus_u, 1i8)
+        };
+
+        let v_minus_u_term = (self.v - self.u) * left_selector;
+        let v_plus_u_term = (self.v + self.u) * right_selector;
+        let t_term = self.t1 * self.t2 * other.t2d;
+        let z_term = self.z.double();
+        let (z_out, t_out) = if z_t_sign > 0 {
+            (z_term + t_term, z_term - t_term)
+        } else {
+            (z_term - t_term, z_term + t_term)
+        };
+
+        CompletedPoint {
+            u: v_plus_u_term - v_minus_u_term,
+            v: v_plus_u_term + v_minus_u_term,
+            z: z_out,
+            t: t_out,
+        }
+        .into_extended()
     }
 
     /// 批量将扩展坐标点转换为仿射坐标点。
@@ -739,20 +834,8 @@ impl<'a, 'b> Add<&'b ExtendedNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b ExtendedNielsPoint) -> ExtendedPoint {
-        //
-
-        let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
-        let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
-        let t_term = self.t1 * self.t2 * other.t2d;
-        let z_term = (self.z * other.z).double();
-
-        CompletedPoint {
-            u: v_plus_u_term - v_minus_u_term,
-            v: v_plus_u_term + v_minus_u_term,
-            z: z_term + t_term,
-            t: z_term - t_term,
-        }
-        .into_extended()
+        // 将第二操作数保持在 Niels 形式，可减少若干乘法并提升批量加法吞吐。
+        self.combine_with_extended_niels(other, false)
     }
 }
 
@@ -761,18 +844,7 @@ impl<'a, 'b> Sub<&'b ExtendedNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, other: &'b ExtendedNielsPoint) -> ExtendedPoint {
-        let v_minus_u_term = (self.v - self.u) * other.v_plus_u;
-        let v_plus_u_term = (self.v + self.u) * other.v_minus_u;
-        let t_term = self.t1 * self.t2 * other.t2d;
-        let z_term = (self.z * other.z).double();
-
-        CompletedPoint {
-            u: v_plus_u_term - v_minus_u_term,
-            v: v_plus_u_term + v_minus_u_term,
-            z: z_term - t_term,
-            t: z_term + t_term,
-        }
-        .into_extended()
+        self.combine_with_extended_niels(other, true)
     }
 }
 
@@ -783,18 +855,7 @@ impl<'a, 'b> Add<&'b AffineNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn add(self, other: &'b AffineNielsPoint) -> ExtendedPoint {
-        let v_minus_u_term = (self.v - self.u) * other.v_minus_u;
-        let v_plus_u_term = (self.v + self.u) * other.v_plus_u;
-        let t_term = self.t1 * self.t2 * other.t2d;
-        let z_term = self.z.double();
-
-        CompletedPoint {
-            u: v_plus_u_term - v_minus_u_term,
-            v: v_plus_u_term + v_minus_u_term,
-            z: z_term + t_term,
-            t: z_term - t_term,
-        }
-        .into_extended()
+        self.combine_with_affine_niels(other, false)
     }
 }
 
@@ -803,18 +864,7 @@ impl<'a, 'b> Sub<&'b AffineNielsPoint> for &'a ExtendedPoint {
 
     #[allow(clippy::suspicious_arithmetic_impl)]
     fn sub(self, other: &'b AffineNielsPoint) -> ExtendedPoint {
-        let v_minus_u_term = (self.v - self.u) * other.v_plus_u;
-        let v_plus_u_term = (self.v + self.u) * other.v_minus_u;
-        let t_term = self.t1 * self.t2 * other.t2d;
-        let z_term = self.z.double();
-
-        CompletedPoint {
-            u: v_plus_u_term - v_minus_u_term,
-            v: v_plus_u_term + v_minus_u_term,
-            z: z_term - t_term,
-            t: z_term + t_term,
-        }
-        .into_extended()
+        self.combine_with_affine_niels(other, true)
     }
 }
 
@@ -868,6 +918,9 @@ struct CompletedPoint {
 }
 
 impl CompletedPoint {
+    /// 将完成坐标（CompletedPoint）转换回扩展坐标。
+    /// 该转换在点加/倍点公式末尾使用，用于进入统一的后续运算表示。
+    /// 通过一次结构化映射恢复 `(u, v, z, t1, t2)` 的一致关系。
     #[inline]
     fn into_extended(self) -> ExtendedPoint {
         ExtendedPoint {
@@ -896,6 +949,7 @@ impl Default for ExtendedPoint {
 pub fn batch_normalize(
     points: &mut [ExtendedPoint],
 ) -> impl Iterator<Item = AffinePoint> + '_ {
+    // 先批量求逆所有 `z`，再逐点恢复仿射坐标，可显著减少总求逆次数。
     BatchInverter::invert_with_internal_scratch(
         points,
         |point| &mut point.z,
@@ -968,6 +1022,36 @@ impl SubgroupPoint {
     pub const fn from_raw_unchecked(u: Fq, v: Fq) -> Self {
         SubgroupPoint(AffinePoint::from_raw_unchecked(u, v).to_extended())
     }
+
+    /// 返回内部扩展点表示的共享引用。
+    /// 该函数用于统一包装类型到核心点运算类型的桥接。
+    /// 通过集中访问入口，可减少重复字段解包写法。
+    #[inline]
+    fn as_extended(&self) -> &ExtendedPoint {
+        &self.0
+    }
+
+    /// 将扩展点重新包装为 `SubgroupPoint`。
+    /// 该辅助函数用于加减法和倍点等返回路径，统一构造风格。
+    /// 不执行额外子群检查，依赖调用路径保证闭包性。
+    #[inline]
+    fn from_extended(point: ExtendedPoint) -> Self {
+        SubgroupPoint(point)
+    }
+
+    /// 采样一个非单位元的子群点。
+    /// 先从扩展点随机采样并清除协因子，再过滤掉单位元。
+    /// 该方法集中封装随机子群采样逻辑，供 `Group::random` 复用。
+    #[inline]
+    fn random_non_identity(rng: &mut impl RngCore) -> Self {
+        loop {
+            let subgroup_candidate =
+                ExtendedPoint::random(&mut *rng).clear_cofactor();
+            if bool::from(!subgroup_candidate.is_identity()) {
+                return subgroup_candidate;
+            }
+        }
+    }
 }
 
 impl<T> Sum<T> for SubgroupPoint
@@ -1005,7 +1089,7 @@ impl<'a, 'b> Add<&'b SubgroupPoint> for &'a ExtendedPoint {
 
     #[inline]
     fn add(self, other: &'b SubgroupPoint) -> ExtendedPoint {
-        self + other.0
+        self + other.as_extended()
     }
 }
 
@@ -1014,7 +1098,7 @@ impl<'a, 'b> Sub<&'b SubgroupPoint> for &'a ExtendedPoint {
 
     #[inline]
     fn sub(self, other: &'b SubgroupPoint) -> ExtendedPoint {
-        self - other.0
+        self - other.as_extended()
     }
 }
 
@@ -1025,7 +1109,7 @@ impl<'a, 'b> Add<&'b SubgroupPoint> for &'a SubgroupPoint {
 
     #[inline]
     fn add(self, other: &'b SubgroupPoint) -> SubgroupPoint {
-        SubgroupPoint(self.0 + other.0)
+        SubgroupPoint::from_extended(self.0 + other.0)
     }
 }
 
@@ -1034,7 +1118,7 @@ impl<'a, 'b> Sub<&'b SubgroupPoint> for &'a SubgroupPoint {
 
     #[inline]
     fn sub(self, other: &'b SubgroupPoint) -> SubgroupPoint {
-        SubgroupPoint(self.0 - other.0)
+        SubgroupPoint::from_extended(self.0 - other.0)
     }
 }
 
@@ -1044,7 +1128,7 @@ impl<'a, 'b> Mul<&'b Fr> for &'a SubgroupPoint {
     type Output = SubgroupPoint;
 
     fn mul(self, other: &'b Fr) -> SubgroupPoint {
-        SubgroupPoint(self.0.multiply(&other.to_bytes()))
+        SubgroupPoint::from_extended(self.0.multiply(&other.to_bytes()))
     }
 }
 
@@ -1053,21 +1137,16 @@ impl_binops_multiplicative!(SubgroupPoint, Fr);
 impl Group for ExtendedPoint {
     type Scalar = Fr;
 
+    /// 通过随机采样 `v` 并按曲线方程恢复 `u` 来构造随机点。
+    /// 采样结果会过滤单位元，保证返回值落在可用群元素集合内。
+    /// 该过程使用公开随机性，允许变长时间分支。
     fn random(mut rng: impl RngCore) -> Self {
         loop {
             let random_v = Fq::random(&mut rng);
-            let flip_sign = rng.next_u32() % 2 != 0;
-
-            let v_squared = random_v.square();
-            let candidate_point = ((v_squared - Fq::one())
-                * ((Fq::one() + EDWARDS_D * v_squared)
-                    .invert()
-                    .unwrap_or(Fq::zero())))
-            .sqrt()
-            .map(|u| AffinePoint {
-                u: if flip_sign { -u } else { u },
-                v: random_v,
-            });
+            let sign_bit = (rng.next_u32() as u8) & 1u8;
+            let candidate_point =
+                AffinePoint::recover_u_from_v(random_v, sign_bit, 0.into())
+                    .map(|u| AffinePoint { u, v: random_v });
 
             if candidate_point.is_some().into() {
                 let point_on_curve = candidate_point.unwrap().to_curve();
@@ -1099,21 +1178,23 @@ impl Group for ExtendedPoint {
 impl Group for SubgroupPoint {
     type Scalar = Fr;
 
+    /// 生成随机子群点并排除单位元。
+    /// 内部复用 `random_non_identity`，保证采样策略集中维护。
+    /// 返回值可直接用于子群运算与协议输入。
     fn random(mut rng: impl RngCore) -> Self {
-        loop {
-            let subgroup_candidate =
-                ExtendedPoint::random(&mut rng).clear_cofactor();
-
-            if bool::from(!subgroup_candidate.is_identity()) {
-                return subgroup_candidate;
-            }
-        }
+        Self::random_non_identity(&mut rng)
     }
 
+    /// 返回子群单位元。
+    /// 该值对应扩展坐标系中的全局零点。
+    /// 对所有子群元素满足加法幺元性质。
     fn identity() -> Self {
-        SubgroupPoint(ExtendedPoint::identity())
+        SubgroupPoint::from_extended(ExtendedPoint::identity())
     }
 
+    /// 返回子群生成元。
+    /// 通过扩展点生成元清除协因子得到素数阶子群生成元。
+    /// 可用于构造公开参数或标量乘基点。
     fn generator() -> Self {
         ExtendedPoint::generator().clear_cofactor()
     }
@@ -1123,19 +1204,22 @@ impl Group for SubgroupPoint {
     }
 
     fn double(&self) -> Self {
-        SubgroupPoint(self.0.double())
+        SubgroupPoint::from_extended(self.0.double())
     }
 }
 
 #[cfg(feature = "alloc")]
 impl WnafGroup for ExtendedPoint {
+    /// 根据标量数量给出经验窗口宽度。
+    /// 该启发式在预计算成本与标量乘吞吐间做折中。
+    /// 返回值越大，单次窗口计算更快但预处理开销更高。
     fn recommended_wnaf_for_num_scalars(num_scalars: usize) -> usize {
         const RECOMMENDATIONS: [usize; 12] =
             [1, 3, 7, 20, 43, 120, 273, 563, 1630, 3128, 7933, 62569];
 
         let mut ret = 4;
-        for r in &RECOMMENDATIONS {
-            if num_scalars > *r {
+        for scalar_count_threshold in &RECOMMENDATIONS {
+            if num_scalars > *scalar_count_threshold {
                 ret += 1;
             } else {
                 break;
@@ -1151,12 +1235,18 @@ impl PrimeGroup for SubgroupPoint {}
 impl CofactorGroup for ExtendedPoint {
     type Subgroup = SubgroupPoint;
 
+    /// 清除协因子，将扩展点映射到素数阶子群。
+    /// 对 JubJub 而言等价于乘以协因子 8。
+    /// 返回包装后的 `SubgroupPoint` 以显式区分语义。
     fn clear_cofactor(&self) -> Self::Subgroup {
-        SubgroupPoint(self.mul_by_cofactor())
+        SubgroupPoint::from_extended(self.mul_by_cofactor())
     }
 
     fn into_subgroup(self) -> CtOption<Self::Subgroup> {
-        CtOption::new(SubgroupPoint(self), self.is_torsion_free())
+        CtOption::new(
+            SubgroupPoint::from_extended(self),
+            self.is_torsion_free(),
+        )
     }
 
     fn is_torsion_free(&self) -> Choice {
@@ -1167,10 +1257,16 @@ impl CofactorGroup for ExtendedPoint {
 impl Curve for ExtendedPoint {
     type AffineRepr = AffinePoint;
 
+    /// 批量归一化接口，桥接到本类型的内部实现。
+    /// 该实现通过批量求逆降低总开销，适合大量点转换场景。
+    /// `p` 与 `q` 必须等长并一一对应。
     fn batch_normalize(p: &[Self], q: &mut [Self::AffineRepr]) {
         Self::batch_normalize(p, q);
     }
 
+    /// 将扩展点转换为仿射点表示。
+    /// 转换过程在必要时会进行一次域逆元运算。
+    /// 返回值可直接用于压缩编码与外部接口。
     fn to_affine(&self) -> Self::AffineRepr {
         self.into()
     }
@@ -1184,10 +1280,16 @@ impl CofactorCurveAffine for AffinePoint {
     type Scalar = Fr;
     type Curve = ExtendedPoint;
 
+    /// 返回仿射坐标系单位元。
+    /// 该值满足曲线群运算的加法幺元性质。
+    /// 在编码层面对应标准压缩零点表示。
     fn identity() -> Self {
         Self::identity()
     }
 
+    /// 返回协议约定的曲线基点（仿射表示）。
+    /// 该常量与扩展坐标生成元保持一致，可互相转换。
+    /// 常用于标量乘、签名与承诺等构造。
     fn generator() -> Self {
         AffinePoint {
             u: Fq::from_raw([
@@ -1217,10 +1319,16 @@ impl CofactorCurveAffine for AffinePoint {
 impl GroupEncoding for ExtendedPoint {
     type Repr = [u8; 32];
 
+    /// 从压缩字节解码扩展点（执行合法性检查）。
+    /// 实际解码路径先进入仿射点，再映射到扩展表示。
+    /// 非法编码将返回 `CtOption::None`。
     fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
         AffinePoint::from_bytes(*bytes).map(Self::from)
     }
 
+    /// 从压缩字节解码扩展点（unchecked 版本）。
+    /// 当前实现与 `from_bytes` 共用同一路径，以维持语义一致。
+    /// 保留该接口用于满足 trait 约束与未来扩展。
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
         AffinePoint::from_bytes(*bytes).map(Self::from)
     }
@@ -1233,12 +1341,19 @@ impl GroupEncoding for ExtendedPoint {
 impl GroupEncoding for SubgroupPoint {
     type Repr = [u8; 32];
 
+    /// 从压缩字节解码并验证是否位于素数阶子群。
+    /// 流程为：先解码扩展点，再执行 `into_subgroup` 扭子检查。
+    /// 若不在子群内则返回 `CtOption::None`。
     fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
         ExtendedPoint::from_bytes(bytes).and_then(|p| p.into_subgroup())
     }
 
+    /// 从压缩字节解码子群点（unchecked 版本）。
+    /// 该路径跳过子群成员性检查，仅做点解码。
+    /// 调用方需自行保证输入来源可信。
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
-        ExtendedPoint::from_bytes_unchecked(bytes).map(SubgroupPoint)
+        ExtendedPoint::from_bytes_unchecked(bytes)
+            .map(SubgroupPoint::from_extended)
     }
 
     fn to_bytes(&self) -> Self::Repr {
@@ -1249,14 +1364,23 @@ impl GroupEncoding for SubgroupPoint {
 impl GroupEncoding for AffinePoint {
     type Repr = [u8; 32];
 
+    /// 从压缩字节解码仿射点（执行曲线合法性检查）。
+    /// 输入格式为 JubJub 标准 32 字节压缩表示。
+    /// 非法输入将返回 `CtOption::None`。
     fn from_bytes(bytes: &Self::Repr) -> CtOption<Self> {
         Self::from_bytes(*bytes)
     }
 
+    /// 从压缩字节解码仿射点（unchecked 版本）。
+    /// 当前实现与 `from_bytes` 共享同一检查路径。
+    /// 该接口主要用于满足通用编码 trait 的一致性。
     fn from_bytes_unchecked(bytes: &Self::Repr) -> CtOption<Self> {
         Self::from_bytes(*bytes)
     }
 
+    /// 将仿射点编码为标准压缩字节表示。
+    /// 编码内容为 `v` 坐标与 `u` 的符号位组合。
+    /// 结果可直接用于网络传输或持久化存储。
     fn to_bytes(&self) -> Self::Repr {
         self.to_bytes()
     }
@@ -1312,7 +1436,7 @@ fn test_extended_niels_point_identity() {
 
 #[test]
 fn test_assoc() {
-    let point = ExtendedPoint::from(AffinePoint {
+    let subgroup_point = ExtendedPoint::from(AffinePoint {
         u: Fq::from_raw([
             0x81c5_71e5_d883_cfb0,
             0x049f_7a68_6f14_7029,
@@ -1327,17 +1451,17 @@ fn test_assoc() {
         ]),
     })
     .mul_by_cofactor();
-    assert!(point.satisfies_extended_curve_equation_vartime());
+    assert!(subgroup_point.satisfies_extended_curve_equation_vartime());
 
     assert_eq!(
-        (point * Fr::from(1000u64)) * Fr::from(3938u64),
-        point * (Fr::from(1000u64) * Fr::from(3938u64)),
+        (subgroup_point * Fr::from(1000u64)) * Fr::from(3938u64),
+        subgroup_point * (Fr::from(1000u64) * Fr::from(3938u64)),
     );
 }
 
 #[test]
 fn test_batch_normalize() {
-    let mut point = ExtendedPoint::from(AffinePoint {
+    let mut current_point = ExtendedPoint::from(AffinePoint {
         u: Fq::from_raw([
             0x81c5_71e5_d883_cfb0,
             0x049f_7a68_6f14_7029,
@@ -1353,38 +1477,59 @@ fn test_batch_normalize() {
     })
     .mul_by_cofactor();
 
-    let mut points = vec![];
+    let mut point_sequence = vec![];
     for _ in 0..10 {
-        points.push(point);
-        point = point.double();
+        point_sequence.push(current_point);
+        current_point = current_point.double();
     }
 
-    for point in &points {
+    for point in &point_sequence {
         assert!(point.satisfies_extended_curve_equation_vartime());
     }
 
-    let expected: std::vec::Vec<_> = points
+    let expected_affine_points: std::vec::Vec<_> = point_sequence
         .iter()
         .map(|point| AffinePoint::from(*point))
         .collect();
-    let mut normalized_points_0 = vec![AffinePoint::identity(); points.len()];
-    ExtendedPoint::batch_normalize(&points, &mut normalized_points_0);
-    for i in 0..10 {
-        assert!(expected[i] == normalized_points_0[i]);
+    let mut normalized_points_round_0 =
+        vec![AffinePoint::identity(); point_sequence.len()];
+    ExtendedPoint::batch_normalize(
+        &point_sequence,
+        &mut normalized_points_round_0,
+    );
+    for point_index in 0..10 {
+        assert!(
+            expected_affine_points[point_index]
+                == normalized_points_round_0[point_index]
+        );
     }
-    let normalized_points_1: std::vec::Vec<_> =
-        batch_normalize(&mut points).collect();
-    for i in 0..10 {
-        assert!(expected[i] == normalized_points_1[i]);
-        assert!(points[i].satisfies_extended_curve_equation_vartime());
-        assert!(AffinePoint::from(points[i]) == expected[i]);
+    let normalized_points_round_1: std::vec::Vec<_> =
+        batch_normalize(&mut point_sequence).collect();
+    for point_index in 0..10 {
+        assert!(
+            expected_affine_points[point_index]
+                == normalized_points_round_1[point_index]
+        );
+        assert!(point_sequence[point_index]
+            .satisfies_extended_curve_equation_vartime());
+        assert!(
+            AffinePoint::from(point_sequence[point_index])
+                == expected_affine_points[point_index]
+        );
     }
-    let normalized_points_2: std::vec::Vec<_> =
-        batch_normalize(&mut points).collect();
-    for i in 0..10 {
-        assert!(expected[i] == normalized_points_2[i]);
-        assert!(points[i].satisfies_extended_curve_equation_vartime());
-        assert!(AffinePoint::from(points[i]) == expected[i]);
+    let normalized_points_round_2: std::vec::Vec<_> =
+        batch_normalize(&mut point_sequence).collect();
+    for point_index in 0..10 {
+        assert!(
+            expected_affine_points[point_index]
+                == normalized_points_round_2[point_index]
+        );
+        assert!(point_sequence[point_index]
+            .satisfies_extended_curve_equation_vartime());
+        assert!(
+            AffinePoint::from(point_sequence[point_index])
+                == expected_affine_points[point_index]
+        );
     }
 }
 
@@ -1499,10 +1644,13 @@ fn find_eight_torsion() {
 
     let mut current_point = torsion_generator;
 
-    for (i, point) in EIGHT_TORSION.iter().enumerate() {
+    for (point_index, expected_point) in EIGHT_TORSION.iter().enumerate() {
         let affine_point = AffinePoint::from(current_point);
-        if &affine_point != point {
-            panic!("{}th torsion point should be {:?}", i, affine_point);
+        if &affine_point != expected_point {
+            panic!(
+                "{}th torsion point should be {:?}",
+                point_index, affine_point
+            );
         }
 
         current_point += &torsion_generator;
@@ -1517,17 +1665,17 @@ fn find_curve_generator() {
         if bool::from(maybe_affine.is_some()) {
             let affine_point = maybe_affine.unwrap();
             assert!(affine_point.satisfies_curve_equation_vartime());
-            let point = ExtendedPoint::from(affine_point);
-            let point = point.multiply(&FR_MODULUS_BYTES);
-            assert!(bool::from(point.is_small_order()));
-            let point = point.double();
-            assert!(bool::from(point.is_small_order()));
-            let point = point.double();
-            assert!(bool::from(point.is_small_order()));
-            if !bool::from(point.is_identity()) {
-                let point = point.double();
-                assert!(bool::from(point.is_small_order()));
-                assert!(bool::from(point.is_identity()));
+            let extended_point = ExtendedPoint::from(affine_point);
+            let torsion_candidate = extended_point.multiply(&FR_MODULUS_BYTES);
+            assert!(bool::from(torsion_candidate.is_small_order()));
+            let doubled_once = torsion_candidate.double();
+            assert!(bool::from(doubled_once.is_small_order()));
+            let doubled_twice = doubled_once.double();
+            assert!(bool::from(doubled_twice.is_small_order()));
+            if !bool::from(doubled_twice.is_identity()) {
+                let doubled_thrice = doubled_twice.double();
+                assert!(bool::from(doubled_thrice.is_small_order()));
+                assert!(bool::from(doubled_thrice.is_identity()));
                 assert_eq!(FULL_GENERATOR, affine_point);
                 assert_eq!(AffinePoint::generator(), affine_point);
                 assert!(bool::from(
@@ -1590,7 +1738,7 @@ fn test_mul_consistency() {
         0x0b67_7e29_380a_97a7,
     ]);
     assert_eq!(left_scalar * right_scalar, product_scalar);
-    let point = ExtendedPoint::from(AffinePoint {
+    let subgroup_point = ExtendedPoint::from(AffinePoint {
         u: Fq::from_raw([
             0x81c5_71e5_d883_cfb0,
             0x049f_7a68_6f14_7029,
@@ -1605,41 +1753,44 @@ fn test_mul_consistency() {
         ]),
     })
     .mul_by_cofactor();
-    assert_eq!(point * product_scalar, (point * left_scalar) * right_scalar);
-
     assert_eq!(
-        point * product_scalar,
-        (point.to_niels() * left_scalar) * right_scalar
-    );
-    assert_eq!(
-        point.to_niels() * product_scalar,
-        (point * left_scalar) * right_scalar
-    );
-    assert_eq!(
-        point.to_niels() * product_scalar,
-        (point.to_niels() * left_scalar) * right_scalar
+        subgroup_point * product_scalar,
+        (subgroup_point * left_scalar) * right_scalar
     );
 
-    let point_affine_niels = AffinePoint::from(point).to_niels();
     assert_eq!(
-        point * product_scalar,
-        (point_affine_niels * left_scalar) * right_scalar
+        subgroup_point * product_scalar,
+        (subgroup_point.to_niels() * left_scalar) * right_scalar
     );
     assert_eq!(
-        point_affine_niels * product_scalar,
-        (point * left_scalar) * right_scalar
+        subgroup_point.to_niels() * product_scalar,
+        (subgroup_point * left_scalar) * right_scalar
     );
     assert_eq!(
-        point_affine_niels * product_scalar,
-        (point_affine_niels * left_scalar) * right_scalar
+        subgroup_point.to_niels() * product_scalar,
+        (subgroup_point.to_niels() * left_scalar) * right_scalar
+    );
+
+    let affine_niels_point = AffinePoint::from(subgroup_point).to_niels();
+    assert_eq!(
+        subgroup_point * product_scalar,
+        (affine_niels_point * left_scalar) * right_scalar
+    );
+    assert_eq!(
+        affine_niels_point * product_scalar,
+        (subgroup_point * left_scalar) * right_scalar
+    );
+    assert_eq!(
+        affine_niels_point * product_scalar,
+        (affine_niels_point * left_scalar) * right_scalar
     );
 }
 
 #[cfg(feature = "alloc")]
 #[test]
 fn test_serialization_consistency() {
-    let generator = FULL_GENERATOR.mul_by_cofactor();
-    let mut current_point = generator;
+    let subgroup_generator = FULL_GENERATOR.mul_by_cofactor();
+    let mut current_point = subgroup_generator;
 
     let expected_serializations = vec![
         [
@@ -1724,12 +1875,13 @@ fn test_serialization_consistency() {
         ],
     ];
 
-    let batched_points =
+    let batched_deserialized_points =
         AffinePoint::batch_from_bytes(expected_serializations.iter().cloned());
 
-    for (expected_serialized, batch_deserialized) in expected_serializations
-        .into_iter()
-        .zip(batched_points.into_iter())
+    for (expected_serialized_bytes, batch_deserialized_point) in
+        expected_serializations
+            .into_iter()
+            .zip(batched_deserialized_points.into_iter())
     {
         assert!(current_point.satisfies_extended_curve_equation_vartime());
         let affine_point = AffinePoint::from(current_point);
@@ -1737,9 +1889,9 @@ fn test_serialization_consistency() {
         let deserialized_point =
             AffinePoint::from_bytes(serialized_point).unwrap();
         assert_eq!(affine_point, deserialized_point);
-        assert_eq!(affine_point, batch_deserialized.unwrap());
-        assert_eq!(expected_serialized, serialized_point);
-        current_point += generator;
+        assert_eq!(affine_point, batch_deserialized_point.unwrap());
+        assert_eq!(expected_serialized_bytes, serialized_point);
+        current_point += subgroup_generator;
     }
 }
 
@@ -1758,30 +1910,30 @@ fn test_zip_216() {
         ],
     ];
 
-    for non_canonical_encoding in &NON_CANONICAL_ENCODINGS {
+    for non_canonical_bytes in &NON_CANONICAL_ENCODINGS {
         {
-            let mut canonicalized_encoding = *non_canonical_encoding;
+            let mut canonicalized_bytes = *non_canonical_bytes;
 
             assert!(bool::from(
-                AffinePoint::from_bytes(canonicalized_encoding).is_none()
+                AffinePoint::from_bytes(canonicalized_bytes).is_none()
             ));
 
-            canonicalized_encoding[31] &= 0b0111_1111;
+            canonicalized_bytes[31] &= 0b0111_1111;
             assert!(bool::from(
-                AffinePoint::from_bytes(canonicalized_encoding).is_some()
+                AffinePoint::from_bytes(canonicalized_bytes).is_some()
             ));
         }
 
         {
             let parsed = AffinePoint::from_bytes_pre_zip216_compatibility(
-                *non_canonical_encoding,
+                *non_canonical_bytes,
             )
             .unwrap();
-            let mut encoded = parsed.to_bytes();
-            assert_ne!(non_canonical_encoding, &encoded);
+            let mut reencoded_bytes = parsed.to_bytes();
+            assert_ne!(non_canonical_bytes, &reencoded_bytes);
 
-            encoded[31] |= 0b1000_0000;
-            assert_eq!(non_canonical_encoding, &encoded);
+            reencoded_bytes[31] |= 0b1000_0000;
+            assert_eq!(non_canonical_bytes, &reencoded_bytes);
         }
     }
 }

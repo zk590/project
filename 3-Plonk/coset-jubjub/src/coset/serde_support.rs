@@ -9,6 +9,19 @@ use serde::{de::Error, Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::{AffinePoint, ExtendedPoint};
 
+/// 将十六进制字符串解码为固定长度字节数组。
+/// 该函数集中处理长度与编码错误，避免在反序列化流程里重复样板逻辑。
+/// 返回的字节长度由调用方通过 const 泛型显式约束。
+fn decode_hex_fixed<const N: usize, E: Error>(
+    serialized_hex: &str,
+) -> Result<[u8; N], E> {
+    let decoded_bytes = hex::decode(serialized_hex).map_err(Error::custom)?;
+    let decoded_len = decoded_bytes.len();
+    decoded_bytes.try_into().map_err(|_| {
+        Error::invalid_length(decoded_len, &N.to_string().as_str())
+    })
+}
+
 impl Serialize for AffinePoint {
     fn serialize<S: Serializer>(
         &self,
@@ -24,11 +37,7 @@ impl<'de> Deserialize<'de> for AffinePoint {
         deserializer: D,
     ) -> Result<Self, D::Error> {
         let serialized_hex = String::deserialize(deserializer)?;
-        let decoded = hex::decode(&serialized_hex).map_err(Error::custom)?;
-        let decoded_len = decoded.len();
-        let bytes: [u8; Self::SIZE] = decoded.try_into().map_err(|_| {
-            Error::invalid_length(decoded_len, &Self::SIZE.to_string().as_str())
-        })?;
+        let bytes: [u8; Self::SIZE] = decode_hex_fixed(&serialized_hex)?;
         AffinePoint::from_bytes(bytes)
             .into_option()
             .ok_or(Error::custom(
@@ -71,12 +80,12 @@ mod tests {
         let mut rng = StdRng::seed_from_u64(0xdead);
         let point = ExtendedPoint::random(&mut rng);
         let point = AffinePoint::from(point);
-        let ser = test_utils::assert_canonical_json(
+        let serialized = test_utils::assert_canonical_json(
             &point,
             "\"7bdf072820ef769376583c858687144b0dcaccf8319880627c82eef222f8c6cb\""
         )?;
-        let deser = serde_json::from_str(&ser)?;
-        assert_eq!(point, deser);
+        let deserialized = serde_json::from_str(&serialized)?;
+        assert_eq!(point, deserialized);
         Ok(())
     }
 
@@ -84,12 +93,12 @@ mod tests {
     fn serde_extended_point() -> Result<(), Box<dyn std::error::Error>> {
         let mut rng = StdRng::seed_from_u64(0xdead);
         let point = ExtendedPoint::random(&mut rng);
-        let ser = test_utils::assert_canonical_json(
+        let serialized = test_utils::assert_canonical_json(
             &point,
             "\"7bdf072820ef769376583c858687144b0dcaccf8319880627c82eef222f8c6cb\""
         )?;
-        let deser = serde_json::from_str(&ser)?;
-        assert_eq!(point, deser);
+        let deserialized = serde_json::from_str(&serialized)?;
+        assert_eq!(point, deserialized);
         Ok(())
     }
 

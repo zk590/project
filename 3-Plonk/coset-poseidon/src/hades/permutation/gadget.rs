@@ -1,4 +1,4 @@
-//
+// 电路约束版本的 Poseidon 置换实现。
 
 use coset_bls12_381::BlsScalar;
 use coset_safe::Safe;
@@ -67,38 +67,33 @@ impl<'a> Hades<Witness> for GadgetPermutation<'a> {
     fn apply_mds_matrix(&mut self, round: usize, state: &mut [Witness; WIDTH]) {
         let mut result = [Composer::ZERO; WIDTH];
 
-        //
-
-        //
-
-        //
-
-        for j in 0..WIDTH {
-            let c = match round + 1 < Self::ROUNDS {
-                true => ROUND_CONSTANTS[round + 1][j],
+        // 每一行执行一次 MDS 线性组合，并在最后一轮之外叠加下一轮常量。
+        for row_index in 0..WIDTH {
+            let next_round_constant = match round + 1 < Self::ROUNDS {
+                true => ROUND_CONSTANTS[round + 1][row_index],
                 false => BlsScalar::zero(),
             };
 
             let constraint = Constraint::new()
-                .left(MDS_MATRIX[j][0])
+                .left(MDS_MATRIX[row_index][0])
                 .a(state[0])
-                .right(MDS_MATRIX[j][1])
+                .right(MDS_MATRIX[row_index][1])
                 .b(state[1])
-                .fourth(MDS_MATRIX[j][2])
+                .fourth(MDS_MATRIX[row_index][2])
                 .d(state[2]);
 
-            result[j] = self.composer.gate_add(constraint);
+            result[row_index] = self.composer.gate_add(constraint);
 
             let constraint = Constraint::new()
-                .left(MDS_MATRIX[j][3])
+                .left(MDS_MATRIX[row_index][3])
                 .a(state[3])
-                .right(MDS_MATRIX[j][4])
+                .right(MDS_MATRIX[row_index][4])
                 .b(state[4])
                 .fourth(1)
-                .d(result[j])
-                .constant(c);
+                .d(result[row_index])
+                .constant(next_round_constant);
 
-            result[j] = self.composer.gate_add(constraint);
+            result[row_index] = self.composer.gate_add(constraint);
         }
 
         state.copy_from_slice(&result);

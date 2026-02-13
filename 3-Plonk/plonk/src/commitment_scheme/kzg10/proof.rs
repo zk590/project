@@ -11,6 +11,21 @@ pub(crate) struct Proof {
     pub(crate) commitment_to_polynomial: Commitment,
 }
 
+impl Proof {
+    /// 由 witness 承诺、评估值和多项式承诺构造单点证明。
+    pub(crate) const fn new(
+        commitment_to_witness: Commitment,
+        evaluated_point: BlsScalar,
+        commitment_to_polynomial: Commitment,
+    ) -> Self {
+        Self {
+            commitment_to_witness,
+            evaluated_point,
+            commitment_to_polynomial,
+        }
+    }
+}
+
 #[cfg(feature = "alloc")]
 pub(crate) mod alloc {
     use super::*;
@@ -33,6 +48,13 @@ pub(crate) mod alloc {
 
     #[allow(dead_code)]
     impl AggregateProof {
+        /// 生成聚合挑战幂次序列。
+        /// 长度与待聚合多项式承诺数量一致，用于线性组合。
+        #[inline]
+        fn challenge_powers(&self, challenge: &BlsScalar) -> Vec<BlsScalar> {
+            powers_of(challenge, self.commitments_to_polynomials.len() - 1)
+        }
+
         /// 使用见证承诺初始化聚合证明容器。
         /// 初始状态仅包含共享 witness 承诺，评估点与多项式承诺留空待追加。
         /// 该构造通常在批量打开流程中作为累加器起点使用。
@@ -56,8 +78,7 @@ pub(crate) mod alloc {
         /// 该步骤分别对承诺与评估值做同构线性组合，得到可一次校验的等价证明。
         /// 挑战值必须与转录器上下文绑定，否则会破坏批量验证的安全性。
         pub(crate) fn flatten(&self, challenge: &BlsScalar) -> Proof {
-            let challenge_powers =
-                powers_of(challenge, self.commitments_to_polynomials.len() - 1);
+            let challenge_powers = self.challenge_powers(challenge);
 
             #[cfg(not(feature = "std"))]
             let flattened_poly_commitments_iter = self
@@ -93,13 +114,11 @@ pub(crate) mod alloc {
                     })
                     .sum();
 
-            Proof {
-                commitment_to_witness: self.commitment_to_witness,
-                evaluated_point: flattened_poly_evaluations,
-                commitment_to_polynomial: Commitment::from(
-                    flattened_poly_commitments,
-                ),
-            }
+            Proof::new(
+                self.commitment_to_witness,
+                flattened_poly_evaluations,
+                Commitment::from(flattened_poly_commitments),
+            )
         }
     }
 }

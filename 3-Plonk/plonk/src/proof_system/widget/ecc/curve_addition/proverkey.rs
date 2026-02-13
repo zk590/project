@@ -29,6 +29,44 @@ pub(crate) struct ProverKey {
 }
 
 impl ProverKey {
+    /// 计算变量基点加法约束的核心恒等式。
+    #[allow(clippy::too_many_arguments)]
+    #[inline]
+    fn curve_add_identity(
+        point_x_left: &BlsScalar,
+        point_x_output: &BlsScalar,
+        point_y_left: &BlsScalar,
+        point_y_output: &BlsScalar,
+        point_x_right: &BlsScalar,
+        point_y_right: &BlsScalar,
+        x_left_mul_y_right: &BlsScalar,
+        kappa: BlsScalar,
+    ) -> BlsScalar {
+        let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
+
+        let y_left_mul_x_right = point_y_left * point_x_right;
+        let y_left_mul_y_right = point_y_left * point_y_right;
+        let x_left_mul_x_right = point_x_left * point_x_right;
+
+        let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
+        let x3_rhs = point_x_output
+            + (point_x_output
+                * EDWARDS_D
+                * x_left_mul_y_right
+                * y_left_mul_x_right);
+        let x3_consistency = (x3_lhs - x3_rhs) * kappa;
+
+        let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
+        let y3_rhs = point_y_output
+            - point_y_output
+                * EDWARDS_D
+                * x_left_mul_y_right
+                * y_left_mul_x_right;
+        let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
+
+        xy_consistency + x3_consistency + y3_consistency
+    }
+
     pub(crate) fn compute_quotient_i(
         &self,
         index: usize,
@@ -53,31 +91,16 @@ impl ProverKey {
         let point_y_right = d_i;
         let x_left_mul_y_right = d_i_w;
 
-        //
-
-        let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
-
-        let y_left_mul_x_right = point_y_left * point_x_right;
-        let y_left_mul_y_right = point_y_left * point_y_right;
-        let x_left_mul_x_right = point_x_left * point_x_right;
-
-        let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
-        let x3_rhs = point_x_output
-            + (point_x_output
-                * EDWARDS_D
-                * x_left_mul_y_right
-                * y_left_mul_x_right);
-        let x3_consistency = (x3_lhs - x3_rhs) * kappa;
-
-        let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
-        let y3_rhs = point_y_output
-            - point_y_output
-                * EDWARDS_D
-                * x_left_mul_y_right
-                * y_left_mul_x_right;
-        let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
-
-        let identity = xy_consistency + x3_consistency + y3_consistency;
+        let identity = Self::curve_add_identity(
+            point_x_left,
+            point_x_output,
+            point_y_left,
+            point_y_output,
+            point_x_right,
+            point_y_right,
+            x_left_mul_y_right,
+            kappa,
+        );
 
         identity * q_variable_group_add_i * curve_add_separation_challenge
     }
@@ -99,29 +122,16 @@ impl ProverKey {
         let point_y_right = evaluations.d_eval;
         let x_left_mul_y_right = evaluations.d_w_eval;
 
-        //
-
-        let xy_consistency = point_x_left * point_y_right - x_left_mul_y_right;
-
-        let y_left_mul_x_right = point_y_left * point_x_right;
-        let y_left_mul_y_right = point_y_left * point_y_right;
-        let x_left_mul_x_right = point_x_left * point_x_right;
-
-        let x3_lhs = x_left_mul_y_right + y_left_mul_x_right;
-        let x3_rhs = point_x_output
-            + (point_x_output
-                * (EDWARDS_D * x_left_mul_y_right * y_left_mul_x_right));
-        let x3_consistency = (x3_lhs - x3_rhs) * kappa;
-
-        let y3_lhs = y_left_mul_y_right + x_left_mul_x_right;
-        let y3_rhs = point_y_output
-            - point_y_output
-                * EDWARDS_D
-                * x_left_mul_y_right
-                * y_left_mul_x_right;
-        let y3_consistency = (y3_lhs - y3_rhs) * kappa.square();
-
-        let identity = xy_consistency + x3_consistency + y3_consistency;
+        let identity = Self::curve_add_identity(
+            &point_x_left,
+            &point_x_output,
+            &point_y_left,
+            &point_y_output,
+            &point_x_right,
+            &point_y_right,
+            &x_left_mul_y_right,
+            kappa,
+        );
 
         q_variable_group_add_poly * &(identity * curve_add_separation_challenge)
     }

@@ -48,27 +48,33 @@ pub(crate) trait Hades<T> {
     fn run_full_round(&mut self, round_index: usize, state: &mut [T; WIDTH]) {
         self.add_round_constants(round_index, state);
 
-        state.iter_mut().for_each(|w| self.quintic_s_box(w));
+        state
+            .iter_mut()
+            .for_each(|state_value| self.quintic_s_box(state_value));
 
         self.apply_mds_matrix(round_index, state);
     }
 
     /// 执行完整 Hades 置换流程（前半全轮 + 部分轮 + 后半全轮）。
     fn apply_permutation(&mut self, state: &mut [T; WIDTH]) {
-        for full_round_index in 0..FULL_ROUNDS / 2 {
+        let half_full_rounds = FULL_ROUNDS / 2;
+        let partial_round_start = half_full_rounds;
+        let final_full_round_start = Self::ROUNDS - half_full_rounds;
+
+        for full_round_index in 0..half_full_rounds {
             self.run_full_round(full_round_index, state);
         }
 
         for partial_round_index in 0..PARTIAL_ROUNDS {
             self.run_partial_round(
-                partial_round_index + FULL_ROUNDS / 2,
+                partial_round_index + partial_round_start,
                 state,
             );
         }
 
-        for full_round_index in 0..FULL_ROUNDS / 2 {
+        for full_round_index in 0..half_full_rounds {
             self.run_full_round(
-                full_round_index + FULL_ROUNDS / 2 + PARTIAL_ROUNDS,
+                full_round_index + final_full_round_start,
                 state,
             );
         }

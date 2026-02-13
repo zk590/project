@@ -38,6 +38,17 @@ impl ops::Deref for Prover {
 }
 
 impl Prover {
+    /// 将公开输入按固定标签追加到 transcript。
+    #[inline]
+    fn append_public_inputs_to_transcript(
+        transcript: &mut Transcript,
+        public_inputs: &[BlsScalar],
+    ) {
+        public_inputs.iter().for_each(|public_input| {
+            transcript.append_scalar(b"pi", public_input)
+        });
+    }
+
     pub(crate) fn new(
         label: Vec<u8>,
         prover_key: ProverKey,
@@ -72,10 +83,10 @@ impl Prover {
     {
         let mut w_vec_inverse = domain.ifft(witnesses);
 
-        for i in 0..hiding_degree + 1 {
+        for blinding_index in 0..hiding_degree + 1 {
             let blinding_scalar = BlsScalar::random(&mut *rng);
 
-            w_vec_inverse[i] -= blinding_scalar;
+            w_vec_inverse[blinding_index] -= blinding_scalar;
             w_vec_inverse.push(blinding_scalar);
         }
 
@@ -233,9 +244,10 @@ impl Prover {
             self.size,
         );
 
-        public_inputs
-            .iter()
-            .for_each(|pi| transcript.append_scalar(b"pi", pi));
+        Self::append_public_inputs_to_transcript(
+            &mut transcript,
+            &public_inputs,
+        );
 
         let mut a_scalars = vec![BlsScalar::zero(); size];
         let mut b_scalars = vec![BlsScalar::zero(); size];
@@ -418,7 +430,7 @@ impl Prover {
         transcript.append_scalar(b"q_l_eval", &q_l_eval);
         transcript.append_scalar(b"q_r_eval", &q_r_eval);
 
-        let evaluations = ProofEvaluations {
+        let evaluations = ProofEvaluations::new(
             a_eval,
             b_eval,
             c_eval,
@@ -434,7 +446,7 @@ impl Prover {
             s_sigma_2_eval,
             s_sigma_3_eval,
             z_eval,
-        };
+        );
 
         let v_challenge = transcript.challenge_scalar(b"v_challenge");
 

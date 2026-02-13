@@ -12,12 +12,16 @@ pub(crate) mod gadget;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Domain {
+    /// 四叉 Merkle 节点哈希域（固定吸收 4 个字段元素，输出 1 个）。
     Merkle4,
 
+    /// 二叉 Merkle 节点哈希域（固定吸收 2 个字段元素，输出 1 个）。
     Merkle2,
 
+    /// Poseidon 加解密专用域，避免与通用哈希域发生跨协议碰撞。
     Encryption,
 
+    /// 通用域，不施加 Merkle 固定长度约束，允许自定义输出长度。
     Other,
 }
 
@@ -48,11 +52,10 @@ fn build_sponge_io_pattern<T>(
     input_segments: &[&[T]],
     output_len: usize,
 ) -> Result<Vec<Call>, Error> {
-    let mut io_calls = Vec::new();
+    let mut io_pattern_calls = Vec::new();
 
-    let total_input_len = input_segments
-        .iter()
-        .fold(0, |accumulator, segment| accumulator + segment.len());
+    let total_input_len: usize =
+        input_segments.iter().map(|segment| segment.len()).sum();
     match domain {
         Domain::Merkle2 if total_input_len != 2 || output_len != 1 => {
             return Err(Error::IOPatternViolation);
@@ -63,11 +66,11 @@ fn build_sponge_io_pattern<T>(
         _ => {}
     }
     for segment in input_segments.iter() {
-        io_calls.push(Call::Absorb(segment.len()));
+        io_pattern_calls.push(Call::Absorb(segment.len()));
     }
-    io_calls.push(Call::Squeeze(output_len));
+    io_pattern_calls.push(Call::Squeeze(output_len));
 
-    Ok(io_calls)
+    Ok(io_pattern_calls)
 }
 
 pub struct Hash<'a> {
@@ -75,6 +78,13 @@ pub struct Hash<'a> {
     input: Vec<&'a [BlsScalar]>,
     output_len: usize,
 }
+
+const TRUNCATION_MASK: BlsScalar = BlsScalar::from_raw([
+    0xffff_ffff_ffff_ffff,
+    0xffff_ffff_ffff_ffff,
+    0xffff_ffff_ffff_ffff,
+    0x03ff_ffff_ffff_ffff,
+]);
 
 impl<'a> Hash<'a> {
     /// 创建指定域分离标签的 Poseidon 哈希上下文。
@@ -108,7 +118,7 @@ impl<'a> Hash<'a> {
     /// 该流程包括：构建 IO 模式、按段 absorb、按约定次数 squeeze、最终 finish。
     /// 若前置模式构建通过，则后续步骤按相同约束执行，不应再触发模式错误。
     pub fn finalize(&self) -> Vec<BlsScalar> {
-        let mut poseidon_sponge = Sponge::start(
+        let mut sponge = Sponge::start(
             ScalarPermutation::new(),
             build_sponge_io_pattern(self.domain, &self.input, self.output_len)
                 .expect("io-pattern should be valid"),
@@ -117,16 +127,16 @@ impl<'a> Hash<'a> {
         .expect("at this point the io-pattern is valid");
 
         for segment in self.input.iter() {
-            poseidon_sponge
+            sponge
                 .absorb(segment.len(), segment)
                 .expect("at this point the io-pattern is valid");
         }
 
-        poseidon_sponge
+        sponge
             .squeeze(self.output_len)
             .expect("at this point the io-pattern is valid");
 
-        poseidon_sponge
+        sponge
             .finish()
             .expect("at this point the io-pattern is valid")
     }
@@ -135,13 +145,6 @@ impl<'a> Hash<'a> {
     /// 截断通过固定掩码完成，再转入 JubJub 标量域，常用于签名电路输入。
     /// 该变换保持确定性，但会丢弃高位信息，不应视作双向可逆映射。
     pub fn finalize_truncated(&self) -> Vec<JubJubScalar> {
-        const TRUNCATION_MASK: BlsScalar = BlsScalar::from_raw([
-            0xffff_ffff_ffff_ffff,
-            0xffff_ffff_ffff_ffff,
-            0xffff_ffff_ffff_ffff,
-            0x03ff_ffff_ffff_ffff,
-        ]);
-
         let field_elements = self.finalize();
 
         field_elements

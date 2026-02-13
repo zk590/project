@@ -29,6 +29,13 @@ impl WitnessPoint {
     pub const fn y(&self) -> &Witness {
         &self.y
     }
+
+    /// 以值拷贝方式返回 (x, y) 两个 witness。
+    /// 适合在需要一次性解包坐标的调用点，减少重复 `x()/y()` 访问。
+    /// 不影响现有按引用访问接口。
+    pub const fn coordinates(&self) -> (Witness, Witness) {
+        (self.x, self.y)
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

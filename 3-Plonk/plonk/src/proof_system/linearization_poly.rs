@@ -1,7 +1,5 @@
 // 模块说明：本文件实现 PLONK 组件（src/proof_system/linearization_poly.rs）。
 
-//
-
 #[cfg(feature = "alloc")]
 use crate::{
     fft::{EvaluationDomain, Polynomial},
@@ -38,10 +36,11 @@ pub(crate) struct ProofEvaluations {
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) d_eval: BlsScalar,
-    //
+    // 线性化多项式在 `z * omega` 处对 witness 多项式的评估。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) a_w_eval: BlsScalar,
-    //
+
+    // 线性化多项式在 `z * omega` 处对 witness 多项式的评估。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) b_w_eval: BlsScalar,
 
@@ -50,16 +49,20 @@ pub(crate) struct ProofEvaluations {
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_arith_eval: BlsScalar,
-    //
+
+    // 算术门选择子在挑战点 `z` 上的评估值。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_c_eval: BlsScalar,
-    //
+
+    // 算术门选择子在挑战点 `z` 上的评估值。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_l_eval: BlsScalar,
-    //
+
+    // 算术门选择子在挑战点 `z` 上的评估值。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) q_r_eval: BlsScalar,
-    //
+
+    // 置换参数相关多项式在挑战点 `z` 上的评估值。
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) s_sigma_1_eval: BlsScalar,
 
@@ -71,6 +74,46 @@ pub(crate) struct ProofEvaluations {
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) z_eval: BlsScalar,
+}
+
+impl ProofEvaluations {
+    /// 由各评估值构造 `ProofEvaluations`。
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) const fn new(
+        a_eval: BlsScalar,
+        b_eval: BlsScalar,
+        c_eval: BlsScalar,
+        d_eval: BlsScalar,
+        a_w_eval: BlsScalar,
+        b_w_eval: BlsScalar,
+        d_w_eval: BlsScalar,
+        q_arith_eval: BlsScalar,
+        q_c_eval: BlsScalar,
+        q_l_eval: BlsScalar,
+        q_r_eval: BlsScalar,
+        s_sigma_1_eval: BlsScalar,
+        s_sigma_2_eval: BlsScalar,
+        s_sigma_3_eval: BlsScalar,
+        z_eval: BlsScalar,
+    ) -> Self {
+        Self {
+            a_eval,
+            b_eval,
+            c_eval,
+            d_eval,
+            a_w_eval,
+            b_w_eval,
+            d_w_eval,
+            q_arith_eval,
+            q_c_eval,
+            q_l_eval,
+            q_r_eval,
+            s_sigma_1_eval,
+            s_sigma_2_eval,
+            s_sigma_3_eval,
+            z_eval,
+        }
+    }
 }
 
 impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
@@ -121,7 +164,7 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
         let s_sigma_3_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
         let z_eval = BlsScalar::from_reader(&mut evaluation_reader)?;
 
-        Ok(ProofEvaluations {
+        Ok(ProofEvaluations::new(
             a_eval,
             b_eval,
             c_eval,
@@ -137,7 +180,7 @@ impl Serializable<{ 15 * BlsScalar::SIZE }> for ProofEvaluations {
             s_sigma_2_eval,
             s_sigma_3_eval,
             z_eval,
-        })
+        ))
     }
 }
 
@@ -208,20 +251,14 @@ pub(crate) fn build_linearization_polynomial(
             z_poly,
         );
 
-    let domain_size = domain.size();
-
-    let z_n = z_challenge.pow(&[domain_size as u64, 0, 0, 0]);
-    let z_two_n = z_challenge.pow(&[2 * domain_size as u64, 0, 0, 0]);
-    let z_three_n = z_challenge.pow(&[3 * domain_size as u64, 0, 0, 0]);
-
-    let t_low_component = t_low_poly;
-    let t_mid_component = t_mid_poly * &z_n;
-    let t_high_component = t_high_poly * &z_two_n;
-    let t_fourth_component = t_fourth_poly * &z_three_n;
-    let quotient_prefix =
-        &(t_low_component + &t_mid_component) + &t_high_component;
-
-    let quotient_polynomial = &quotient_prefix + &t_fourth_component;
+    let quotient_polynomial = build_quotient_polynomial_on_challenge(
+        z_challenge,
+        domain.size(),
+        t_low_poly,
+        t_mid_poly,
+        t_high_poly,
+        t_fourth_poly,
+    );
 
     let z_h_eval = -domain.evaluate_vanishing_polynomial(z_challenge);
 
@@ -231,6 +268,27 @@ pub(crate) fn build_linearization_polynomial(
         &circuit_linearization + &permutation_linearization;
 
     &linearized_identity + &quotient_polynomial
+}
+
+#[cfg(feature = "alloc")]
+fn build_quotient_polynomial_on_challenge(
+    z_challenge: &BlsScalar,
+    domain_size: usize,
+    t_low_poly: &Polynomial,
+    t_mid_poly: &Polynomial,
+    t_high_poly: &Polynomial,
+    t_fourth_poly: &Polynomial,
+) -> Polynomial {
+    let z_n = z_challenge.pow(&[domain_size as u64, 0, 0, 0]);
+    let z_two_n = z_challenge.pow(&[2 * domain_size as u64, 0, 0, 0]);
+    let z_three_n = z_challenge.pow(&[3 * domain_size as u64, 0, 0, 0]);
+
+    let t_mid_component = t_mid_poly * &z_n;
+    let t_high_component = t_high_poly * &z_two_n;
+    let t_fourth_component = t_fourth_poly * &z_three_n;
+    let quotient_prefix = &(t_low_poly + &t_mid_component) + &t_high_component;
+
+    &quotient_prefix + &t_fourth_component
 }
 
 #[cfg(feature = "alloc")]

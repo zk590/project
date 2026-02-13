@@ -1,8 +1,6 @@
 // 模块说明：本文件实现 PLONK
 // 组件（src/proof_system/widget/ecc/scalar_mul/fixed_base/proverkey.rs）。
 
-//
-
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
 use coset_bls12_381::BlsScalar;
@@ -35,6 +33,17 @@ pub(crate) struct ProverKey {
 }
 
 impl ProverKey {
+    /// 计算固定基标量乘约束使用的 kappa 幂次。
+    #[inline]
+    fn separation_powers(
+        ecc_separation_challenge: &BlsScalar,
+    ) -> (BlsScalar, BlsScalar, BlsScalar) {
+        let kappa = ecc_separation_challenge.square();
+        let kappa_sq = kappa.square();
+        let kappa_cu = kappa_sq * kappa;
+        (kappa, kappa_sq, kappa_cu)
+    }
+
     pub(crate) fn compute_quotient_i(
         &self,
         index: usize,
@@ -50,9 +59,8 @@ impl ProverKey {
         let q_fixed_group_add_i = &self.q_fixed_group_add.1[index];
         let q_c_i = &self.q_c.1[index];
 
-        let kappa = ecc_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
+        let (kappa, kappa_sq, kappa_cu) =
+            Self::separation_powers(ecc_separation_challenge);
 
         let x_beta = &self.q_l.1[index];
         let y_beta = &self.q_r.1[index];
@@ -68,7 +76,7 @@ impl ProverKey {
         let accumulated_bit_w = d_i_w;
         let bit = extract_bit(accumulated_bit, accumulated_bit_w);
 
-        //
+        // 先约束 bit 合法性，再约束加法公式在 Edwards 曲线上的一致性。
 
         let bit_consistency = check_bit_consistency(bit);
 
@@ -107,9 +115,8 @@ impl ProverKey {
     ) -> Polynomial {
         let q_fixed_group_add_poly = &self.q_fixed_group_add.0;
 
-        let kappa = ecc_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
+        let (kappa, kappa_sq, kappa_cu) =
+            Self::separation_powers(ecc_separation_challenge);
 
         let x_beta_eval = evaluations.q_l_eval;
         let y_beta_eval = evaluations.q_r_eval;

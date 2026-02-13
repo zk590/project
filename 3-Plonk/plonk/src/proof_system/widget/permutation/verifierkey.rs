@@ -31,6 +31,23 @@ pub(crate) struct VerifierKey {
     pub(crate) s_sigma_4: Commitment,
 }
 
+impl VerifierKey {
+    /// 由四条 sigma 承诺构造置换 verifier key。
+    pub(crate) const fn new(
+        s_sigma_1: Commitment,
+        s_sigma_2: Commitment,
+        s_sigma_3: Commitment,
+        s_sigma_4: Commitment,
+    ) -> Self {
+        Self {
+            s_sigma_1,
+            s_sigma_2,
+            s_sigma_3,
+            s_sigma_4,
+        }
+    }
+}
+
 #[cfg(feature = "alloc")]
 mod alloc {
     use super::*;

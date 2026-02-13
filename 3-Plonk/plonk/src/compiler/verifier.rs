@@ -1,4 +1,4 @@
-//
+// Verifier 构建、序列化与证明验证入口。
 
 use alloc::vec::Vec;
 
@@ -24,6 +24,17 @@ pub struct Verifier {
 }
 
 impl Verifier {
+    /// 将公开输入按固定标签追加到 transcript。
+    #[inline]
+    fn append_public_inputs_to_transcript(
+        transcript: &mut Transcript,
+        public_inputs: &[BlsScalar],
+    ) {
+        public_inputs.iter().for_each(|public_input| {
+            transcript.append_scalar(b"pi", public_input)
+        });
+    }
+
     pub(crate) fn new(
         label: Vec<u8>,
         verifier_key: VerifierKey,
@@ -198,9 +209,10 @@ impl Verifier {
 
         let mut transcript = self.transcript.clone();
 
-        public_inputs
-            .iter()
-            .for_each(|pi| transcript.append_scalar(b"pi", pi));
+        Self::append_public_inputs_to_transcript(
+            &mut transcript,
+            public_inputs,
+        );
 
         let dense_public_inputs = Composer::dense_public_inputs(
             &self.public_input_indexes,

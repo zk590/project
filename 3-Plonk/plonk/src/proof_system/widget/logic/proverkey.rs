@@ -1,7 +1,7 @@
 // 模块说明：本文件实现 PLONK
 // 组件（src/proof_system/widget/logic/proverkey.rs）。
 
-//
+// 逻辑门（XOR/AND）约束在 Prover 侧的商多项式与线性化实现。
 
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
@@ -31,6 +31,18 @@ pub(crate) struct ProverKey {
 }
 
 impl ProverKey {
+    /// 计算逻辑约束使用的 kappa 幂次。
+    #[inline]
+    fn separation_powers(
+        logic_separation_challenge: &BlsScalar,
+    ) -> (BlsScalar, BlsScalar, BlsScalar, BlsScalar) {
+        let kappa = logic_separation_challenge.square();
+        let kappa_sq = kappa.square();
+        let kappa_cu = kappa_sq * kappa;
+        let kappa_qu = kappa_cu * kappa;
+        (kappa, kappa_sq, kappa_cu, kappa_qu)
+    }
+
     pub(crate) fn compute_quotient_i(
         &self,
         index: usize,
@@ -48,10 +60,8 @@ impl ProverKey {
         let q_logic_i = &self.q_logic.1[index];
         let q_c_i = &self.q_c.1[index];
 
-        let kappa = logic_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
-        let kappa_qu = kappa_cu * kappa;
+        let (kappa, kappa_sq, kappa_cu, kappa_qu) =
+            Self::separation_powers(logic_separation_challenge);
 
         let a_shift_delta_input = a_i_w - four * a_i;
         let c_0 = delta(a_shift_delta_input);
@@ -85,10 +95,8 @@ impl ProverKey {
         let four = BlsScalar::from(4);
         let q_logic_poly = &self.q_logic.0;
 
-        let kappa = logic_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
-        let kappa_qu = kappa_cu * kappa;
+        let (kappa, kappa_sq, kappa_cu, kappa_qu) =
+            Self::separation_powers(logic_separation_challenge);
 
         let a_shift_delta_input =
             evaluations.a_w_eval - four * evaluations.a_eval;
@@ -144,12 +152,12 @@ pub(crate) fn delta_xor_and(
     let eighty_one = BlsScalar::from(81);
     let eighty_three = BlsScalar::from(83);
 
-    let F = w
+    let accumulator_polynomial = w
         * (w * (four * w - eighteen * (a + b) + eighty_one)
             + eighteen * (a.square() + b.square())
             - eighty_one * (a + b)
             + eighty_three);
-    let E = three * (a + b + c) - (two * F);
-    let B = q_c * ((nine * c) - three * (a + b));
-    B + E
+    let linear_term = three * (a + b + c) - (two * accumulator_polynomial);
+    let selector_term = q_c * ((nine * c) - three * (a + b));
+    selector_term + linear_term
 }

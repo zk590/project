@@ -39,19 +39,19 @@ impl<const A: usize> Aggregate<A> for () {
 /// 初始化固定长度数组的内部工具函数。
 /// 该函数用闭包按索引逐项构造数组，避免 `T: Copy/Default` 约束。
 /// 实现使用 `MaybeUninit` 安全地完成逐元素写入，再整体转回已初始化数组。
-pub(crate) fn init_fixed_array<T, F, const N: usize>(closure: F) -> [T; N]
+pub(crate) fn init_fixed_array<T, F, const N: usize>(initializer: F) -> [T; N]
 where
     F: Fn(usize) -> T,
 {
-    let mut array: [MaybeUninit<T>; N] =
+    let mut uninit_array: [MaybeUninit<T>; N] =
         unsafe { MaybeUninit::uninit().assume_init() };
 
     let mut index = 0;
     while index < N {
-        array[index].write(closure(index));
+        uninit_array[index].write(initializer(index));
         index += 1;
     }
-    let array_ptr = array.as_ptr();
+    let array_ptr = uninit_array.as_ptr();
 
     unsafe { ptr::read(array_ptr.cast()) }
 }

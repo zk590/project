@@ -1,4 +1,4 @@
-//
+// Poseidon 哈希在 PLONK 约束系统中的 gadget 实现。
 
 use alloc::vec::Vec;
 
@@ -40,7 +40,7 @@ impl<'a> HashGadget<'a> {
 
     /// 在电路中执行 Poseidon sponge 并返回输出 witness。
     pub fn finalize(&self, composer: &mut Composer) -> Vec<Witness> {
-        let mut poseidon_sponge = Sponge::start(
+        let mut sponge = Sponge::start(
             GadgetPermutation::new(composer),
             build_sponge_io_pattern(self.domain, &self.input, self.output_len)
                 .expect("io-pattern should be valid"),
@@ -49,25 +49,25 @@ impl<'a> HashGadget<'a> {
         .expect("at this point the io-pattern is valid");
 
         for segment in self.input.iter() {
-            poseidon_sponge
+            sponge
                 .absorb(segment.len(), segment)
                 .expect("at this point the io-pattern is valid");
         }
 
-        poseidon_sponge
+        sponge
             .squeeze(self.output_len)
             .expect("at this point the io-pattern is valid");
 
-        poseidon_sponge
+        sponge
             .finish()
             .expect("at this point the io-pattern is valid")
     }
 
     /// 对输出做位宽截断，得到 JubJub 标量语义的 witness。
     pub fn finalize_truncated(&self, composer: &mut Composer) -> Vec<Witness> {
-        let field_witnesses = self.finalize(composer);
+        let hash_output_witnesses = self.finalize(composer);
 
-        field_witnesses
+        hash_output_witnesses
             .iter()
             .map(|witness| {
                 composer.append_logic_xor::<125>(*witness, Composer::ZERO)

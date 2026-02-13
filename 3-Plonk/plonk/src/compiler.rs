@@ -3,7 +3,9 @@ use coset_bls12_381::BlsScalar;
 use crate::commitment_scheme::{CommitKey, OpeningKey, PublicParameters};
 use crate::error::Error;
 use crate::fft::{EvaluationDomain, Evaluations, Polynomial};
-use crate::proof_system::preprocess::Polynomials;
+use crate::proof_system::preprocess::{
+    Polynomials, SelectorPolynomials, SigmaPolynomials,
+};
 use crate::proof_system::{widget, ProverKey};
 
 use crate::prelude::{Circuit, Composer};
@@ -17,6 +19,18 @@ pub use verifier::Verifier;
 pub struct Compiler;
 
 impl Compiler {
+    /// 在给定扩展域上计算多项式的 coset FFT 并封装为 `Evaluations`。
+    #[inline]
+    fn coset_evaluations(
+        domain_8n: EvaluationDomain,
+        polynomial: &Polynomial,
+    ) -> Evaluations {
+        Evaluations::from_vec_and_domain(
+            domain_8n.coset_fft(polynomial),
+            domain_8n,
+        )
+    }
+
     /// 使用 `Circuit::default()` 构建电路并完成预处理，返回 prover/verifier。
     pub fn compile<C>(
         pp: &PublicParameters,
@@ -25,9 +39,7 @@ impl Compiler {
     where
         C: Circuit,
     {
-        let mut composer = Composer::initialized();
-        C::default().circuit(&mut composer)?;
-
+        let composer = Self::build_composer_with_default::<C>()?;
         Self::compile_with_composer(pp, label, &composer)
     }
 
@@ -40,9 +52,7 @@ impl Compiler {
     where
         C: Circuit,
     {
-        let mut composer = Composer::initialized();
-        circuit.circuit(&mut composer)?;
-
+        let composer = Self::build_composer(circuit)?;
         Self::compile_with_composer(pp, label, &composer)
     }
 
@@ -71,6 +81,19 @@ impl Compiler {
             Self::preprocess(label, commit, opening, composer)?;
 
         Ok((prover, verifier))
+    }
+
+    /// 用给定电路实例构建并填充 composer。
+    fn build_composer<C: Circuit>(circuit: &C) -> Result<Composer, Error> {
+        let mut composer = Composer::initialized();
+        circuit.circuit(&mut composer)?;
+        Ok(composer)
+    }
+
+    /// 使用默认电路实例构建 composer。
+    fn build_composer_with_default<C: Circuit>() -> Result<Composer, Error> {
+        let circuit = C::default();
+        Self::build_composer(&circuit)
     }
 
     /// 预处理电路并构造 prover/verifier 键材料。
@@ -222,87 +245,55 @@ impl Compiler {
             permutation: permutation_verifier_key,
         };
 
-        let selectors = Polynomials {
-            q_m: q_m_poly,
-            q_l: q_l_poly,
-            q_r: q_r_poly,
-            q_o: q_o_poly,
-            q_f: q_f_poly,
-            q_c: q_c_poly,
-            q_arith: q_arith_poly,
-            q_range: q_range_poly,
-            q_logic: q_logic_poly,
-            q_fixed_group_add: q_fixed_group_add_poly,
-            q_variable_group_add: q_variable_group_add_poly,
-            s_sigma_1: s_sigma_1_poly,
-            s_sigma_2: s_sigma_2_poly,
-            s_sigma_3: s_sigma_3_poly,
-            s_sigma_4: s_sigma_4_poly,
-        };
+        let selector_polynomials: SelectorPolynomials = [
+            q_m_poly,
+            q_l_poly,
+            q_r_poly,
+            q_o_poly,
+            q_f_poly,
+            q_c_poly,
+            q_arith_poly,
+            q_range_poly,
+            q_logic_poly,
+            q_fixed_group_add_poly,
+            q_variable_group_add_poly,
+        ];
+        let sigma_polynomials: SigmaPolynomials = [
+            s_sigma_1_poly,
+            s_sigma_2_poly,
+            s_sigma_3_poly,
+            s_sigma_4_poly,
+        ];
+        let selectors =
+            Polynomials::from_parts(selector_polynomials, sigma_polynomials);
 
         let domain_8n = EvaluationDomain::new(8 * domain.size())?;
 
-        let q_m_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_m),
-            domain_8n,
-        );
-        let q_l_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_l),
-            domain_8n,
-        );
-        let q_r_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_r),
-            domain_8n,
-        );
-        let q_o_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_o),
-            domain_8n,
-        );
-        let q_c_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_c),
-            domain_8n,
-        );
-        let q_f_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_f),
-            domain_8n,
-        );
-        let q_arith_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_arith),
-            domain_8n,
-        );
-        let q_range_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_range),
-            domain_8n,
-        );
-        let q_logic_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_logic),
-            domain_8n,
-        );
-        let q_fixed_group_add_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_fixed_group_add),
-            domain_8n,
-        );
-        let q_variable_group_add_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.q_variable_group_add),
-            domain_8n,
-        );
+        let q_m_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_m);
+        let q_l_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_l);
+        let q_r_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_r);
+        let q_o_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_o);
+        let q_c_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_c);
+        let q_f_eval_8n = Self::coset_evaluations(domain_8n, &selectors.q_f);
+        let q_arith_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.q_arith);
+        let q_range_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.q_range);
+        let q_logic_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.q_logic);
+        let q_fixed_group_add_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.q_fixed_group_add);
+        let q_variable_group_add_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.q_variable_group_add);
 
-        let s_sigma_1_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.s_sigma_1),
-            domain_8n,
-        );
-        let s_sigma_2_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.s_sigma_2),
-            domain_8n,
-        );
-        let s_sigma_3_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.s_sigma_3),
-            domain_8n,
-        );
-        let s_sigma_4_eval_8n = Evaluations::from_vec_and_domain(
-            domain_8n.coset_fft(&selectors.s_sigma_4),
-            domain_8n,
-        );
+        let s_sigma_1_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.s_sigma_1);
+        let s_sigma_2_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.s_sigma_2);
+        let s_sigma_3_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.s_sigma_3);
+        let s_sigma_4_eval_8n =
+            Self::coset_evaluations(domain_8n, &selectors.s_sigma_4);
 
         let linear_eval_8n = Evaluations::from_vec_and_domain(
             domain_8n.coset_fft(&[BlsScalar::zero(), BlsScalar::one()]),

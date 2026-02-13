@@ -1,7 +1,5 @@
 // 模块说明：本文件实现 Poseidon 组件（src/hades/round_constants.rs）。
 
-//
-
 use coset_bls12_381::BlsScalar;
 
 use crate::hades::{FULL_ROUNDS, PARTIAL_ROUNDS, WIDTH};
@@ -15,23 +13,24 @@ pub const ROUND_CONSTANTS: [[BlsScalar; WIDTH]; ROUNDS] = {
         panic!("There are not enough round constants stored in 'assets/arc.bin', have a look at the HOWTO to generate enough constants.");
     }
 
-    let mut cnst = [[BlsScalar::zero(); WIDTH]; ROUNDS];
+    let mut constants = [[BlsScalar::zero(); WIDTH]; ROUNDS];
 
-    let mut i = 0;
-    let mut j = 0;
-    while i < WIDTH * ROUNDS * 32 {
-        let a = super::read_u64_le_from_bytes(bytes, i);
-        let b = super::read_u64_le_from_bytes(bytes, i + 8);
-        let c = super::read_u64_le_from_bytes(bytes, i + 16);
-        let d = super::read_u64_le_from_bytes(bytes, i + 24);
+    let mut byte_offset = 0;
+    let mut constant_index = 0;
+    while byte_offset < WIDTH * ROUNDS * 32 {
+        let limb_0 = super::read_u64_le_from_bytes(bytes, byte_offset);
+        let limb_1 = super::read_u64_le_from_bytes(bytes, byte_offset + 8);
+        let limb_2 = super::read_u64_le_from_bytes(bytes, byte_offset + 16);
+        let limb_3 = super::read_u64_le_from_bytes(bytes, byte_offset + 24);
 
-        cnst[j / WIDTH][j % WIDTH] = BlsScalar::from_raw([a, b, c, d]);
-        j += 1;
+        constants[constant_index / WIDTH][constant_index % WIDTH] =
+            BlsScalar::from_raw([limb_0, limb_1, limb_2, limb_3]);
+        constant_index += 1;
 
-        i += 32;
+        byte_offset += 32;
     }
 
-    cnst
+    constants
 };
 
 #[cfg(test)]

@@ -1,3 +1,8 @@
+
+cd /opt/project && git push -u origin main
+
+
+cargo run --bin some_merkle -- --List '["alpha", "beta", "gamma"]'
 1-Sender:
 
 ##Sha3程序

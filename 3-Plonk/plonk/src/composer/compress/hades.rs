@@ -16,14 +16,13 @@ pub fn constants() -> [BlsScalar; CONSTANTS] {
     let mut hash_state = b"poseidon-for-plonk".to_vec();
 
     round_constants.iter_mut().for_each(|constant_slot| {
-        hash_state = Sha512::digest(hash_state.as_slice()).to_vec();
+        let digest = Sha512::digest(hash_state.as_slice());
+        let digest_bytes: [u8; 64] = digest.into();
 
-        let mut wide_hash_bytes = [0x00u8; 64];
-        wide_hash_bytes.copy_from_slice(&hash_state[0..64]);
-
-        *constant_slot = BlsScalar::from_bytes_wide(&wide_hash_bytes)
-            + previous_round_constant;
+        *constant_slot =
+            BlsScalar::from_bytes_wide(&digest_bytes) + previous_round_constant;
         previous_round_constant = *constant_slot;
+        hash_state = digest_bytes.to_vec();
     });
 
     round_constants
@@ -37,22 +36,17 @@ pub fn mds() -> [[BlsScalar; WIDTH]; WIDTH] {
     let mut x_values = [BlsScalar::zero(); WIDTH];
     let mut y_values = [BlsScalar::zero(); WIDTH];
 
-    (0..WIDTH).for_each(|column_index| {
-        x_values[column_index] = BlsScalar::from(column_index as u64);
-        y_values[column_index] = BlsScalar::from((column_index + WIDTH) as u64);
-    });
+    for index in 0..WIDTH {
+        x_values[index] = BlsScalar::from(index as u64);
+        y_values[index] = BlsScalar::from((index + WIDTH) as u64);
+    }
 
-    x_values
-        .iter()
-        .enumerate()
-        .for_each(|(row_index, x_coordinate)| {
-            y_values.iter().enumerate().for_each(
-                |(column_index, y_coordinate)| {
-                    mds_matrix[row_index][column_index] =
-                        (*x_coordinate + *y_coordinate).invert().unwrap();
-                },
-            );
-        });
+    for (row_index, x_coordinate) in x_values.iter().enumerate() {
+        for (column_index, y_coordinate) in y_values.iter().enumerate() {
+            mds_matrix[row_index][column_index] =
+                (*x_coordinate + *y_coordinate).invert().unwrap();
+        }
+    }
 
     mds_matrix
 }

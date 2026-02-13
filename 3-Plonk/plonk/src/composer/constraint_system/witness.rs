@@ -47,6 +47,13 @@ impl Witness {
     pub const fn index(&self) -> usize {
         self.index
     }
+
+    /// 判断当前 witness 是否为预置常量（0 或 1）。
+    /// 该辅助函数可用于约束构造中的快速分支优化。
+    /// 不依赖 composer 实例，纯索引判定。
+    pub const fn is_predefined_constant(&self) -> bool {
+        self.index <= Self::ONE.index
+    }
 }
 
 #[cfg(feature = "zeroize")]

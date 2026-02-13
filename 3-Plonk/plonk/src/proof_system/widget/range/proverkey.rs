@@ -1,8 +1,6 @@
 // 模块说明：本文件实现 PLONK
 // 组件（src/proof_system/widget/range/proverkey.rs）。
 
-//
-
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
 use coset_bls12_381::BlsScalar;
@@ -28,6 +26,17 @@ pub(crate) struct ProverKey {
 }
 
 impl ProverKey {
+    /// 计算范围约束使用的 kappa 幂次。
+    #[inline]
+    fn separation_powers(
+        range_separation_challenge: &BlsScalar,
+    ) -> (BlsScalar, BlsScalar, BlsScalar) {
+        let kappa = range_separation_challenge.square();
+        let kappa_sq = kappa.square();
+        let kappa_cu = kappa_sq * kappa;
+        (kappa, kappa_sq, kappa_cu)
+    }
+
     pub(crate) fn compute_quotient_i(
         &self,
         index: usize,
@@ -41,11 +50,10 @@ impl ProverKey {
         let four = BlsScalar::from(4);
         let q_range_i = &self.q_range.1[index];
 
-        let kappa = range_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
+        let (kappa, kappa_sq, kappa_cu) =
+            Self::separation_powers(range_separation_challenge);
 
-        //
+        // 依次检查 4 比特分块之间的范围关系一致性。
         let c_minus_4d_delta = delta(c_i - four * d_i);
         let b_minus_4c_delta = delta(b_i - four * c_i) * kappa;
         let a_minus_4b_delta = delta(a_i - four * b_i) * kappa_sq;
@@ -66,9 +74,8 @@ impl ProverKey {
         let four = BlsScalar::from(4);
         let q_range_poly = &self.q_range.0;
 
-        let kappa = range_separation_challenge.square();
-        let kappa_sq = kappa.square();
-        let kappa_cu = kappa_sq * kappa;
+        let (kappa, kappa_sq, kappa_cu) =
+            Self::separation_powers(range_separation_challenge);
 
         let c_minus_4d_delta =
             delta(evaluations.c_eval - four * evaluations.d_eval);

@@ -37,3 +37,13 @@ pub struct Gate {
 
     pub(crate) d: Witness,
 }
+
+impl Gate {
+    #[allow(dead_code)]
+    /// 返回门上四条线绑定的 witness。
+    /// 顺序固定为 `(a, b, c, d)`，与约束系统线位编码一致。
+    /// 该辅助访问器不改变内部数据，仅做只读聚合。
+    pub(crate) const fn wires(&self) -> (Witness, Witness, Witness, Witness) {
+        (self.a, self.b, self.c, self.d)
+    }
+}

@@ -25,10 +25,10 @@ pub struct Fr(pub(crate) [u64; 4]);
 
 impl fmt::Debug for Fr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let tmp = self.to_bytes();
+        let canonical_bytes = self.to_bytes();
         write!(f, "0x")?;
-        for &b in tmp.iter().rev() {
-            write!(f, "{:02x}", b)?;
+        for &byte in canonical_bytes.iter().rev() {
+            write!(f, "{:02x}", byte)?;
         }
         Ok(())
     }
@@ -229,6 +229,49 @@ impl Default for Fr {
 }
 
 impl Fr {
+    /// 从 32 字节小端数组中解析 4 个 `u64` limb。
+    /// 该函数只负责字节切片到整数的重组，不做模数范围校验。
+    /// 返回值顺序与 Montgomery 内部 limb 顺序保持一致。
+    #[inline]
+    fn limbs_from_32_bytes_le(bytes: &[u8; 32]) -> [u64; 4] {
+        [
+            u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
+            u64::from_le_bytes(bytes[8..16].try_into().unwrap()),
+            u64::from_le_bytes(bytes[16..24].try_into().unwrap()),
+            u64::from_le_bytes(bytes[24..32].try_into().unwrap()),
+        ]
+    }
+
+    /// 从 64 字节小端数组中解析 8 个 `u64` limb。
+    /// 这通常用于宽输入约简（例如哈希到标量时的 512-bit 中间值）。
+    /// 返回的 limb 顺序同样是低位在前（little-endian limbs）。
+    #[inline]
+    fn limbs_from_64_bytes_le(bytes: &[u8; 64]) -> [u64; 8] {
+        [
+            u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
+            u64::from_le_bytes(bytes[8..16].try_into().unwrap()),
+            u64::from_le_bytes(bytes[16..24].try_into().unwrap()),
+            u64::from_le_bytes(bytes[24..32].try_into().unwrap()),
+            u64::from_le_bytes(bytes[32..40].try_into().unwrap()),
+            u64::from_le_bytes(bytes[40..48].try_into().unwrap()),
+            u64::from_le_bytes(bytes[48..56].try_into().unwrap()),
+            u64::from_le_bytes(bytes[56..64].try_into().unwrap()),
+        ]
+    }
+
+    /// 将 4 个 `u64` limb 重新编码为 32 字节小端数组。
+    /// 该函数假定输入已经是标准域元素的普通表示（非 Montgomery 表示）。
+    /// 编码结果可直接用于跨进程/跨语言传输。
+    #[inline]
+    fn bytes_from_4_limbs_le(limbs: [u64; 4]) -> [u8; 32] {
+        let mut encoded_bytes = [0; 32];
+        encoded_bytes[0..8].copy_from_slice(&limbs[0].to_le_bytes());
+        encoded_bytes[8..16].copy_from_slice(&limbs[1].to_le_bytes());
+        encoded_bytes[16..24].copy_from_slice(&limbs[2].to_le_bytes());
+        encoded_bytes[24..32].copy_from_slice(&limbs[3].to_le_bytes());
+        encoded_bytes
+    }
+
     #[inline]
     /// 返回标量域加法单位元。
     pub const fn zero() -> Fr {
@@ -249,12 +292,7 @@ impl Fr {
 
     /// 从 32 字节小端编码反序列化标量，并检查是否小于模数。
     pub fn from_bytes(bytes: &[u8; 32]) -> CtOption<Fr> {
-        let mut tmp = Fr([0, 0, 0, 0]);
-
-        tmp.0[0] = u64::from_le_bytes(bytes[0..8].try_into().unwrap());
-        tmp.0[1] = u64::from_le_bytes(bytes[8..16].try_into().unwrap());
-        tmp.0[2] = u64::from_le_bytes(bytes[16..24].try_into().unwrap());
-        tmp.0[3] = u64::from_le_bytes(bytes[24..32].try_into().unwrap());
+        let mut tmp = Fr(Self::limbs_from_32_bytes_le(bytes));
 
         let (_, borrow) = sbb(tmp.0[0], MODULUS.0[0], 0);
         let (_, borrow) = sbb(tmp.0[1], MODULUS.0[1], borrow);
@@ -270,42 +308,25 @@ impl Fr {
 
     /// 将标量序列化为 32 字节小端编码。
     pub fn to_bytes(&self) -> [u8; 32] {
-        let tmp = Fr::montgomery_reduce(
+        let canonical = Fr::montgomery_reduce(
             self.0[0], self.0[1], self.0[2], self.0[3], 0, 0, 0, 0,
         );
 
-        let mut res = [0; 32];
-        res[0..8].copy_from_slice(&tmp.0[0].to_le_bytes());
-        res[8..16].copy_from_slice(&tmp.0[1].to_le_bytes());
-        res[16..24].copy_from_slice(&tmp.0[2].to_le_bytes());
-        res[24..32].copy_from_slice(&tmp.0[3].to_le_bytes());
-
-        res
+        Self::bytes_from_4_limbs_le(canonical.0)
     }
 
     /// 从 64 字节宽输入构造标量，内部会执行模约简。
     pub fn from_bytes_wide(bytes: &[u8; 64]) -> Fr {
-        Fr::reduce_u512_words([
-            u64::from_le_bytes(bytes[0..8].try_into().unwrap()),
-            u64::from_le_bytes(bytes[8..16].try_into().unwrap()),
-            u64::from_le_bytes(bytes[16..24].try_into().unwrap()),
-            u64::from_le_bytes(bytes[24..32].try_into().unwrap()),
-            u64::from_le_bytes(bytes[32..40].try_into().unwrap()),
-            u64::from_le_bytes(bytes[40..48].try_into().unwrap()),
-            u64::from_le_bytes(bytes[48..56].try_into().unwrap()),
-            u64::from_le_bytes(bytes[56..64].try_into().unwrap()),
-        ])
+        Fr::reduce_u512_words(Self::limbs_from_64_bytes_le(bytes))
     }
 
     fn reduce_u512_words(limbs: [u64; 8]) -> Fr {
-        //
+        // 按 256-bit 边界拆成低/高两段后分别映射到 Montgomery 域：
+        // value = low + high * 2^256，且 R2/R3 预先编码了相应的幂关系。
+        let lower_256 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
+        let upper_256 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
 
-        //
-
-        let d0 = Fr([limbs[0], limbs[1], limbs[2], limbs[3]]);
-        let d1 = Fr([limbs[4], limbs[5], limbs[6], limbs[7]]);
-
-        d0 * R2 + d1 * R3
+        lower_256 * R2 + upper_256 * R3
     }
 
     /// 将普通整数表示转换为 Montgomery 域表示。
@@ -358,31 +379,34 @@ impl Fr {
 
     /// 常时间幂运算实现。
     pub fn pow(&self, by: &[u64; 4]) -> Self {
-        let mut res = Self::one();
-        for e in by.iter().rev() {
-            for i in (0..64).rev() {
-                res = res.square();
-                let mut tmp = res;
-                tmp.mul_assign(self);
-                res.conditional_assign(&tmp, (((*e >> i) & 0x1) as u8).into());
+        let mut result = Self::one();
+        for exponent_word in by.iter().rev() {
+            for bit_index in (0..64).rev() {
+                result = result.square();
+                let mut multiplied = result;
+                multiplied.mul_assign(self);
+                result.conditional_assign(
+                    &multiplied,
+                    (((*exponent_word >> bit_index) & 0x1) as u8).into(),
+                );
             }
         }
-        res
+        result
     }
 
     /// 变长时间幂运算，适用于公开指数。
     pub fn pow_vartime(&self, by: &[u64; 4]) -> Self {
-        let mut res = Self::one();
-        for e in by.iter().rev() {
-            for i in (0..64).rev() {
-                res = res.square();
+        let mut result = Self::one();
+        for exponent_word in by.iter().rev() {
+            for bit_index in (0..64).rev() {
+                result = result.square();
 
-                if ((*e >> i) & 1) == 1 {
-                    res.mul_assign(self);
+                if ((*exponent_word >> bit_index) & 1) == 1 {
+                    result.mul_assign(self);
                 }
             }
         }
-        res
+        result
     }
 
     /// 计算乘法逆元；0 元素返回空值。
@@ -502,32 +526,32 @@ impl Fr {
         r6: u64,
         r7: u64,
     ) -> Self {
-        let k = r0.wrapping_mul(INV);
-        let (_, carry) = mac(r0, k, MODULUS.0[0], 0);
-        let (r1, carry) = mac(r1, k, MODULUS.0[1], carry);
-        let (r2, carry) = mac(r2, k, MODULUS.0[2], carry);
-        let (r3, carry) = mac(r3, k, MODULUS.0[3], carry);
+        let reduction_factor = r0.wrapping_mul(INV);
+        let (_, carry) = mac(r0, reduction_factor, MODULUS.0[0], 0);
+        let (r1, carry) = mac(r1, reduction_factor, MODULUS.0[1], carry);
+        let (r2, carry) = mac(r2, reduction_factor, MODULUS.0[2], carry);
+        let (r3, carry) = mac(r3, reduction_factor, MODULUS.0[3], carry);
         let (r4, carry2) = adc(r4, 0, carry);
 
-        let k = r1.wrapping_mul(INV);
-        let (_, carry) = mac(r1, k, MODULUS.0[0], 0);
-        let (r2, carry) = mac(r2, k, MODULUS.0[1], carry);
-        let (r3, carry) = mac(r3, k, MODULUS.0[2], carry);
-        let (r4, carry) = mac(r4, k, MODULUS.0[3], carry);
+        let reduction_factor = r1.wrapping_mul(INV);
+        let (_, carry) = mac(r1, reduction_factor, MODULUS.0[0], 0);
+        let (r2, carry) = mac(r2, reduction_factor, MODULUS.0[1], carry);
+        let (r3, carry) = mac(r3, reduction_factor, MODULUS.0[2], carry);
+        let (r4, carry) = mac(r4, reduction_factor, MODULUS.0[3], carry);
         let (r5, carry2) = adc(r5, carry2, carry);
 
-        let k = r2.wrapping_mul(INV);
-        let (_, carry) = mac(r2, k, MODULUS.0[0], 0);
-        let (r3, carry) = mac(r3, k, MODULUS.0[1], carry);
-        let (r4, carry) = mac(r4, k, MODULUS.0[2], carry);
-        let (r5, carry) = mac(r5, k, MODULUS.0[3], carry);
+        let reduction_factor = r2.wrapping_mul(INV);
+        let (_, carry) = mac(r2, reduction_factor, MODULUS.0[0], 0);
+        let (r3, carry) = mac(r3, reduction_factor, MODULUS.0[1], carry);
+        let (r4, carry) = mac(r4, reduction_factor, MODULUS.0[2], carry);
+        let (r5, carry) = mac(r5, reduction_factor, MODULUS.0[3], carry);
         let (r6, carry2) = adc(r6, carry2, carry);
 
-        let k = r3.wrapping_mul(INV);
-        let (_, carry) = mac(r3, k, MODULUS.0[0], 0);
-        let (r4, carry) = mac(r4, k, MODULUS.0[1], carry);
-        let (r5, carry) = mac(r5, k, MODULUS.0[2], carry);
-        let (r6, carry) = mac(r6, k, MODULUS.0[3], carry);
+        let reduction_factor = r3.wrapping_mul(INV);
+        let (_, carry) = mac(r3, reduction_factor, MODULUS.0[0], 0);
+        let (r4, carry) = mac(r4, reduction_factor, MODULUS.0[1], carry);
+        let (r5, carry) = mac(r5, reduction_factor, MODULUS.0[2], carry);
+        let (r6, carry) = mac(r6, reduction_factor, MODULUS.0[3], carry);
         let (r7, _) = adc(r7, carry2, carry);
 
         (&Fr([r4, r5, r6, r7])).sub(&MODULUS)
@@ -985,13 +1009,25 @@ const LARGEST: Fr = Fr([
     0x0e7d_b4ea_6533_afa9,
 ]);
 
+/// 以 MSB->LSB 顺序遍历标量字节表示中的比特位。
+/// 该辅助函数用于测试中的“位级乘法”参考实现，避免重复展开迭代样板。
+/// 返回的布尔值表示当前比特是否为 1。
+#[cfg(test)]
+fn iter_fr_bits_msb(field_element: &Fr) -> impl Iterator<Item = bool> {
+    field_element.to_bytes().iter().rev().flat_map(|byte| {
+        (0..8)
+            .rev()
+            .map(move |bit_index| ((byte >> bit_index) & 1u8) == 1u8)
+    })
+}
+
 #[test]
 fn test_addition() {
-    let mut tmp = LARGEST;
-    tmp += &LARGEST;
+    let mut accumulated = LARGEST;
+    accumulated += &LARGEST;
 
     assert_eq!(
-        tmp,
+        accumulated,
         Fr([
             0xd097_0e5e_d6f7_2cb5,
             0xa668_2093_ccc8_1082,
@@ -1000,89 +1036,84 @@ fn test_addition() {
         ])
     );
 
-    let mut tmp = LARGEST;
-    tmp += &Fr([1, 0, 0, 0]);
+    let mut wraparound_candidate = LARGEST;
+    wraparound_candidate += &Fr([1, 0, 0, 0]);
 
-    assert_eq!(tmp, Fr::zero());
+    assert_eq!(wraparound_candidate, Fr::zero());
 }
 
 #[test]
 fn test_negation() {
-    let tmp = -&LARGEST;
+    let negated_largest = -&LARGEST;
 
-    assert_eq!(tmp, Fr([1, 0, 0, 0]));
+    assert_eq!(negated_largest, Fr([1, 0, 0, 0]));
 
-    let tmp = -&Fr::zero();
-    assert_eq!(tmp, Fr::zero());
-    let tmp = -&Fr([1, 0, 0, 0]);
-    assert_eq!(tmp, LARGEST);
+    let negated_zero = -&Fr::zero();
+    assert_eq!(negated_zero, Fr::zero());
+    let negated_one = -&Fr([1, 0, 0, 0]);
+    assert_eq!(negated_one, LARGEST);
 }
 
 #[test]
 fn test_subtraction() {
-    let mut tmp = LARGEST;
-    tmp -= &LARGEST;
+    let mut difference = LARGEST;
+    difference -= &LARGEST;
 
-    assert_eq!(tmp, Fr::zero());
+    assert_eq!(difference, Fr::zero());
 
-    let mut tmp = Fr::zero();
-    tmp -= &LARGEST;
+    let mut modular_difference = Fr::zero();
+    modular_difference -= &LARGEST;
 
-    let mut tmp2 = MODULUS;
-    tmp2 -= &LARGEST;
+    let mut expected_difference = MODULUS;
+    expected_difference -= &LARGEST;
 
-    assert_eq!(tmp, tmp2);
+    assert_eq!(modular_difference, expected_difference);
 }
 
 #[test]
 fn test_multiplication() {
-    let mut cur = LARGEST;
+    let mut current = LARGEST;
 
     for _ in 0..100 {
-        let mut tmp = cur;
-        tmp *= &cur;
+        let mut multiplication_result = current;
+        multiplication_result *= &current;
 
-        let mut tmp2 = Fr::zero();
-        for b in cur.to_bytes().iter().rev().flat_map(|byte| {
-            (0..8).rev().map(move |i| ((byte >> i) & 1u8) == 1u8)
-        }) {
-            let tmp3 = tmp2;
-            tmp2.add_assign(&tmp3);
+        let mut bitwise_result = Fr::zero();
+        for bit in iter_fr_bits_msb(&current) {
+            let doubled_result = bitwise_result;
+            bitwise_result.add_assign(&doubled_result);
 
-            if b {
-                tmp2.add_assign(&cur);
+            if bit {
+                bitwise_result.add_assign(&current);
             }
         }
 
-        assert_eq!(tmp, tmp2);
+        assert_eq!(multiplication_result, bitwise_result);
 
-        cur.add_assign(&LARGEST);
+        current.add_assign(&LARGEST);
     }
 }
 
 #[test]
 fn test_squaring() {
-    let mut cur = LARGEST;
+    let mut current = LARGEST;
 
     for _ in 0..100 {
-        let mut tmp = cur;
-        tmp = tmp.square();
+        let square_result = current.square();
 
-        let mut tmp2 = Fr::zero();
-        for b in cur.to_bytes().iter().rev().flat_map(|byte| {
-            (0..8).rev().map(move |i| ((byte >> i) & 1u8) == 1u8)
-        }) {
-            let tmp3 = tmp2;
-            tmp2.add_assign(&tmp3);
+        let mut bitwise_result = Fr::zero();
+        for bit in iter_fr_bits_msb(&current) {
+            let doubled_result = bitwise_result;
+            bitwise_result.add_assign(&doubled_result);
 
-            if b {
-                tmp2.add_assign(&cur);
+            if bit {
+                bitwise_result.add_assign(&current);
             }
         }
 
-        assert_eq!(tmp, tmp2);
+        assert_eq!(square_result, bitwise_result);
 
-        cur.add_assign(&LARGEST);
+        current.add_assign(&LARGEST);
     }
 }
 
@@ -1092,15 +1123,15 @@ fn test_inversion() {
     assert_eq!(Fr::one().invert().unwrap(), Fr::one());
     assert_eq!((-&Fr::one()).invert().unwrap(), -&Fr::one());
 
-    let mut tmp = R2;
+    let mut current = R2;
 
     for _ in 0..100 {
-        let mut tmp2 = tmp.invert().unwrap();
-        tmp2.mul_assign(&tmp);
+        let mut multiplicative_identity_candidate = current.invert().unwrap();
+        multiplicative_identity_candidate.mul_assign(&current);
 
-        assert_eq!(tmp2, Fr::one());
+        assert_eq!(multiplicative_identity_candidate, Fr::one());
 
-        tmp.add_assign(&R2);
+        current.add_assign(&R2);
     }
 }
 
@@ -1113,21 +1144,22 @@ fn test_invert_is_pow() {
         0x0e7d_b4ea_6533_afa9,
     ];
 
-    let mut r1 = R;
-    let mut r2 = R;
-    let mut r3 = R;
+    let mut inverse_via_invert = R;
+    let mut inverse_via_pow_vartime = R;
+    let mut inverse_via_pow_ct = R;
 
     for _ in 0..100 {
-        r1 = r1.invert().unwrap();
-        r2 = r2.pow_vartime(&r_minus_2);
-        r3 = r3.pow(&r_minus_2);
+        inverse_via_invert = inverse_via_invert.invert().unwrap();
+        inverse_via_pow_vartime =
+            inverse_via_pow_vartime.pow_vartime(&r_minus_2);
+        inverse_via_pow_ct = inverse_via_pow_ct.pow(&r_minus_2);
 
-        assert_eq!(r1, r2);
-        assert_eq!(r2, r3);
+        assert_eq!(inverse_via_invert, inverse_via_pow_vartime);
+        assert_eq!(inverse_via_pow_vartime, inverse_via_pow_ct);
 
-        r1.add_assign(&R);
-        r2 = r1;
-        r3 = r1;
+        inverse_via_invert.add_assign(&R);
+        inverse_via_pow_vartime = inverse_via_invert;
+        inverse_via_pow_ct = inverse_via_invert;
     }
 }
 

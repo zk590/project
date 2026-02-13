@@ -1,8 +1,6 @@
 // 模块说明：本文件实现 PLONK
 // 组件（src/proof_system/widget/arithmetic/proverkey.rs）。
 
-//
-
 use crate::fft::{Evaluations, Polynomial};
 use crate::proof_system::linearization_poly::ProofEvaluations;
 use coset_bls12_381::BlsScalar;
@@ -56,7 +54,7 @@ impl ProverKey {
         let q_c_i = &self.q_c.1[index];
         let q_arith_i = &self.q_arith.1[index];
 
-        //
+        // 聚合算术门六类 selector 约束并受 q_arith 开关控制。
         let mul_selector_term = a_i * b_i * q_m_i;
         let left_selector_term = a_i * q_l_i;
         let right_selector_term = b_i * q_r_i;
@@ -83,7 +81,7 @@ impl ProverKey {
         let q_f_poly = &self.q_f.0;
         let q_c_poly = &self.q_c.0;
 
-        //
+        // 在线性化阶段把 witness 评估值替换为挑战点上的常量。
 
         let witness_product = evaluations.a_eval * evaluations.b_eval;
         let mul_selector_term = q_m_poly * &witness_product;

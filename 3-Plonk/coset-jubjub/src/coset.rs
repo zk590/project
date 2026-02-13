@@ -79,26 +79,38 @@ impl Serializable<32> for JubJubAffine {
     fn from_bytes(bytes: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let mut encoded_bytes = *bytes;
 
-        let sign = encoded_bytes[31] >> 7;
+        let sign_bit = encoded_bytes[31] >> 7;
 
         encoded_bytes[31] &= 0b0111_1111;
 
-        let v = <BlsScalar as Serializable<32>>::from_bytes(&encoded_bytes)?;
+        let v_coordinate =
+            <BlsScalar as Serializable<32>>::from_bytes(&encoded_bytes)?;
 
-        let v2 = v.square();
+        let v_squared = v_coordinate.square();
 
         Option::from(
-            ((v2 - BlsScalar::one())
-                * ((BlsScalar::one() + EDWARDS_D * v2)
+            ((v_squared - BlsScalar::one())
+                * ((BlsScalar::one() + EDWARDS_D * v_squared)
                     .invert()
                     .unwrap_or(BlsScalar::zero())))
             .sqrt()
-            .and_then(|u| {
-                let flip_sign = Choice::from((u.to_bytes()[0] ^ sign) & 1);
-                let u = BlsScalar::conditional_select(&u, &-u, flip_sign);
+            .and_then(|u_coordinate| {
+                let flip_sign =
+                    Choice::from((u_coordinate.to_bytes()[0] ^ sign_bit) & 1);
+                let signed_u = BlsScalar::conditional_select(
+                    &u_coordinate,
+                    &-u_coordinate,
+                    flip_sign,
+                );
 
-                let u_is_zero = u.ct_eq(&BlsScalar::zero());
-                CtOption::new(JubJubAffine { u, v }, !(u_is_zero & flip_sign))
+                let u_is_zero = signed_u.ct_eq(&BlsScalar::zero());
+                CtOption::new(
+                    JubJubAffine {
+                        u: signed_u,
+                        v: v_coordinate,
+                    },
+                    !(u_is_zero & flip_sign),
+                )
             }),
         )
         .ok_or(BytesError::InvalidData)
@@ -125,6 +137,28 @@ impl JubJubAffine {
 }
 
 impl JubJubExtended {
+    /// 尝试将 32 字节解码为素数阶子群点。
+    /// 仅当“字节可解码”为曲线点且“点属于素数阶子群”时返回 `Some`。
+    #[inline]
+    fn decode_prime_order_point(bytes: &[u8; 32]) -> Option<Self> {
+        if let Ok(decoded_affine_point) =
+            <JubJubAffine as Serializable<32>>::from_bytes(bytes)
+        {
+            if decoded_affine_point.is_prime_order().into() {
+                return Some(decoded_affine_point.into());
+            }
+        }
+        None
+    }
+
+    /// 用 `u64` 低位覆盖 y 坐标字节前 8 位，构造映射搜索起点。
+    #[inline]
+    fn mapped_y_bytes(input: &u64) -> [u8; 32] {
+        let mut point_bytes = GENERATOR.get_v().to_bytes();
+        point_bytes[..u64::SIZE].copy_from_slice(&input.to_le_bytes());
+        point_bytes
+    }
+
     /// 将仿射点嵌入扩展坐标表示。
     pub const fn from_affine(affine: JubJubAffine) -> Self {
         Self::from_raw_unchecked(
@@ -147,22 +181,37 @@ impl JubJubExtended {
         Self { u, v, z, t1, t2 }
     }
 
+    /// 读取扩展点 `u` 分量。
+    /// 该访问器不做任何归一化或合法性检查。
+    /// 常用于调试、序列化和中间状态观测。
     pub const fn get_u(&self) -> BlsScalar {
         self.u
     }
 
+    /// 读取扩展点 `v` 分量。
+    /// 返回值按值复制，不影响原对象内部状态。
+    /// 与 `get_u` 组合可直接构造哈希输入。
     pub const fn get_v(&self) -> BlsScalar {
         self.v
     }
 
+    /// 读取扩展点 `z` 分量。
+    /// 在扩展坐标系中该值决定仿射恢复时的逆元因子。
+    /// 对单位元通常取 `one()`。
     pub const fn get_z(&self) -> BlsScalar {
         self.z
     }
 
+    /// 读取扩展点 `t1` 分量。
+    /// 该分量与 `t2` 一起缓存 `u * v` 的拆分乘积。
+    /// 用于降低点加法中的乘法开销。
     pub const fn get_t1(&self) -> BlsScalar {
         self.t1
     }
 
+    /// 读取扩展点 `t2` 分量。
+    /// 与 `get_t1` 配对维护扩展坐标不变量。
+    /// 该访问器同样不触发任何计算。
     pub const fn get_t2(&self) -> BlsScalar {
         self.t2
     }
@@ -187,12 +236,8 @@ impl JubJubExtended {
 
             array.copy_from_slice(&state.as_bytes()[..32]);
 
-            if let Ok(point) =
-                <JubJubAffine as Serializable<32>>::from_bytes(&array)
-            {
-                if point.is_prime_order().into() {
-                    return point.into();
-                }
+            if let Some(point) = Self::decode_prime_order_point(&array) {
+                return point;
             }
             counter += 1
         }
@@ -200,28 +245,17 @@ impl JubJubExtended {
 
     /// 将 `u64` 映射到素数阶子群点（可逆映射）。
     pub fn map_to_point(input: &u64) -> Self {
-        let input_bytes = input.to_le_bytes();
-
-        let mut y_coordinate = GENERATOR.get_v();
-
-        let mut point_bytes = y_coordinate.to_bytes();
-
-        point_bytes[..u64::SIZE].copy_from_slice(&input_bytes);
-        y_coordinate = BlsScalar::from_bytes(&point_bytes).unwrap();
+        let mut point_bytes = Self::mapped_y_bytes(input);
+        let mut y_coordinate = BlsScalar::from_bytes(&point_bytes).unwrap();
 
         let adder = BlsScalar::from(u64::MAX) + BlsScalar::one();
 
         for _ in 0..u64::MAX {
-            if let Ok(point) =
-                <JubJubAffine as Serializable<32>>::from_bytes(&point_bytes)
-            {
-                if point.is_prime_order().into() {
-                    return point.into();
-                }
+            if let Some(point) = Self::decode_prime_order_point(&point_bytes) {
+                return point;
             }
 
-            //
-
+            // 保持低 64 位不变，仅提升高位候选，遍历同一映射桶中的其它 y 值。
             y_coordinate += adder;
             point_bytes = y_coordinate.to_bytes();
         }
@@ -257,11 +291,11 @@ fn test_map_to_point() {
     let mut rng = rand::thread_rng();
 
     for _ in 0..500 {
-        let value: u64 = rng.gen();
-        let point = JubJubExtended::map_to_point(&value);
-        let unmapped_value = point.unmap_from_point();
+        let input_value: u64 = rng.gen();
+        let mapped_point = JubJubExtended::map_to_point(&input_value);
+        let unmapped_value = mapped_point.unmap_from_point();
 
-        assert_eq!(value, unmapped_value);
+        assert_eq!(input_value, unmapped_value);
     }
 }
 
@@ -342,31 +376,25 @@ fn test_is_on_curve() {
 fn second_gen_nums() {
     use blake2::{Blake2b, Digest};
     let generator_bytes = GENERATOR.to_bytes();
-    let mut counter = 0u64;
-    let mut array = [0u8; 32];
+    let mut hash_counter = 0u64;
+    let mut candidate_bytes = [0u8; 32];
     loop {
         let mut hasher = Blake2b::new();
         hasher.update(generator_bytes);
-        hasher.update(counter.to_le_bytes());
-        let digest = hasher.finalize();
-        array.copy_from_slice(&digest[0..32]);
-        if <JubJubAffine as Serializable<32>>::from_bytes(&array).is_ok()
-            && <JubJubAffine as Serializable<32>>::from_bytes(&array)
-                .unwrap()
-                .is_prime_order()
-                .unwrap_u8()
-                == 1
+        hasher.update(hash_counter.to_le_bytes());
+        let hash_digest = hasher.finalize();
+        candidate_bytes.copy_from_slice(&hash_digest[0..32]);
+        if let Ok(decoded_affine_point) =
+            <JubJubAffine as Serializable<32>>::from_bytes(&candidate_bytes)
         {
-            assert!(
-                GENERATOR_NUMS
-                    == <JubJubAffine as Serializable<32>>::from_bytes(&array)
-                        .unwrap()
-            );
-            break;
+            if decoded_affine_point.is_prime_order().unwrap_u8() == 1 {
+                assert!(GENERATOR_NUMS == decoded_affine_point);
+                break;
+            }
         }
-        counter += 1;
+        hash_counter += 1;
     }
-    assert_eq!(counter, 18);
+    assert_eq!(hash_counter, 18);
 }
 
 #[cfg(all(test, feature = "alloc"))]
@@ -376,10 +404,10 @@ mod fuzz {
     use crate::ExtendedPoint;
 
     quickcheck::quickcheck! {
-        fn prop_hash_to_point(bytes: Vec<u8>) -> bool {
-            let point = ExtendedPoint::hash_to_point(&bytes);
+        fn prop_hash_to_point(input_bytes: Vec<u8>) -> bool {
+            let mapped_point = ExtendedPoint::hash_to_point(&input_bytes);
 
-            point.satisfies_extended_curve_equation_vartime() && point.is_prime_order().into()
+            mapped_point.satisfies_extended_curve_equation_vartime() && mapped_point.is_prime_order().into()
         }
     }
 }

@@ -77,6 +77,32 @@ struct ZKProofData {
     data: Vec<u8>,
 }
 
+/// 将 32 字节哈希解析为 `BlsScalar`。
+#[inline]
+fn parse_scalar_from_hash(
+    hash_bytes: &[u8; 32],
+    context: &str,
+) -> Result<BlsScalar, IoError> {
+    BlsScalar::from_bytes(hash_bytes)
+        .into_option()
+        .ok_or_else(|| {
+            IoError::new(ErrorKind::Other, format!("{}失败", context))
+        })
+}
+
+/// 使用 rkyv 将字节载荷包装为 `ZKProofData` 并写入文件。
+#[inline]
+fn write_archived_data_file(
+    output_path: &Path,
+    payload: Vec<u8>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let archived_payload = ZKProofData { data: payload };
+    let serialized = rkyv::to_bytes::<_, 1024>(&archived_payload)?;
+    let mut output_file = File::create(output_path)?;
+    output_file.write_all(&serialized)?;
+    Ok(())
+}
+
 // 存储带容量信息的证明器数据
 #[derive(
     Archive, Serialize, Deserialize, Debug, serde::Serialize, serde::Deserialize,
@@ -250,15 +276,8 @@ pub fn process_batch_proofs_with_config(
         unsafe { rkyv::archived_root::<MultipleLeavesData>(&bytes) };
     // 解析根哈希
     let root_hash =
-        match BlsScalar::from_bytes(&all_leaves_data.root_hash).into_option() {
-            Some(hash) => hash,
-            None => {
-                return Err(Box::new(IoError::new(
-                    ErrorKind::Other,
-                    "解析根哈希失败",
-                )));
-            }
-        };
+        parse_scalar_from_hash(&all_leaves_data.root_hash, "解析根哈希")
+            .map_err(|error| Box::new(error) as Box<dyn std::error::Error>)?;
     let circuit_load_start = Instant::now();
     // 加载或编译电路
     let (prover, verifier) = load_or_compile_opening_circuit(config)?;
@@ -266,19 +285,11 @@ pub fn process_batch_proofs_with_config(
     let circuit_load_duration =
         circuit_load_end.duration_since(circuit_load_start);
     println!("加载电路耗时: {:?}", circuit_load_duration);
-    // println!(
-    //     "Plonk Proof verifier = {}",
-    //     hex::encode(verifier.to_bytes())
-    // );
 
     println!(
         "1. 收到{} 个叶子节点数据",
         all_leaves_data.leaves_info.len()
     );
-    // println!(
-    //     "Plonk Public_input.root = {}",
-    //     hex::encode(all_leaves_data.root_hash)
-    // );
     // 处理所有叶子节点
     for (leaf_index, leaf_info) in
         all_leaves_data.leaves_info.iter().enumerate()
@@ -296,9 +307,10 @@ pub fn process_batch_proofs_with_config(
         }
         // 解析叶子节点哈希
         let leaf_hash =
-            match BlsScalar::from_bytes(&leaf_info.leaf_hash).into_option() {
-                Some(hash) => hash,
-                None => {
+            match parse_scalar_from_hash(&leaf_info.leaf_hash, "解析叶子哈希")
+            {
+                Ok(hash) => hash,
+                Err(_) => {
                     println!("  解析叶子哈希失败，跳过此节点");
                     continue;
                 }
@@ -329,8 +341,7 @@ pub fn process_batch_proofs_with_config(
             continue;
         }
 
-        // println!(" 开始生成零知识证明");
-        // 创建电路实例
+        // 创建电路实例并生成零知识证明
         let circuit = OpeningCircuit::new(opening, leaf);
         let first_circuit_start = if leaf_index == 0 {
             Some(Instant::now())
@@ -340,9 +351,7 @@ pub fn process_batch_proofs_with_config(
         // 生成零知识证明
         let mut rng = StdRng::seed_from_u64(0xdea1 + leaf_index as u64);
         let (proof, public_inputs) = prover.prove(&mut rng, &circuit)?;
-        // println!("  生成零知识证明成功");
         if let Some(first_start) = first_circuit_start {
-            // println!("Plonk proof = {}", hex::encode(proof.to_bytes()));
             let first_end = Instant::now();
             let first_proof_duration = first_end.duration_since(first_start);
             println!("生成Plonk证明耗时: {:?}", first_proof_duration);
@@ -362,11 +371,6 @@ pub fn process_batch_proofs_with_config(
             .flat_map(|scalar| scalar.to_bytes().to_vec())
             .collect();
 
-        // 使用rkyv保存证明数据
-        let proof_data = ZKProofData {
-            data: proof_bytes.to_vec(),
-        };
-
         // 为每个证明创建唯一的文件名（按照1、2、3的顺序）
         let proof_file_name =
             format!("{}{}.bin", config.proof_file_prefix, leaf_index + 1);
@@ -379,32 +383,14 @@ pub fn process_batch_proofs_with_config(
         let public_inputs_file_path =
             config.output_dir.join(&public_inputs_file_name);
 
-        // 序列化并保存到文件
-        let mut proof_file = File::create(&proof_file_path)?;
-        let proof_bytes_serialized = rkyv::to_bytes::<_, 1024>(&proof_data)?;
-        proof_file.write_all(&proof_bytes_serialized)?;
-
-        // 使用rkyv保存公开输入数据
-        let public_inputs_data = ZKProofData {
-            data: public_inputs_flattened,
-        };
-
-        let mut public_inputs_file = File::create(&public_inputs_file_path)?;
-        let public_inputs_bytes_serialized =
-            rkyv::to_bytes::<_, 1024>(&public_inputs_data)?;
-        public_inputs_file.write_all(&public_inputs_bytes_serialized)?;
+        write_archived_data_file(&proof_file_path, proof_bytes.to_vec())?;
+        write_archived_data_file(
+            &public_inputs_file_path,
+            public_inputs_flattened,
+        )?;
 
         println!("  成功保存证明数据");
-        // println!("   ├── 证明文件: {}", proof_file_path.display());
-        // println!("   ├── 证明数据大小: {} 字节",
-        // proof_bytes_serialized.len()); println!("   ├── 公开输入文件:
-        // {}", public_inputs_file_path.display()); println!(
-        //     "   └── 公开输入数据大小: {} 字节",
-        //     public_inputs_bytes_serialized.len()
-        // );
     }
-
-    // println!("\n===== 批量处理完成 ======");
 
     Ok(())
 }

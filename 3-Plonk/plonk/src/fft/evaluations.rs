@@ -78,6 +78,27 @@ impl Evaluations {
         domain.ifft_in_place(&mut evals);
         Polynomial::from_coefficients_vec(evals)
     }
+
+    /// 断言两个评估表使用同一域。
+    /// 点值运算必须在相同采样域上逐点执行，否则结果无数学意义。
+    #[inline]
+    fn assert_same_domain(&self, other: &Evaluations) {
+        assert_eq!(self.domain, other.domain, "domains are unequal");
+    }
+
+    /// 对两个评估表执行逐点就地更新。
+    /// 该辅助函数统一了加/减/乘/除的公共迭代模板，减少重复代码。
+    #[inline]
+    fn apply_pointwise_assign<F>(&mut self, other: &Evaluations, mut op: F)
+    where
+        F: FnMut(&mut BlsScalar, &BlsScalar),
+    {
+        self.assert_same_domain(other);
+        self.evals
+            .iter_mut()
+            .zip(&other.evals)
+            .for_each(|(self_value, other_value)| op(self_value, other_value));
+    }
 }
 
 impl Index<usize> for Evaluations {
@@ -105,11 +126,9 @@ impl<'a, 'b> Mul<&'a Evaluations> for &'b Evaluations {
 impl<'a> MulAssign<&'a Evaluations> for Evaluations {
     #[inline]
     fn mul_assign(&mut self, other: &'a Evaluations) {
-        assert_eq!(self.domain, other.domain, "domains are unequal");
-        self.evals
-            .iter_mut()
-            .zip(&other.evals)
-            .for_each(|(self_value, other_value)| *self_value *= other_value);
+        self.apply_pointwise_assign(other, |self_value, other_value| {
+            *self_value *= other_value;
+        });
     }
 }
 
@@ -127,11 +146,9 @@ impl<'a, 'b> Add<&'a Evaluations> for &'b Evaluations {
 impl<'a> AddAssign<&'a Evaluations> for Evaluations {
     #[inline]
     fn add_assign(&mut self, other: &'a Evaluations) {
-        assert_eq!(self.domain, other.domain, "domains are unequal");
-        self.evals
-            .iter_mut()
-            .zip(&other.evals)
-            .for_each(|(self_value, other_value)| *self_value += other_value);
+        self.apply_pointwise_assign(other, |self_value, other_value| {
+            *self_value += other_value;
+        });
     }
 }
 
@@ -149,22 +166,17 @@ impl<'a, 'b> Sub<&'a Evaluations> for &'b Evaluations {
 impl<'a> SubAssign<&'a Evaluations> for Evaluations {
     #[inline]
     fn sub_assign(&mut self, other: &'a Evaluations) {
-        assert_eq!(self.domain, other.domain, "domains are unequal");
-        self.evals
-            .iter_mut()
-            .zip(&other.evals)
-            .for_each(|(self_value, other_value)| *self_value -= other_value);
+        self.apply_pointwise_assign(other, |self_value, other_value| {
+            *self_value -= other_value;
+        });
     }
 }
 
 impl<'a> DivAssign<&'a Evaluations> for Evaluations {
     #[inline]
     fn div_assign(&mut self, other: &'a Evaluations) {
-        assert_eq!(self.domain, other.domain, "domains are unequal");
-        self.evals.iter_mut().zip(&other.evals).for_each(
-            |(self_value, other_value)| {
-                *self_value *= other_value.invert().unwrap()
-            },
-        );
+        self.apply_pointwise_assign(other, |self_value, other_value| {
+            *self_value *= other_value.invert().unwrap();
+        });
     }
 }

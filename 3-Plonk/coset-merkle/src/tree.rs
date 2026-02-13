@@ -40,17 +40,17 @@ where
     }
 
     /// 在指定叶子位置插入（或覆盖）一个元素，并向上更新聚合值。
-    pub fn insert(&mut self, index: u64, item: impl Into<T>) {
+    pub fn insert(&mut self, position: u64, item: impl Into<T>) {
         let capacity = self.capacity();
 
         assert!(
-            index < capacity,
+            position < capacity,
             "index out of bounds: \
-             the capacity is {capacity} but the index is {index}"
+             the capacity is {capacity} but the index is {position}"
         );
 
-        self.root.insert(0, index, item);
-        self.positions.insert(index);
+        self.root.insert(0, position, item);
+        self.positions.insert(position);
     }
 
     /// 移除指定位置的叶子元素；若位置不存在则返回 `None`。
@@ -91,25 +91,25 @@ where
 
     /// 返回覆盖全部已插入元素的最小子树及其高度。
     pub fn smallest_subtree(&self) -> (Ref<'_, T>, usize) {
-        let mut current_node = &self.root;
-        let mut current_height = H;
+        let mut subtree_root = &self.root;
+        let mut subtree_height = H;
         loop {
-            let mut non_empty_children = current_node.children.iter().flatten();
+            let mut non_empty_children = subtree_root.children.iter().flatten();
             match non_empty_children.next() {
                 None => return (self.root(), 0),
                 Some(child) => {
-                    if non_empty_children.next().is_none() && current_height > 1
+                    if non_empty_children.next().is_none() && subtree_height > 1
                     {
-                        current_node = child;
+                        subtree_root = child;
                     } else {
                         return (
-                            current_node.aggregated_item(),
-                            current_height,
+                            subtree_root.aggregated_item(),
+                            subtree_height,
                         );
                     }
                 }
             }
-            current_height -= 1;
+            subtree_height -= 1;
         }
     }
 
@@ -224,24 +224,28 @@ mod tests {
         const EMPTY_SUBTREE: Self = None;
 
         fn aggregate(items: [&Self; A]) -> Self {
-            let mut block_height_range = None;
+            let mut merged_range = None;
 
-            for item in items {
-                block_height_range = match (block_height_range, item.as_ref()) {
+            for candidate_range in items {
+                merged_range = match (merged_range, candidate_range.as_ref()) {
                     (None, None) => None,
-                    (None, Some(r)) => Some(*r),
-                    (Some(r), None) => Some(r),
-                    (Some(existing_range), Some(item_range)) => {
-                        let min =
-                            core::cmp::min(item_range.min, existing_range.min);
-                        let max =
-                            core::cmp::max(item_range.max, existing_range.max);
+                    (None, Some(range)) => Some(*range),
+                    (Some(range), None) => Some(range),
+                    (Some(existing_range), Some(candidate_range)) => {
+                        let min = core::cmp::min(
+                            candidate_range.min,
+                            existing_range.min,
+                        );
+                        let max = core::cmp::max(
+                            candidate_range.max,
+                            existing_range.max,
+                        );
                         Some(Range { min, max })
                     }
                 };
             }
 
-            block_height_range
+            merged_range
         }
     }
 

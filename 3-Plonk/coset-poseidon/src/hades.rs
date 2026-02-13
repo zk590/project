@@ -1,4 +1,4 @@
-//
+// Poseidon Hades 置换核心参数与通用接口实现。
 
 mod mds_matrix;
 mod permutation;
@@ -84,12 +84,13 @@ mod tests {
     ];
 
     fn compute_poseidon_hash_for_test(input: &[BlsScalar]) -> BlsScalar {
-        let iopattern =
+        let io_pattern =
             vec![Call::Absorb(input.len()), Call::Absorb(1), Call::Squeeze(1)];
 
-        let domain_sep = 0;
-        let mut sponge = Sponge::start(Test::new(), iopattern, domain_sep)
-            .expect("IO pattern should be valid");
+        let domain_separator = 0;
+        let mut sponge =
+            Sponge::start(Test::new(), io_pattern, domain_separator)
+                .expect("IO pattern should be valid");
 
         sponge
             .absorb(input.len(), input)
@@ -103,41 +104,56 @@ mod tests {
         output[0]
     }
 
+    fn assert_poseidon_case(
+        all_inputs: &[BlsScalar],
+        prefix_len: usize,
+        expected_digest_hex: &str,
+    ) {
+        // 使用输入前缀构造测试向量，校验当前实现与固定官方向量一致。
+        let digest = compute_poseidon_hash_for_test(&all_inputs[..prefix_len]);
+        assert_eq!(expected_digest_hex, format!("{:?}", digest));
+    }
+
     #[test]
     fn poseidon_hash() {
-        let test_inputs: vec::Vec<BlsScalar> = TEST_INPUTS
+        let input_scalars: vec::Vec<BlsScalar> = TEST_INPUTS
             .iter()
             .map(|input| BlsScalar::from_hex_str(input).unwrap())
             .collect();
 
-        assert_eq!(
-        "0x26abf2d0476f154e69bf19740092fe36265680c294462b8e759ad73a99567dd5",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..3]))
-    );
+        let hash_test_cases: [(&str, usize); 6] = [
+            (
+                "0x26abf2d0476f154e69bf19740092fe36265680c294462b8e759ad73a99567dd5",
+                3,
+            ),
+            (
+                "0x1cc40219c7ec92919d6db7a41cd41953333a2ed544606daca182e4eaa6c7db2d",
+                4,
+            ),
+            (
+                "0x707c98a0e9a6e4832ac33ee08811bce122017a58dbbbf66a2f6fcdc69d45462d",
+                5,
+            ),
+            (
+                "0x26905a794d3d2fb0c3ed2276abc696c27a5bfdea7f106e596cbeedd86891c461",
+                6,
+            ),
+            (
+                "0x1b98a2c5f1fe54d21b5ce9bf0dcc99ea8784a64f3c544fa06d3f73569741006e",
+                8,
+            ),
+            (
+                "0x211b7ea21c9afca93dabdfbda8b2d5275b2dd802fed87bb431e98557c61667d2",
+                10,
+            ),
+        ];
 
-        assert_eq!(
-        "0x1cc40219c7ec92919d6db7a41cd41953333a2ed544606daca182e4eaa6c7db2d",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..4]))
-    );
-
-        assert_eq!(
-        "0x707c98a0e9a6e4832ac33ee08811bce122017a58dbbbf66a2f6fcdc69d45462d",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..5]))
-    );
-
-        assert_eq!(
-        "0x26905a794d3d2fb0c3ed2276abc696c27a5bfdea7f106e596cbeedd86891c461",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..6]))
-    );
-
-        assert_eq!(
-        "0x1b98a2c5f1fe54d21b5ce9bf0dcc99ea8784a64f3c544fa06d3f73569741006e",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..8]))
-    );
-
-        assert_eq!(
-        "0x211b7ea21c9afca93dabdfbda8b2d5275b2dd802fed87bb431e98557c61667d2",
-        format!("{:?}", compute_poseidon_hash_for_test(&test_inputs[..10]))
-    );
+        for (expected_digest_hex, prefix_len) in hash_test_cases {
+            assert_poseidon_case(
+                &input_scalars,
+                prefix_len,
+                expected_digest_hex,
+            );
+        }
     }
 }

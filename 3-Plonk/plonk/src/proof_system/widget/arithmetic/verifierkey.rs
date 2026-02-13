@@ -38,6 +38,29 @@ pub(crate) struct VerifierKey {
     pub q_arith: Commitment,
 }
 
+impl VerifierKey {
+    /// 由各算术 selector 承诺构造 verifier key。
+    pub(crate) const fn new(
+        q_m: Commitment,
+        q_l: Commitment,
+        q_r: Commitment,
+        q_o: Commitment,
+        q_f: Commitment,
+        q_c: Commitment,
+        q_arith: Commitment,
+    ) -> Self {
+        Self {
+            q_m,
+            q_l,
+            q_r,
+            q_o,
+            q_f,
+            q_c,
+            q_arith,
+        }
+    }
+}
+
 impl Serializable<{ 7 * Commitment::SIZE }> for VerifierKey {
     type Error = coset_bytes::Error;
 
@@ -67,15 +90,7 @@ impl Serializable<{ 7 * Commitment::SIZE }> for VerifierKey {
         let q_c = Commitment::from_reader(&mut buffer)?;
         let q_arith = Commitment::from_reader(&mut buffer)?;
 
-        Ok(VerifierKey {
-            q_m,
-            q_l,
-            q_r,
-            q_o,
-            q_f,
-            q_c,
-            q_arith,
-        })
+        Ok(VerifierKey::new(q_m, q_l, q_r, q_o, q_f, q_c, q_arith))
     }
 }
 

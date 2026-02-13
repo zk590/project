@@ -9,6 +9,12 @@ use coset_jubjub::JubJubAffine;
 use crate::hades::ScalarPermutation;
 use crate::{Domain, Error};
 
+/// 提取共享密钥仿射点的 `(u, v)` 坐标，作为加解密关联输入。
+#[inline]
+fn shared_secret_coordinates(secret_point: &JubJubAffine) -> [BlsScalar; 2] {
+    [secret_point.get_u(), secret_point.get_v()]
+}
+
 /// 使用 Poseidon sponge 进行加密，返回密文字段向量。
 /// 该函数把共享密钥点坐标作为关联输入，与随机数共同驱动加密流程。
 /// 底层调用 `coset_safe::encrypt`，并固定使用 `Domain::Encryption` 域分离。
@@ -18,8 +24,7 @@ pub fn encrypt(
     shared_secret: &JubJubAffine,
     nonce_scalar: &BlsScalar,
 ) -> Result<Vec<BlsScalar>, Error> {
-    let shared_secret_coordinates =
-        [shared_secret.get_u(), shared_secret.get_v()];
+    let shared_secret_coordinates = shared_secret_coordinates(shared_secret);
     Ok(coset_safe::encrypt(
         ScalarPermutation::new(),
         Domain::Encryption,
@@ -38,8 +43,7 @@ pub fn decrypt(
     shared_secret: &JubJubAffine,
     nonce_scalar: &BlsScalar,
 ) -> Result<Vec<BlsScalar>, Error> {
-    let shared_secret_coordinates =
-        [shared_secret.get_u(), shared_secret.get_v()];
+    let shared_secret_coordinates = shared_secret_coordinates(shared_secret);
     Ok(coset_safe::decrypt(
         ScalarPermutation::new(),
         Domain::Encryption,

@@ -20,12 +20,20 @@ pub(crate) struct Commitment(
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)] pub(crate) G1Affine,
 );
 
+impl Commitment {
+    /// 由底层仿射点构造承诺包装类型。
+    #[inline]
+    pub(crate) const fn new(point: G1Affine) -> Self {
+        Self(point)
+    }
+}
+
 impl From<G1Affine> for Commitment {
     /// 从仿射点构造承诺对象。
     /// 该转换不做额外计算，直接封装底层群元素。
     /// 常用于提交流程后将结果统一包装为协议类型。
     fn from(point: G1Affine) -> Commitment {
-        Commitment(point)
+        Commitment::new(point)
     }
 }
 
@@ -34,7 +42,7 @@ impl From<G1Projective> for Commitment {
     /// 内部会先转换为仿射表示，再存入 `Commitment`。
     /// 适用于 MSM 累加结果等通常位于射影坐标的场景。
     fn from(point: G1Projective) -> Commitment {
-        Commitment(point.into())
+        Commitment::new(point.into())
     }
 }
 
@@ -53,7 +61,7 @@ impl Serializable<{ G1Affine::SIZE }> for Commitment {
     /// 解析失败返回错误，防止无效承诺进入验证逻辑。
     fn from_bytes(buf: &[u8; Self::SIZE]) -> Result<Self, Self::Error> {
         let commitment_point = G1Affine::from_slice(buf)?;
-        Ok(Self(commitment_point))
+        Ok(Self::new(commitment_point))
     }
 }
 
@@ -62,7 +70,7 @@ impl Commitment {
     /// 该值常用于初始化累加器或表示“空承诺”占位语义。
     /// 在群运算上它是加法单位，不改变后续叠加结果。
     fn identity() -> Commitment {
-        Commitment(G1Affine::identity())
+        Commitment::new(G1Affine::identity())
     }
 }
 

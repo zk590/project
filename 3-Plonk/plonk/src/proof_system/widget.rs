@@ -142,17 +142,10 @@ impl VerifierKey {
         s_sigma_3: Commitment,
         s_sigma_4: Commitment,
     ) -> VerifierKey {
-        let arithmetic = arithmetic::VerifierKey {
-            q_m,
-            q_l,
-            q_r,
-            q_o,
-            q_f,
-            q_c,
-            q_arith,
-        };
-        let logic = logic::VerifierKey { q_c, q_logic };
-        let range = range::VerifierKey { q_range };
+        let arithmetic =
+            arithmetic::VerifierKey::new(q_m, q_l, q_r, q_o, q_f, q_c, q_arith);
+        let logic = logic::VerifierKey::new(q_c, q_logic);
+        let range = range::VerifierKey::new(q_range);
         let fixed_base = ecc::scalar_mul::fixed_base::VerifierKey {
             q_l,
             q_r,
@@ -163,12 +156,9 @@ impl VerifierKey {
             q_variable_group_add,
         };
 
-        let permutation = permutation::VerifierKey {
-            s_sigma_1,
-            s_sigma_2,
-            s_sigma_3,
-            s_sigma_4,
-        };
+        let permutation = permutation::VerifierKey::new(
+            s_sigma_1, s_sigma_2, s_sigma_3, s_sigma_4,
+        );
 
         VerifierKey {
             n,

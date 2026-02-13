@@ -30,13 +30,13 @@ where
     pub(crate) fn advance_depth_first(
         &mut self,
         node: &'a Node<T, H, A>,
-        level_index: usize,
+        depth: usize,
     ) -> Option<Ref<'a, T>> {
-        if level_index == H - 1 {
-            let child_cursor = &mut self.indices[level_index];
+        if depth == H - 1 {
+            let leaf_cursor = &mut self.indices[depth];
 
-            for child_index in *child_cursor..A {
-                *child_cursor = child_index + 1;
+            for child_index in *leaf_cursor..A {
+                *leaf_cursor = child_index + 1;
                 if let Some(leaf) = &node.children[child_index] {
                     let leaf = leaf.aggregated_item();
                     if (self.walker)(&*leaf) {
@@ -45,39 +45,38 @@ where
                 }
             }
 
-            *child_cursor = 0;
+            *leaf_cursor = 0;
             return None;
         }
 
-        if self.path[level_index].is_none() {
+        if self.path[depth].is_none() {
             for child_index in 0..A {
-                self.indices[level_index] = child_index;
+                self.indices[depth] = child_index;
                 if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
                     if (self.walker)(&*child.aggregated_item()) {
-                        self.path[level_index] = Some(child);
+                        self.path[depth] = Some(child);
                         break;
                     }
                 }
             }
         }
 
-        //
-
-        if let Some(child) = self.path[level_index] {
-            if let Some(item) = self.advance_depth_first(child, level_index + 1)
-            {
+        // 先沿着当前已命中的路径继续深入，
+        // 若子树耗尽再回溯到同层的下一个兄弟节点。
+        if let Some(child) = self.path[depth] {
+            if let Some(item) = self.advance_depth_first(child, depth + 1) {
                 return Some(item);
             }
 
-            for child_index in self.indices[level_index] + 1..A {
-                self.indices[level_index] = child_index;
+            for child_index in self.indices[depth] + 1..A {
+                self.indices[depth] = child_index;
 
                 if let Some(child) = &node.children[child_index] {
                     let child = child.as_ref();
                     if (self.walker)(&*child.aggregated_item()) {
-                        self.path[level_index] = Some(child);
-                        match self.advance_depth_first(child, level_index + 1) {
+                        self.path[depth] = Some(child);
+                        match self.advance_depth_first(child, depth + 1) {
                             Some(item) => return Some(item),
                             None => continue,
                         }
@@ -85,8 +84,8 @@ where
                 }
             }
 
-            self.path[level_index] = None;
-            self.indices[level_index] = 0;
+            self.path[depth] = None;
+            self.indices[depth] = 0;
         }
 
         None
@@ -116,8 +115,8 @@ mod tests {
     struct Max(u64);
 
     impl From<u64> for Max {
-        fn from(i: u64) -> Self {
-            Max(i)
+        fn from(value: u64) -> Self {
+            Max(value)
         }
     }
 
@@ -133,7 +132,13 @@ mod tests {
         const EMPTY_SUBTREE: Self = Max(0);
 
         fn aggregate(items: [&Self; A]) -> Self {
-            Self(items.into_iter().map(|i| i.0).max().unwrap_or_default())
+            Self(
+                items
+                    .into_iter()
+                    .map(|candidate| candidate.0)
+                    .max()
+                    .unwrap_or_default(),
+            )
         }
     }
 
@@ -156,8 +161,8 @@ mod tests {
 
         let mut walk = tree.walk(is_larger_than);
 
-        assert!(matches!(walk.next(), Some(x) if x.0 == 8));
-        assert!(matches!(walk.next(), Some(x) if x.0 == 16));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 8));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 16));
         assert!(matches!(walk.next(), None));
     }
 
@@ -170,7 +175,7 @@ mod tests {
 
         let mut walk = tree.walk(is_larger_than);
 
-        assert!(matches!(walk.next(), Some(x) if x.0 == 8));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 8));
         assert!(matches!(walk.next(), None));
     }
 
@@ -187,10 +192,10 @@ mod tests {
 
         let mut walk = tree.walk(is_larger_than);
 
-        assert!(matches!(walk.next(), Some(x) if x.0 == 16));
-        assert!(matches!(walk.next(), Some(x) if x.0 == 25));
-        assert!(matches!(walk.next(), Some(x) if x.0 == 8));
-        assert!(matches!(walk.next(), Some(x) if x.0 == 25));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 16));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 25));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 8));
+        assert!(matches!(walk.next(), Some(found) if found.0 == 25));
         assert!(matches!(walk.next(), None));
     }
 

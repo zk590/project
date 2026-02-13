@@ -78,10 +78,7 @@ use core::ops::MulAssign;
 pub fn batch_inversion(scalars: &mut [BlsScalar]) {
     let mut prefix_products = Vec::with_capacity(scalars.len());
     let mut running_product = BlsScalar::one();
-    for scalar in scalars
-        .iter()
-        .filter(|scalar| scalar != &&BlsScalar::zero())
-    {
+    for scalar in scalars.iter().filter(|scalar| is_non_zero_scalar(scalar)) {
         running_product.mul_assign(scalar);
         prefix_products.push(running_product);
     }
@@ -91,7 +88,7 @@ pub fn batch_inversion(scalars: &mut [BlsScalar]) {
     for (scalar, prefix_product) in scalars
         .iter_mut()
         .rev()
-        .filter(|scalar| scalar != &&BlsScalar::zero())
+        .filter(|scalar| is_non_zero_scalar(*scalar))
         .zip(
             prefix_products
                 .into_iter()
@@ -104,6 +101,13 @@ pub fn batch_inversion(scalars: &mut [BlsScalar]) {
         *scalar = running_product * prefix_product;
         running_product = next_running_product;
     }
+}
+
+/// 判断标量是否为零值。
+/// 该辅助函数用于批量求逆流程中过滤无逆元项，避免在主逻辑中重复写判定表达式。
+#[inline]
+fn is_non_zero_scalar(scalar: &BlsScalar) -> bool {
+    scalar != &BlsScalar::zero()
 }
 #[cfg(test)]
 mod test {

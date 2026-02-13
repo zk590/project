@@ -16,6 +16,12 @@ where
 {
     const INIT_NODE: Option<Box<Node<T, H, A>>> = None;
 
+    /// 判断当前节点是否仍包含至少一个子节点。
+    #[inline]
+    fn has_any_child(&self) -> bool {
+        self.children.iter().any(Option::is_some)
+    }
+
     /// 创建一个空节点。
     pub(crate) const fn new() -> Self {
         debug_assert!(H > 0, "Height must be larger than zero");
@@ -92,8 +98,10 @@ where
             *selected_child = Some(Box::new(Node::new()));
         }
 
-        let selected_child = self.children[child_index].as_mut().unwrap();
-        Self::insert(selected_child, height + 1, child_pos, item);
+        let child_node = self.children[child_index]
+            .as_mut()
+            .expect("child should exist after initialization");
+        Self::insert(child_node, height + 1, child_pos, item);
     }
 
     /// 递归删除叶子，并返回 `(被删元素, 当前节点是否仍有子节点)`。
@@ -117,15 +125,7 @@ where
             self.children[child_index] = None;
         }
 
-        let mut has_children = false;
-        for child_node in &self.children {
-            if child_node.is_some() {
-                has_children = true;
-                break;
-            }
-        }
-
-        (removed_item, has_children)
+        (removed_item, self.has_any_child())
     }
 }
 

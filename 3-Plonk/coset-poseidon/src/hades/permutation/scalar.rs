@@ -111,15 +111,15 @@ mod tests {
 
     #[test]
     fn hades_det() {
-        let mut x = [BlsScalar::from(17u64); WIDTH];
-        let mut y = [BlsScalar::from(17u64); WIDTH];
-        let mut z = [BlsScalar::from(19u64); WIDTH];
+        let mut first_state = [BlsScalar::from(17u64); WIDTH];
+        let mut second_state = [BlsScalar::from(17u64); WIDTH];
+        let mut different_state = [BlsScalar::from(19u64); WIDTH];
 
-        ScalarPermutation::new().permute(&mut x);
-        ScalarPermutation::new().permute(&mut y);
-        ScalarPermutation::new().permute(&mut z);
+        ScalarPermutation::new().permute(&mut first_state);
+        ScalarPermutation::new().permute(&mut second_state);
+        ScalarPermutation::new().permute(&mut different_state);
 
-        assert_eq!(x, y);
-        assert_ne!(x, z);
+        assert_eq!(first_state, second_state);
+        assert_ne!(first_state, different_state);
     }
 }

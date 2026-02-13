@@ -1,4 +1,4 @@
-//
+// 证明对象定义、序列化与验证流程实现。
 
 use super::linearization_poly::ProofEvaluations;
 use crate::commitment_scheme::Commitment;
@@ -62,6 +62,40 @@ pub struct Proof {
 
     #[cfg_attr(feature = "rkyv-impl", omit_bounds)]
     pub(crate) evaluations: ProofEvaluations,
+}
+
+impl Proof {
+    /// 由承诺与评估值构造证明对象。
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) const fn new(
+        a_comm: Commitment,
+        b_comm: Commitment,
+        c_comm: Commitment,
+        d_comm: Commitment,
+        z_comm: Commitment,
+        t_low_comm: Commitment,
+        t_mid_comm: Commitment,
+        t_high_comm: Commitment,
+        t_fourth_comm: Commitment,
+        w_z_chall_comm: Commitment,
+        w_z_chall_w_comm: Commitment,
+        evaluations: ProofEvaluations,
+    ) -> Self {
+        Self {
+            a_comm,
+            b_comm,
+            c_comm,
+            d_comm,
+            z_comm,
+            t_low_comm,
+            t_mid_comm,
+            t_high_comm,
+            t_fourth_comm,
+            w_z_chall_comm,
+            w_z_chall_w_comm,
+            evaluations,
+        }
+    }
 }
 
 #[cfg(feature = "rkyv-impl")]
@@ -135,7 +169,7 @@ impl Serializable<{ 11 * Commitment::SIZE + ProofEvaluations::SIZE }>
         let w_z_chall_w_comm = Commitment::from_reader(&mut buffer)?;
         let evaluations = ProofEvaluations::from_reader(&mut buffer)?;
 
-        Ok(Proof {
+        Ok(Proof::new(
             a_comm,
             b_comm,
             c_comm,
@@ -148,7 +182,7 @@ impl Serializable<{ 11 * Commitment::SIZE + ProofEvaluations::SIZE }>
             w_z_chall_comm,
             w_z_chall_w_comm,
             evaluations,
-        })
+        ))
     }
 }
 
@@ -174,6 +208,55 @@ pub(crate) mod alloc {
     use rayon::prelude::*;
 
     impl Proof {
+        /// 构造验证阶段 `v` 系列挑战系数。
+        fn build_v_coefficients(
+            v_challenge: BlsScalar,
+            v_w_challenge: BlsScalar,
+            u_challenge: BlsScalar,
+        ) -> Vec<BlsScalar> {
+            let mut v_coefficients_for_e = vec![v_challenge];
+            for coefficient_index in 1..V_MAX_DEGREE {
+                v_coefficients_for_e.push(
+                    v_coefficients_for_e[coefficient_index - 1] * v_challenge,
+                );
+            }
+            v_coefficients_for_e.push(v_w_challenge * u_challenge);
+            v_coefficients_for_e
+                .push(v_coefficients_for_e[V_MAX_DEGREE] * v_w_challenge);
+            v_coefficients_for_e
+                .push(v_coefficients_for_e[V_MAX_DEGREE + 1] * v_w_challenge);
+            v_coefficients_for_e
+        }
+
+        /// 聚合评估值为 batched opening 标量。
+        fn compute_e_scalar(
+            &self,
+            v_coefficients_for_e: &[BlsScalar],
+            r_0_eval: BlsScalar,
+            u_challenge: BlsScalar,
+        ) -> BlsScalar {
+            let e_evaluations = [
+                self.evaluations.a_eval,
+                self.evaluations.b_eval,
+                self.evaluations.c_eval,
+                self.evaluations.d_eval,
+                self.evaluations.s_sigma_1_eval,
+                self.evaluations.s_sigma_2_eval,
+                self.evaluations.s_sigma_3_eval,
+                self.evaluations.a_w_eval,
+                self.evaluations.b_w_eval,
+                self.evaluations.d_w_eval,
+            ];
+
+            let mut e_scalar: BlsScalar = e_evaluations
+                .iter()
+                .zip(v_coefficients_for_e.iter())
+                .map(|(eval, coeff)| eval * coeff)
+                .sum();
+            e_scalar += -r_0_eval + (u_challenge * self.evaluations.z_eval);
+            e_scalar
+        }
+
         #[allow(non_snake_case)]
         /// 使用验证键、转录器与公开输入对证明执行完整验证。
         pub(crate) fn verify(
@@ -185,7 +268,7 @@ pub(crate) mod alloc {
         ) -> Result<(), Error> {
             let domain = EvaluationDomain::new(verifier_key.n)?;
 
-            //
+            // 先按 Fiat-Shamir 顺序将证明对象写入 transcript 并采样挑战。
 
             transcript.append_commitment(b"a_comm", &self.a_comm);
             transcript.append_commitment(b"b_comm", &self.b_comm);
@@ -299,38 +382,16 @@ pub(crate) mod alloc {
                     * (self.evaluations.d_eval + gamma)
                     * self.evaluations.z_eval;
 
-            let mut v_coefficients_for_e = vec![v_challenge];
-
-            for i in 1..V_MAX_DEGREE {
-                v_coefficients_for_e
-                    .push(v_coefficients_for_e[i - 1] * v_challenge);
-            }
-
-            v_coefficients_for_e.push(v_w_challenge * u_challenge);
-            v_coefficients_for_e
-                .push(v_coefficients_for_e[V_MAX_DEGREE] * v_w_challenge);
-            v_coefficients_for_e
-                .push(v_coefficients_for_e[V_MAX_DEGREE + 1] * v_w_challenge);
-
-            let e_evaluations = vec![
-                self.evaluations.a_eval,
-                self.evaluations.b_eval,
-                self.evaluations.c_eval,
-                self.evaluations.d_eval,
-                self.evaluations.s_sigma_1_eval,
-                self.evaluations.s_sigma_2_eval,
-                self.evaluations.s_sigma_3_eval,
-                self.evaluations.a_w_eval,
-                self.evaluations.b_w_eval,
-                self.evaluations.d_w_eval,
-            ];
-
-            let mut e_scalar: BlsScalar = e_evaluations
-                .iter()
-                .zip(v_coefficients_for_e.iter())
-                .map(|(eval, coeff)| eval * coeff)
-                .sum();
-            e_scalar += -r_0_eval + (u_challenge * self.evaluations.z_eval);
+            let v_coefficients_for_e = Self::build_v_coefficients(
+                v_challenge,
+                v_w_challenge,
+                u_challenge,
+            );
+            let e_scalar = self.compute_e_scalar(
+                &v_coefficients_for_e,
+                r_0_eval,
+                u_challenge,
+            );
 
             let msm_points = vec![
                 self.a_comm.0,
@@ -377,7 +438,7 @@ pub(crate) mod alloc {
 
             let e_commitment = msm_results[V_MAX_DEGREE];
 
-            //
+            // 将 batched opening 条件转为一次配对等式并检查是否成立。
 
             let left_pairing_point = G1Affine::from(
                 -(self.w_z_chall_comm.0 + msm_results[V_MAX_DEGREE + 1]),

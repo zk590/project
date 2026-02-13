@@ -25,6 +25,13 @@ pub(crate) struct VerifierKey {
     pub(crate) q_range: Commitment,
 }
 
+impl VerifierKey {
+    /// 由范围门承诺构造 verifier key。
+    pub(crate) const fn new(q_range: Commitment) -> Self {
+        Self { q_range }
+    }
+}
+
 #[cfg(feature = "alloc")]
 mod alloc {
     use super::*;

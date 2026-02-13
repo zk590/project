@@ -27,6 +27,13 @@ pub(crate) struct VerifierKey {
     pub(crate) q_logic: Commitment,
 }
 
+impl VerifierKey {
+    /// 由逻辑门所需承诺构造 verifier key。
+    pub(crate) const fn new(q_c: Commitment, q_logic: Commitment) -> Self {
+        Self { q_c, q_logic }
+    }
+}
+
 #[cfg(feature = "alloc")]
 mod alloc {
     use super::*;

@@ -1,4 +1,4 @@
-//
+// 模块说明：加载 Poseidon 置换使用的 MDS 矩阵常量。
 
 use coset_bls12_381::BlsScalar;
 
@@ -7,24 +7,25 @@ use crate::hades::WIDTH;
 /// Poseidon 置换使用的 MDS 矩阵常量（从二进制资源加载）。
 pub const MDS_MATRIX: [[BlsScalar; WIDTH]; WIDTH] = {
     let bytes = include_bytes!("../../assets/mds.bin");
-    let mut mds = [[BlsScalar::zero(); WIDTH]; WIDTH];
-    let mut k = 0;
-    let mut i = 0;
+    let mut matrix = [[BlsScalar::zero(); WIDTH]; WIDTH];
+    let mut byte_offset = 0;
+    let mut row_index = 0;
 
-    while i < WIDTH {
-        let mut j = 0;
-        while j < WIDTH {
-            let a = super::read_u64_le_from_bytes(bytes, k);
-            let b = super::read_u64_le_from_bytes(bytes, k + 8);
-            let c = super::read_u64_le_from_bytes(bytes, k + 16);
-            let d = super::read_u64_le_from_bytes(bytes, k + 24);
-            k += 32;
+    while row_index < WIDTH {
+        let mut column_index = 0;
+        while column_index < WIDTH {
+            let limb_0 = super::read_u64_le_from_bytes(bytes, byte_offset);
+            let limb_1 = super::read_u64_le_from_bytes(bytes, byte_offset + 8);
+            let limb_2 = super::read_u64_le_from_bytes(bytes, byte_offset + 16);
+            let limb_3 = super::read_u64_le_from_bytes(bytes, byte_offset + 24);
+            byte_offset += 32;
 
-            mds[i][j] = BlsScalar::from_raw([a, b, c, d]);
-            j += 1;
+            matrix[row_index][column_index] =
+                BlsScalar::from_raw([limb_0, limb_1, limb_2, limb_3]);
+            column_index += 1;
         }
-        i += 1;
+        row_index += 1;
     }
 
-    mds
+    matrix
 };
